@@ -9,11 +9,11 @@
 #  Never paste the service_role key here.
 # =====================================================================
 
-url = 
-key = 
+url = https://ecafthmrhlodgddeuvwh.supabase.co
+key = sb_publishable_QuOuxDRUlU6wD315IWgjBw_2h3Z-eCf
 
 # GitHub repository that builds the apps (Download page links). Example: github = shubhamkale/biomotor-platform
-github = 
+github = BIOMOTOR-sport-fitness/biomotorsports 
 
 # Example:
 # url = https://abcdefgh.supabase.co
