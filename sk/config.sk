@@ -1,0 +1,20 @@
+# =====================================================================
+#  BIOMOTOR Sport and Fitness — cloud settings (sk/config.sk)
+#  Owner: Shubham kale · founder.shubhamkale@gmail.com · 9321766523
+#
+#  Paste your Supabase Project URL and anon public key after the "=" sign
+#  (Supabase → Project Settings → API). Leave both empty to run the
+#  platform on one device only. The anon key is safe to publish:
+#  the security rules in supabase/setup.sql protect the data.
+#  Never paste the service_role key here.
+# =====================================================================
+
+url = 
+key = 
+
+# GitHub repository that builds the apps (Download page links). Example: github = shubhamkale/biomotor-platform
+github = 
+
+# Example:
+# url = https://abcdefgh.supabase.co
+# key = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9....

@@ -1,0 +1,32 @@
+# Publishes the website to Google Cloud (Firebase Hosting) every time you push to the main branch.
+# No key file: GitHub signs in to Google with "Workload Identity" (set up once with tools/google-cloud-link.sh).
+# Needs 3 GitHub repository variables: FIREBASE_PROJECT_ID, GCP_WIF_PROVIDER, GCP_SERVICE_ACCOUNT
+name: Deploy to Google Cloud
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Sign in to Google Cloud (Workload Identity — no key file)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - name: Add Google MediaPipe body tracking (self-hosted)
+        run: node tools/fetch-mediapipe.js
+      - name: Make the hosting file from firebase.shubham
+        run: node tools/shubham-build.js firebase.shubham
+      - name: Publish to Firebase Hosting
+        run: npx --yes firebase-tools@13 deploy --only hosting --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive

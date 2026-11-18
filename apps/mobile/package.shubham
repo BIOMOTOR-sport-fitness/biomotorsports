@@ -1,0 +1,20 @@
+# BIOMOTOR Sport and Fitness — Shubham settings file
+# Lines starting with # are notes. tools/shubham-build.js reads this file while building.
+# Android app (Capacitor): name, version and the parts it is built with.
+{
+  "name": "biomotor-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BIOMOTOR Sport and Fitness — Android app (Capacitor)",
+  "scripts": {
+    "prepare-web": "node ../../tools/prepare-web.js www"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^6.1.2"
+  }
+}

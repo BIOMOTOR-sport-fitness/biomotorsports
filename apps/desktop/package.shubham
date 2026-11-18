@@ -1,0 +1,65 @@
+# BIOMOTOR Sport and Fitness — Shubham settings file
+# Lines starting with # are notes. tools/shubham-build.js reads this file while building.
+# Windows / Mac / Linux app (Electron): name, version, installer settings.
+{
+  "name": "biomotor",
+  "productName": "BIOMOTOR",
+  "version": "1.0.0",
+  "description": "BIOMOTOR Sport and Fitness performance platform",
+  "author": "Shubham kale <founder.shubhamkale@gmail.com>",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "prepare-web": "node ../../tools/prepare-web.js www",
+    "start": "npm run prepare-web && electron .",
+    "dist": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.biomotor.sportsfitness",
+    "productName": "BIOMOTOR",
+    "copyright": "© BIOMOTOR Sport and Fitness",
+    "files": [
+      "main.js",
+      "www/**/*"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png",
+      "artifactName": "BIOMOTOR-Windows-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "BIOMOTOR"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.sports",
+      "identity": null,
+      "artifactName": "BIOMOTOR-Mac.${ext}"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png",
+      "category": "Sports",
+      "artifactName": "BIOMOTOR-Linux.${ext}"
+    }
+  }
+}

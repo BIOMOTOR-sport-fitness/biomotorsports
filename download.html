@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Download the BIOMOTOR app</title>
+<meta name="description" content="Download the BIOMOTOR Sport and Fitness app for Android, iPhone, Windows and Mac.">
+<link rel="icon" href="assets/bm-fav.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#c8102e">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--red:#c8102e;--red2:#8f0c1c;--ink:#1d1d22;--muted:#646873;--line:#ebebee;--bg:#f6f6f7}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+a{color:inherit}
+.hero{background:linear-gradient(135deg,var(--red2),var(--red) 60%,#e0243f);color:#fff;padding:28px 20px 90px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-80px;top:-80px;width:300px;height:300px;border-radius:50%;border:46px solid rgba(255,255,255,.07)}
+.wrap{max-width:1040px;margin:0 auto;position:relative;z-index:1}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.plate{background:#fff;border-radius:16px;padding:8px 14px;display:inline-block}.plate img{height:56px;display:block}
+.top a.open{color:#fff;text-decoration:none;font-weight:600;border:1px solid rgba(255,255,255,.4);padding:9px 14px;border-radius:10px}
+h1{font-family:"Space Grotesk",Inter,sans-serif;font-size:clamp(30px,5vw,50px);margin:34px 0 8px;letter-spacing:-.02em}
+.lead{font-size:18px;opacity:.9;max-width:640px;margin:0}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.chips span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);padding:6px 12px;border-radius:99px;font-size:13px;font-weight:600}
+.cards{max-width:1040px;margin:-60px auto 0;padding:0 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:16px;position:relative;z-index:2}
+.card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 14px 34px -24px rgba(30,20,20,.4);display:flex;flex-direction:column;gap:10px}
+.card.mine{border:2px solid var(--red);box-shadow:0 18px 40px -22px rgba(200,16,46,.55)}
+.ico{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:28px;background:#fdecee}
+.card h2{margin:4px 0 0;font-size:21px}.card p{margin:0;color:var(--muted);font-size:14px;line-height:1.5}
+.tag{align-self:flex-start;background:var(--red);color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 9px;border-radius:99px}
+.btn{display:flex;justify-content:center;align-items:center;gap:8px;background:var(--red);color:#fff;border:0;border-radius:12px;padding:13px 16px;font-weight:700;font-size:15px;text-decoration:none;cursor:pointer;font-family:inherit;margin-top:auto}
+.btn.alt{background:#fff;color:var(--red);border:2px solid var(--red)}.btn[aria-disabled=true]{opacity:.45;pointer-events:none}
+.small{font-size:12px;color:var(--muted);text-align:center}
+section.more{max-width:1040px;margin:34px auto;padding:0 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px}
+.box{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px}.box h3{margin:0 0 12px;font-size:19px}
+ol{margin:0;padding-left:20px;line-height:1.8}li b{color:var(--red)}
+.note{background:#fff7e6;border:1px solid #f5d38a;border-radius:14px;padding:12px 14px;font-size:14px;color:#6b4e08;margin-top:12px}
+@media(max-width:600px){.plate img{height:42px}.top a.open{padding:8px 10px;font-size:14px}}
+.top a.open{white-space:nowrap}
+footer{text-align:center;color:var(--muted);font-size:13px;padding:24px 20px 40px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1d1d22;color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;display:none;z-index:9}
+</style>
+</head>
+<body>
+<div class="hero"><div class="wrap">
+ <div class="top"><span class="plate"><img src="assets/bm-logo.png" alt="BIOMOTOR Sport and Fitness"></span><span style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><a class="open" href="https://biomotorsports.com">🌐 biomotorsports.com</a><a class="open" href="index.html">Open web app →</a></span></div>
+ <h1>Get the BIOMOTOR app</h1>
+ <p class="lead">Athletes, testing, training, goals and payments — on your phone, tablet and computer. One login, your data on every device.</p>
+ <div class="chips"><span>📱 Android</span><span>🍏 iPhone &amp; iPad</span><span>🪟 Windows</span><span>💻 Mac</span><span>🐧 Linux</span></div>
+</div></div>
+
+<div class="cards">
+ <div class="card" id="c-android"><span class="ico">📱</span><h2>Android</h2><p>Phone or tablet. Install the app straight from this page — no Play Store needed.</p>
+  <button class="btn" data-install>⬇ Install on Android</button><a class="btn alt" id="apk" href="#">Download APK file</a><div class="small" id="apkNote"></div></div>
+ <div class="card" id="c-ios"><span class="ico">🍏</span><h2>iPhone &amp; iPad</h2><p>Add BIOMOTOR to your Home Screen from Safari. It opens full-screen like any app.</p>
+  <a class="btn" href="#ios-steps">How to install (3 taps)</a></div>
+ <div class="card" id="c-win"><span class="ico">🪟</span><h2>Windows</h2><p>Windows 10 and 11. Installs with a Start-menu and desktop shortcut.</p>
+  <a class="btn" id="exe" href="#">⬇ Download for Windows</a><button class="btn alt" data-install>Install from browser</button></div>
+ <div class="card" id="c-mac"><span class="ico">💻</span><h2>Mac</h2><p>macOS on Apple Silicon and Intel. Drag BIOMOTOR into Applications.</p>
+  <a class="btn" id="dmg" href="#">⬇ Download for Mac</a><button class="btn alt" data-install>Install from Chrome</button></div>
+</div>
+
+<section class="more">
+ <div class="box" id="ios-steps"><h3>🍏 Install on iPhone / iPad</h3><ol>
+  <li>Open this page in <b>Safari</b>.</li><li>Tap the <b>Share</b> button (square with ↑ arrow).</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li></ol>
+  <div class="note">The BIOMOTOR icon appears on your Home Screen and opens full-screen.</div></div>
+ <div class="box"><h3>📱 Android APK — first time only</h3><ol>
+  <li>Tap <b>Download APK file</b>.</li><li>Open the downloaded file.</li><li>If asked, allow <b>Install unknown apps</b> for your browser, then tap <b>Install</b>.</li></ol>
+  <div class="note">Easiest way: tap <b>Install on Android</b> above — Chrome installs the app directly, and it updates by itself.</div></div>
+ <div class="box"><h3>🪟 Windows &amp; 💻 Mac — first time only</h3><ol>
+  <li>Windows: open <b>BIOMOTOR-Windows-Setup.exe</b>. If SmartScreen appears, click <b>More info → Run anyway</b>.</li>
+  <li>Mac: open <b>BIOMOTOR-Mac.dmg</b>, drag BIOMOTOR to Applications. First launch: <b>right-click → Open</b>.</li>
+  <li>Or use <b>Install from browser</b> in Chrome / Edge — no file needed.</li></ol></div>
+</section>
+<footer>BIOMOTOR Sport and Fitness · Owner: Shubham kale · founder.shubhamkale@gmail.com · 9321766523<br><a href="https://biomotorsports.com">biomotorsports.com</a> · <a href="index.html">Open the web app</a></footer>
+<div id="toast"></div>
+<script>
+(function(){
+ const ua=navigator.userAgent,os=/android/i.test(ua)?'android':/iphone|ipad|ipod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'ios':/windows/i.test(ua)?'win':/mac/i.test(ua)?'mac':'';
+ const card=document.getElementById('c-'+os);if(card){card.classList.add('mine');card.insertAdjacentHTML('afterbegin','<span class="tag">YOUR DEVICE</span>');card.parentNode.prepend(card)}
+ const toast=t=>{const e=document.getElementById('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',3500)};
+ let deferred=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e});
+ addEventListener('appinstalled',()=>toast('BIOMOTOR installed ✅'));
+ document.querySelectorAll('[data-install]').forEach(b=>b.onclick=async()=>{
+  if(deferred){deferred.prompt();const r=await deferred.userChoice;deferred=null;if(r.outcome==='accepted')toast('Installing BIOMOTOR…');return}
+  if(matchMedia('(display-mode: standalone)').matches){toast('BIOMOTOR is already installed on this device');return}
+  if(os==='ios'){location.hash='ios-steps';return}
+  toast('Open the browser menu (⋮) and choose "Install app" / "Add to Home screen"')});
+ // native files come from the GitHub Releases of the repo named in sk/config.sk  (github = owner/repo)
+ const set=(id,href,ok)=>{const a=document.getElementById(id);if(ok){a.href=href;a.removeAttribute('aria-disabled')}else{a.setAttribute('aria-disabled','true');a.removeAttribute('href')}};
+ const files={apk:'BIOMOTOR-Android.apk',exe:'BIOMOTOR-Windows-Setup.exe',dmg:'BIOMOTOR-Mac.dmg'};
+ fetch('sk/config.sk',{cache:'no-store'}).then(r=>r.ok?r.text():'').catch(()=>'').then(t=>{
+  const m=String(t).match(/^\s*github\s*=\s*([\w.-]+\/[\w.-]+)\s*$/m);const repo=m&&m[1];
+  Object.entries(files).forEach(([id,f])=>set(id,repo?`https://github.com/${repo}/releases/latest/download/${f}`:'',!!repo));
+  if(!repo)document.getElementById('apkNote').textContent='App files will appear here once the first build is published.';
+ });
+ if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>
