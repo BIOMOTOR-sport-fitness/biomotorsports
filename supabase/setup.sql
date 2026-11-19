@@ -62,6 +62,13 @@ language sql stable security definer set search_path = public as $$
                    from profiles where id = auth.uid()), false)
 $$;
 
+-- Can change organisation data: owner and staff. Athlete, Parent and Viewer accounts are view-only.
+create or replace function public.is_editor() returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select status = 'Active' and (owner or role not in ('Athlete','Parent','Viewer'))
+                   from profiles where id = auth.uid()), false)
+$$;
+
 create or replace function public.is_owner() returns boolean
 language sql stable security definer set search_path = public as $$
   select coalesce((select owner from profiles where id = auth.uid()), false)
@@ -130,8 +137,8 @@ drop policy if exists data_update on public.org_data;
 create policy prof_read   on public.profiles for select to authenticated using (id = auth.uid() or is_admin());
 create policy prof_update on public.profiles for update to authenticated using (is_admin()) with check (is_admin());
 create policy data_read   on public.org_data for select to authenticated using (is_member());
-create policy data_insert on public.org_data for insert to authenticated with check (is_member() and id = 'main');
-create policy data_update on public.org_data for update to authenticated using (is_member()) with check (is_member() and id = 'main');
+create policy data_insert on public.org_data for insert to authenticated with check (is_editor() and id = 'main');
+create policy data_update on public.org_data for update to authenticated using (is_editor()) with check (is_editor() and id = 'main');
 
 -- 6) Functions the app calls ----------------------------------------
 create or replace function public.touch_login() returns void
@@ -159,6 +166,14 @@ begin
    where id = auth.uid() and status = 'Pending';
   return coalesce(inv->>'role', 'Coach');
 end $$;
+
+-- API access for signed-in users (row rules above still decide which rows they see)
+grant usage on schema public to anon, authenticated;
+grant select, update          on public.profiles to authenticated;
+grant select, insert, update  on public.org_data to authenticated;
+grant execute on function public.touch_login()        to authenticated;
+grant execute on function public.accept_invite(text)  to authenticated;
+grant execute on function public.shubham_items(public.shubham) to authenticated;
 
 revoke execute on function public.touch_login()      from anon;
 revoke execute on function public.accept_invite(text) from anon;

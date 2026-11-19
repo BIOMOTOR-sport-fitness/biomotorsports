@@ -80,7 +80,7 @@ function seed(){
 }
 let db;
 function load(){try{const s=localStorage.getItem(KEY);db=s?Object.assign(seed(),Shubham.parse(s)):seed()}catch(e){db=seed()}}
-function save(){try{localStorage.setItem(KEY,Shubham.stringify(db))}catch(e){}accSave();if(CLOUD&&CME&&CME.status==='Active')cloudQueue()}
+function save(){if(typeof roUser==='function'&&roUser(authUser())){axRevert();return}try{localStorage.setItem(KEY,Shubham.stringify(db))}catch(e){}accSave();if(CLOUD&&CME&&CME.status==='Active')cloudQueue()}
 load();
 const MCATS=['Speed','Agility','Power','Strength','Conditioning','Mobility','Medical','Body Composition','Sport Specific','Coach Custom'];
 const DRILLS=[['10m Acceleration',10],['20m Sprint',20],['30m Sprint',30],['40 yd Dash',36.58],['Flying Sprint',20],['Max Velocity (GPS)',''],['5-10-5 Pro Agility',''],['L-Drill',''],['T-Test',''],['505 Agility',''],['Custom sprint',20]];
@@ -177,12 +177,12 @@ const athOpts=(sel)=>`<option value="">— select athlete —</option>`+db.athle
 const NAV=[
  ['TODAY',[['dashboard','Dashboard'],['communication','Communication']]],
  ['ATHLETES',[['athletes','Athletes'],['weighins','Weigh-ins'],['teams','Teams & Groups']]],
- ['TRAIN',[['programs','Programs'],['workout-review','Workout Review'],['live-lift','Live Lift'],['speed-log','Speed Log'],['calendar','Calendar']]],
- ['TEST',[['testing','Testing'],['video-jump','Video Jump Test'],['testing-library','Testing Library'],['athlete-goals','Athlete Goals'],['import-data','Import Data']]],
+ ['TRAIN',[['programs','Programs'],['periodisation','Periodisation Program Design'],['workout-review','Workout Review'],['live-lift','Live Lift'],['speed-log','Speed Log'],['calendar','Calendar']]],
+ ['TEST',[['testing','Testing'],['video-jump','Video Jump Test'],['testing-library','Testing Library'],['athlete-goals','Athlete Goals'],['fitness-consultation','Fitness Consultation'],['sports-tests','Sports Specific Test'],['import-data','Import Data']]],
  ['INSIGHTS',[['team-analytics','Team Analytics'],['weekly-summary','Weekly Summary'],['recruiting','Recruiting Showcase'],['events','Events']]],
  ['ADMIN',[['organization','Organization'],['coaches-users','Coaches & Users'],['onboarding','Onboarding Center'],['facility','Facility Setup'],['branding','Branding'],['app-settings','Settings'],['subscription','Subscription'],['payments','Payments'],['beta','Beta Setup'],['my-profile','Profile'],['help','Help & Feedback']]]];
 const TITLES=Object.fromEntries(NAV.flatMap(g=>g[1]));
-function drawNav(cur){const me=authUser(),adm=isAdmin(me);document.getElementById('nav').innerHTML=NAV.map(([g,items])=>[g,adm?items:items.filter(([k])=>!ADMIN_PAGES.includes(k))]).filter(([g,items])=>items.length).map(([g,items])=>`<div class="grp">${g}</div>`+items.map(([k,l])=>`<a href="#${k}" class="${k===cur?'on':''}" title="${l}"><span class="ic">${l[0]}</span><span>${l}</span></a>`).join('')).join('');if(dlAppOk())document.getElementById('nav').insertAdjacentHTML('beforeend',`<a href="download.html" class="dl-app"><span class="ic">📲</span><span>Download app</span></a>`);document.getElementById('nav').insertAdjacentHTML('beforeend',`<a href="${esc(siteUrl())}" target="_blank" rel="noopener" class="site-link"><span class="ic">🌐</span><span>${esc(siteName())}</span></a>`)}
+function drawNav(cur){const me=authUser(),adm=isAdmin(me);document.getElementById('nav').innerHTML=axNav(me).map(([g,items])=>`<div class="grp">${g}</div>`+items.map(([k,l])=>`<a href="#${k}" class="${k===cur?'on':''}" title="${l}"><span class="ic">${l[0]}</span><span>${l}</span></a>`).join('')).join('');if(dlAppOk())document.getElementById('nav').insertAdjacentHTML('beforeend',`<a href="download.html" class="dl-app"><span class="ic">📲</span><span>Download app</span></a>`);document.getElementById('nav').insertAdjacentHTML('beforeend',`<a href="${esc(siteUrl())}" target="_blank" rel="noopener" class="site-link"><span class="ic">🌐</span><span>${esc(siteName())}</span></a>`)}
 
 /* ============ PAGES ============ */
 const P={};
@@ -4132,6 +4132,1003 @@ function agPrint(sid){const s=agSheetFix(byId('goalSheets',sid)),t=agNorm(byId('
  const w=window.open('','_blank');if(!w){toast('Allow pop-ups to print');return}
  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(a.name)} — Goal sheet</title><style>body{font-family:system-ui,-apple-system,sans-serif;margin:20px;background:#fff}@media print{body{margin:0}}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${agPaper(t,{athlete:a,group:s.group,sheet:s})}<script>setTimeout(()=>print(),400)<\/script></body></html>`);w.document.close()}
 
+/* ============ FITNESS CONSULTATION (step-by-step consultation + PDF report) ============ */
+const FCROLES=['Coach','Head Coach','Strength & Conditioning Coach','Sport Scientist','Exercise Specialist','Physiotherapist','Sports Nutritionist','Sports Psychologist','Sports Medicine Doctor','Athletic Trainer','Personal Trainer','Other'];
+const FCSTEPS=['Consultation','Demographic Information','Health History','Risk Factors','Medical Clearance','Exercise History','Resistance Training Status','Lifestyle History','Fitness Test Report','Goal Setting','FC Report & Sign-off'];
+const FCPARQ=['Has your doctor ever told you that you have a heart condition, or have you ever suffered a stroke?',
+ 'Do you ever experience unexplained pains in your chest at rest or during physical activity / exercise?',
+ 'Do you ever feel faint or dizzy during physical activity that causes you to lose balance?',
+ 'Have you had an asthma attack requiring immediate medical attention at any time over the last 12 months?',
+ 'If you have diabetes, have you had trouble controlling your blood glucose in the last 3 months?',
+ 'Do you have any diagnosed muscle, bone or joint problems that you have been told could be made worse by participating in physical activity / exercise?',
+ 'Do you have any other medical conditions that may make it dangerous for you to participate in physical activity / exercise?'];
+const FCREL=[['father','Father','M'],['brother','Brother','M'],['son','Son','M'],['mother','Mother','F'],['sister','Sister','F'],['daughter','Daughter','F']];
+const FCTYPES=['Body weight exercise','Weightlifting','Cardio','Zumba','CrossFit','Sport-specific','Yoga','Any other'];
+const FCRT=[['program','Current program',['Not training or just began training','Currently training','Currently training (consistent)']],
+ ['age','Training age',['Less than 2 months','2 to 6 months','1 year or more']],
+ ['freq','Frequency (per week)',['1 to 2 sessions','2 to 3 sessions','3 to 4 sessions or more']],
+ ['stress','Training stress (RPE)',['None or low','Medium','High']],
+ ['tech','Technique experience and skill',['None or minimal (body weight / supported compound lifts)','Basic (compound and structural lifts that load the spine)','High (power lifts)']]];
+const FCRTL=['Beginner (untrained)','Intermediate (moderately resistance trained)','Advanced (well resistance trained)'];
+const FCTEST=[['vo2','Cardiorespiratory fitness (VO2max)','ml/kg/min','vo2'],['me','Muscular endurance (push-ups)','reps','pushup'],['msu','Muscular strength: upper body (1RM bench ÷ BW)','ratio','bench'],['msl','Muscular strength: lower body (1RM leg press ÷ BW)','ratio','legpress'],
+ ['pow','Power: vertical jump','cm','vj'],['spd','Speed: 30 m sprint','s','s30'],['agi','Agility: Illinois agility run','s','illinois'],['flex','Flexibility: sit-and-reach','cm','sitreach'],
+ ['bmi','BMI','kg/m²','bmi'],['fat','Body fat','%','bf'],['fatkg','Fat mass','kg',''],['ffm','Fat-free mass','kg',''],['rhr','Resting heart rate','bpm','rhr']];
+const FCRATE=['Poor','Fair','Average','Good','Very good','Excellent','Underweight','Normal weight','Overweight','Obese'];
+let FC={id:null,step:0,q:'',busy:false};
+function fcDb(){db.fitConsults=db.fitConsults||[];return db.fitConsults}
+function fcBlank(){const me=authUser()||{};const role=FCROLES.includes(me.role)?me.role:(me.role==='Physio'?'Physiotherapist':me.role==='Trainer'?'Personal Trainer':'Coach');
+ return {id:uid('fc'),status:'Draft',created:new Date().toISOString(),updated:new Date().toISOString(),date:today(),place:db.org.address||db.org.city||'',athlete:'',
+  staffRole:role,staffRoleOther:'',staffName:me.name||db.profile.name||'',
+  demo:{name:'',age:'',gender:'',height:'',weight:'',occupation:'',workHours:'',workDays:'',availDays:'',availTime:'',availDur:'',phone:'',email:'',address:''},
+  parq:['','','','','','',''],
+  risk:{fam:{},smoke:'',smokeQty:'',pa:{level:'',lf:'',ld:'',mf:'',md:'',vf:'',vd:''},chol:'',sugar:''},
+  clear:{active:'',disease:'',symptoms:'',intensity:'Moderate',decision:'auto',notes:''},
+  exh:{status:'',types:[],other:'',freq:'',int:'',dur:'',type:'',vol:''},
+  rt:{program:'',age:'',freq:'',stress:'',tech:'',level:''},
+  life:{meals:'',junk:'',mealTiming:'',diet:[{t:'',c:false,p:false,f:false,n:''},{t:'',c:false,p:false,f:false,n:''},{t:'',c:false,p:false,f:false,n:''}],sleepAt:'',wakeAt:'',quality:'',total:'',water:'',stress:''},
+  test:{rows:FCTEST.map(([k,l,u,n])=>({k,l,u,n,cur:'',curR:'',tgt:'',tgtR:''})),intLo:'50',intHi:'70',mhrF:'220'},
+  calc:{h:'',w:'',fw:'',fp:'',mw:'',mf:'',age:'',mhr:'',rhr:''},
+  goal:{client:'',specific:'',measurable:'',achievable:'Yes',realistic:'Yes',time:'',timeNote:''},
+  report:{summary:'',recs:'',review:'',clientName:'',consent:false}}}
+const fcRec=()=>FC.id?byId('fitConsults',FC.id):null;
+const fcGet=(o,p)=>p.split('.').reduce((a,k)=>a==null?a:a[k],o);
+function fcPut(o,p,v){const k=p.split('.');let x=o;for(let i=0;i<k.length-1;i++){if(x[k[i]]==null)x[k[i]]={};x=x[k[i]]}x[k[k.length-1]]=v}
+let fcT=null;function fcSave(r){r.updated=new Date().toISOString();clearTimeout(fcT);fcT=setTimeout(()=>save(),350)}
+function fcIn(el){const r=fcRec();if(!r)return;fcPut(r,el.dataset.p,el.type==='checkbox'?el.checked:el.value);fcSave(r);fcLive()}
+function fcSetV(p,v){const r=fcRec();if(!r)return;fcPut(r,p,v);fcSave(r);render()}
+function fcToggleType(t){const r=fcRec();const L=r.exh.types;const i=L.indexOf(t);i<0?L.push(t):L.splice(i,1);fcSave(r);render()}
+const fcNum=v=>{const n=parseFloat(String(v??'').replace(',','.'));return isFinite(n)?n:null};
+const fcR=(n,d=1)=>n==null?'':(Math.round(n*10**d)/10**d).toString();
+function fcAge(r){const a=fcNum(r.demo.age);if(a!=null)return a;const at=byId('athletes',r.athlete);if(at&&at.dob){const d=new Date(at.dob),n=new Date(r.date||today());let y=n.getFullYear()-d.getFullYear();if(n<new Date(n.getFullYear(),d.getMonth(),d.getDate()))y--;return y}return null}
+function fcCalc(r){const C={};const g=String(r.demo.gender||'').toLowerCase();C.age=fcAge(r);
+ const K=r.calc=r.calc||{};const ov=(k,d)=>{const v=fcNum(K[k]);return v!=null?v:d};
+ const h=ov('h',fcNum(r.demo.height)),w=ov('w',fcNum(r.demo.weight));C.h=h;C.w=w;C.bmi=h&&w?w/((h/100)**2):null;
+ C.bmiCat=C.bmi==null?'':C.bmi<18.5?'Underweight':C.bmi<25?'Normal weight':C.bmi<30?'Overweight':'Obese';
+ const row=k=>r.test.rows.find(x=>x.k===k)||{};const wd=fcNum(r.demo.weight);C.fw=ov('fw',ov('w',wd));C.fp=ov('fp',fcNum(row('fat').cur));C.fatKg=C.fw!=null&&C.fp!=null?C.fw*C.fp/100:null;
+ C.mw=ov('mw',C.fw);C.mf=ov('mf',C.fatKg);C.ffm=C.mw!=null&&C.mf!=null?C.mw-C.mf:null;
+ const ft=fcNum(row('fat').tgt);C.fatKgT=w!=null&&ft!=null?w*ft/100:null;C.ffmT=C.fatKgT!=null?w-C.fatKgT:null;
+ C.nAge=C.age;C.kAge=ov('age',C.age);C.rhr=ov('rhr',fcNum(row('rhr').cur));const mf=(r.test.mhrF||'220');C.mhrF=mf;C.mhrAuto=C.kAge==null?null:mf==='tanaka'?208-0.7*C.kAge:mf==='gellish'?207-0.7*C.kAge:220-C.kAge;C.mhr=ov('mhr',C.mhrAuto);
+ const lo=fcNum(r.test.intLo),hi=fcNum(r.test.intHi);if(C.mhr!=null&&C.rhr!=null){const hrr=C.mhr-C.rhr;C.hrr=hrr;C.thrLo=lo!=null?hrr*lo/100+C.rhr:null;C.thrHi=hi!=null?hrr*hi/100+C.rhr:null}
+ /* risk factors (as in the consultation booklet) */
+ const R=[];const male=g.startsWith('m'),fem=g.startsWith('f');
+ R.push({k:'Age',data:C.age!=null?`${C.age} years${r.demo.gender?', '+r.demo.gender:''}`:'Not entered',crit:'Male 45 years or older, female 55 years or older',s:C.age!=null&&((male&&C.age>=45)||(fem&&C.age>=55))?1:0});
+ const fam=FCREL.filter(([k])=>r.risk.fam[k]&&r.risk.fam[k].on);const famHit=fam.some(([k,,sx])=>{const a=fcNum(r.risk.fam[k].age);return a!=null&&(sx==='M'?a<55:a<65)});
+ R.push({k:'Family history of heart disease',data:fam.length?fam.map(([k,l])=>l+(r.risk.fam[k].age?' ('+r.risk.fam[k].age+' y)':'')).join(', '):'None reported',crit:'Male relative under 55 or female relative under 65 (maximum 1)',s:famHit?1:0});
+ R.push({k:'Cigarette smoking',data:r.risk.smoke==='Y'?'Yes'+(r.risk.smokeQty?', '+r.risk.smokeQty:''):r.risk.smoke==='N'?'No':'Not entered',crit:'Smokes regularly or quit in the last 6 months',s:r.risk.smoke==='Y'?1:0});
+ const P=r.risk.pa;const m=(fcNum(P.mf)||0)*(fcNum(P.md)||0),v=(fcNum(P.vf)||0)*(fcNum(P.vd)||0),l=(fcNum(P.lf)||0)*(fcNum(P.ld)||0);C.paMin=m+2*v;const paKnown=!!(P.level||P.mf||P.vf||P.lf);
+ R.push({k:'Physical activity level',data:paKnown?`${P.level||'—'}; ${Math.round(C.paMin)} weighted min/week (moderate + vigorous x 2)${l?', light '+Math.round(l)+' min':''}`:'Not entered',crit:'Under 150 min/week = +1; 150 min/week or more = -1',s:!paKnown?0:C.paMin>=150?-1:1});
+ R.push({k:'Body mass index',data:C.bmi!=null?`${fcR(C.bmi)} kg/m² (${C.bmiCat})`:'Height / weight not entered',crit:'BMI 30 kg/m² or more',s:C.bmi!=null&&C.bmi>=30?1:0});
+ R.push({k:'High cholesterol',data:r.risk.chol==='Y'?'Yes':r.risk.chol==='N'?'No':'Not entered',crit:'Told by a doctor = +1',s:r.risk.chol==='Y'?1:0});
+ R.push({k:'High blood sugar',data:r.risk.sugar==='Y'?'Yes':r.risk.sugar==='N'?'No':'Not entered',crit:'Told by a doctor = +1',s:r.risk.sugar==='Y'?1:0});
+ C.risk=R;C.riskTotal=R.reduce((a,x)=>a+x.s,0);C.riskLevel=C.riskTotal>=2?'Moderate risk':'Low risk';
+ C.parqYes=r.parq.filter(x=>x==='Y').length;C.parqDone=r.parq.every(x=>x==='Y'||x==='N');
+ /* medical clearance (ACSM pre-participation logic) */
+ const c=r.clear;let s='',why='';
+ if(C.parqYes){s='Required';why=`${C.parqYes} "Yes" answer(s) in the health history: seek guidance from a GP or allied health professional before exercise.`}
+ else if(c.symptoms==='Y'){s='Required';why='Signs or symptoms of disease are present.'}
+ else if(c.active==='N'&&c.disease==='Y'){s='Required';why='Not physically active and has known disease.'}
+ else if(c.active==='Y'&&c.disease==='Y'&&c.intensity==='Vigorous'){s='Required';why='Known disease and vigorous intensity is planned.'}
+ else if(c.active||c.disease||c.symptoms){s='Not required';why=c.disease==='Y'?'Known disease without symptoms: start at light to moderate intensity.':'No disease, no signs or symptoms: light to moderate exercise can start; progress gradually.'}
+ C.clearAuto=s;C.clearWhy=why;C.clear=c.decision==='auto'?s:c.decision;
+ /* resistance training level */
+ const vals=FCRT.map(([k])=>+r.rt[k]||0).filter(Boolean);if(vals.length){const avg=vals.reduce((a,b)=>a+b,0)/vals.length,mx=Math.max(...vals);
+  C.rtAuto=avg<1.5?(mx>1?'Beginner, moving toward intermediate':'Beginner'):avg<2.5?(mx>2?'Intermediate, moving toward advanced':'Intermediate'):'Advanced'}else C.rtAuto='';
+ C.rtLevel=r.rt.level||C.rtAuto;
+ /* sleep */
+ const tm=s=>{const x=/^(\d{1,2}):(\d{2})/.exec(s||'');return x?+x[1]*60+ +x[2]:null};const a=tm(r.life.sleepAt),b=tm(r.life.wakeAt);C.sleep=a!=null&&b!=null?((b-a+1440)%1440)/60:null;
+ C.staffRole=(r.report&&r.report.signRole)||(r.staffRole==='Other'?(r.staffRoleOther||'Staff'):r.staffRole);
+ C.client=r.demo.name||nameOf(byId('athletes',r.athlete))||'Client';
+ return C}
+function fcLive(){const r=fcRec();if(!r)return;const C=fcCalc(r);document.querySelectorAll('[data-ph]').forEach(e=>{const d=fcCalcDef(r,C,e.dataset.ph);e.placeholder=d==null?'':String(d)});document.querySelectorAll('[data-calc]').forEach(e=>{const k=e.dataset.calc;let v='';
+ if(k==='bmi')v=C.bmi!=null?`${fcR(C.bmi)} kg/m² · ${C.bmiCat}`:'Enter height and weight';
+ else if(k==='age')v=C.age!=null?C.age+' years':'';
+ else if(k==='risk')v=`${C.riskTotal} · ${C.riskLevel}`;
+ else if(k==='pamin')v=Math.round(C.paMin||0)+' weighted min/week';
+ else if(k==='fatkg')v=C.fatKg!=null?fcR(C.fatKg)+' kg':'—';
+ else if(k==='ffm')v=C.ffm!=null?fcR(C.ffm)+' kg':'—';
+ else if(k==='mhr')v=C.mhr!=null?fcR(C.mhr,0)+' bpm':'Enter age';
+ else if(k==='thr')v=C.thrLo!=null&&C.thrHi!=null?`${Math.round(C.thrLo)} – ${Math.round(C.thrHi)} bpm`:'Enter age, resting HR and intensity';
+ else if(k==='sleep')v=C.sleep!=null?fcR(C.sleep)+' h':'';
+ else if(k==='rt')v=C.rtAuto||'Select the boxes above';
+ else if(k==='clear')v=C.clearAuto?C.clearAuto+' — '+C.clearWhy:'Answer the questions above';
+ else if(k.startsWith('chg:')){const x=r.test.rows[+k.slice(4)];const cu=fcNum(fcRowCur(r,x,C)),t=fcNum(x.tgt);v=cu!=null&&t!=null?(t>=cu?'↑ ':'↓ ')+fcR(Math.abs(t-cu),2)+' '+(x.u==='ratio'?'':x.u||''):''}
+ else if(k.startsWith('rc:')||k.startsWith('rt:')){const x=r.test.rows[+k.slice(3)];const R=fcRowRating(r,x,C,k.startsWith('rc:')?'cur':'tgt');v=R.txt||'';e.className='fc-rate'+(R.R&&R.R.best?' ok':R.R&&R.R.i===0?' bad':'')}
+ else if(k==='hdr')v=`${fmtDate(r.date)} · by ${C.staffRole}${r.staffName?': '+r.staffName:''}`;
+ else if(k==='bmiF')v=C.h&&C.w?`${fcR(C.w,1)} ÷ (${fcR(C.h/100,2)})² = ${fcR(C.bmi,2)} kg/m²`:'Enter height and weight';
+ else if(k==='fatF')v=C.fatKg!=null?`${fcR(C.fw,1)} × ${fcR(C.fp,1)}% = ${fcR(C.fatKg,2)} kg`:'Enter weight and body fat %';
+ else if(k==='ffmF')v=C.ffm!=null?`${fcR(C.mw,1)} − ${fcR(C.mf,2)} = ${fcR(C.ffm,2)} kg`:'Enter weight and fat mass';
+ else if(k==='mhrF')v=C.mhr!=null?`${fcR(C.mhr,0)} bpm`:'Enter age';
+ else if(k==='hrr')v=C.hrr!=null?`${fcR(C.mhr,0)} − ${fcR(C.rhr,0)} = ${fcR(C.hrr,0)} bpm`:'Enter age and resting HR';
+ else if(k==='thrF')v=C.thrLo!=null?`(${fcR(C.hrr,0)} × ${r.test.intLo}%) + ${fcR(C.rhr,0)} = ${Math.round(C.thrLo)}  ·  (${fcR(C.hrr,0)} × ${r.test.intHi}%) + ${fcR(C.rhr,0)} = ${Math.round(C.thrHi)} bpm`:'';
+ e.textContent=v})}
+function fcRowCur(r,x,C){if(x.cur!==''&&x.cur!=null)return x.cur;if(x.k==='bmi'&&C.bmi!=null)return fcR(C.bmi);if(x.k==='fatkg'&&C.fatKg!=null)return fcR(C.fatKg);if(x.k==='ffm'&&C.ffm!=null)return fcR(C.ffm);return ''}
+/* ---------- form helpers ---------- */
+const fcV=p=>{const v=fcGet(fcRec(),p);return v==null?'':v};
+const fI=(p,l,t='text',x='')=>`<div><label>${l}</label><input data-p="${p}" type="${t}" value="${esc(fcV(p))}" oninput="fcIn(this)" ${x}></div>`;
+const fT=(p,l,rows=3,ph='')=>`<div style="grid-column:1/-1"><label>${l}</label><textarea data-p="${p}" rows="${rows}" placeholder="${esc(ph)}" oninput="fcIn(this)">${esc(fcV(p))}</textarea></div>`;
+const fS=(p,l,o,ph='Select…')=>`<div><label>${l}</label><select data-p="${p}" onchange="fcIn(this)"><option value="">${ph}</option>${o.map(x=>{const[v,t]=Array.isArray(x)?x:[x,x];return `<option value="${esc(v)}" ${String(fcV(p))===String(v)?'selected':''}>${esc(t)}</option>`}).join('')}</select></div>`;
+const fYN=(p,yes='Yes',no='No')=>{const v=fcV(p);return `<span class="fc-yn"><button type="button" class="${v==='Y'?'on y':''}" onclick="fcSetV('${p}','${v==='Y'?'':'Y'}')">✓ ${yes}</button><button type="button" class="${v==='N'?'on n':''}" onclick="fcSetV('${p}','${v==='N'?'':'N'}')">✕ ${no}</button></span>`};
+const fG=(h,min=220)=>`<div class="fc-g" style="grid-template-columns:repeat(auto-fill,minmax(min(${min}px,100%),1fr))">${h}</div>`;
+const fCalc=(k,l)=>`<div class="fc-calc"><span class="muted">${l}</span><b data-calc="${k}"></b></div>`;
+/* ---------- page ---------- */
+P['fitness-consultation']=()=>{fcDb();const me=authUser()||{};
+ if(me.role&&!STAFF(me.role)&&!me.owner)return head('Test','Fitness Consultation','')+`<div class="card"><p class="muted" style="margin:0">Fitness consultations are filled in by BIOMOTOR staff. Ask your coach for your consultation report.</p></div>`;
+ if(FC.id&&!fcRec())FC.id=null;
+ return FC.id?fcWizard():fcList()};
+function fcList(){const q=FC.q.toLowerCase();const L=fcDb().slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.updated).localeCompare(String(a.updated)))
+  .filter(r=>!q||[fcCalc(r).client,r.staffName,r.staffRole,r.status].join(' ').toLowerCase().includes(q));
+ const done=fcDb().filter(r=>r.status==='Completed').length;
+ return head('Test','Fitness Consultation','Step-by-step client consultation: health history, risk factors, medical clearance, training status, lifestyle, fitness tests and SMART goals, with a signed PDF report.',`<button class="btn pri" onclick="fcNew()">＋ New consultation</button>`)+
+ `<div class="grid g3" style="margin-bottom:16px">${[['Consultations',fcDb().length],['Completed',done],['Drafts',fcDb().length-done]].map(([l,n])=>`<div class="card" style="margin:0"><div class="eyebrow">${l}</div><div style="font-size:30px;font-weight:700;margin-top:6px">${n}</div></div>`).join('')}</div>
+ <div class="card"><div class="row" style="justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px"><h3 style="margin:0">All consultations</h3><input style="max-width:280px" placeholder="Search client or staff…" value="${esc(FC.q)}" oninput="FC.q=this.value;clearTimeout(window._fcq);window._fcq=setTimeout(()=>{render();const s=document.querySelector('[data-fcq]');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length)}},250)" data-fcq></div>
+ ${L.length?`<div style="overflow:auto"><table><thead><tr><th>Client</th><th>Date</th><th>Conducted by</th><th>Risk</th><th>Medical clearance</th><th>Status</th><th></th></tr></thead><tbody>${L.map(r=>{const C=fcCalc(r);return `<tr>
+  <td><b>${esc(C.client)}</b>${r.athlete?'<div class="muted" style="font-size:12px">Athlete profile linked</div>':''}</td><td>${fmtDate(r.date)}</td><td>${esc(r.staffName||'—')}<div class="muted" style="font-size:12px">${esc(C.staffRole)}</div></td>
+  <td><span class="pill ${C.riskTotal>=2?'p-warn':'p-ok'}">${C.riskTotal} · ${C.riskLevel}</span></td><td>${C.clear?`<span class="pill ${C.clear==='Required'?'p-bad':'p-ok'}">${C.clear}</span>`:'<span class="muted">—</span>'}</td>
+  <td><span class="pill ${r.status==='Completed'?'p-ok':'p-blue'}">${r.status}</span></td>
+  <td style="white-space:nowrap;text-align:right"><button class="btn sm" onclick="fcOpen('${r.id}')">${r.status==='Completed'?'Open':'Continue'}</button> <button class="btn sm pri" onclick="fcPdf('${r.id}')">⬇ PDF</button> <button class="btn sm" title="Delete" onclick="fcDel('${r.id}')">🗑</button></td></tr>`}).join('')}</tbody></table></div>`
+ :`<div style="text-align:center;padding:28px 10px"><div style="font-size:40px">🫀</div><h3 style="margin:8px 0 4px">No consultations yet</h3><p class="muted" style="margin:0 0 14px">Start one for a new client or for an athlete on your roster.</p><button class="btn pri" onclick="fcNew()">＋ New consultation</button></div>`}</div>`}
+function fcNew(){const r=fcBlank();fcDb().unshift(r);save();FC.id=r.id;FC.step=0;render();window.scrollTo(0,0)}
+function fcOpen(id){FC.id=id;FC.step=0;render();window.scrollTo(0,0)}
+function fcClose(){save();FC.id=null;render()}
+function fcDel(id){confirmBox('Delete this fitness consultation? This cannot be undone.',()=>{db.fitConsults=fcDb().filter(r=>r.id!==id);save();if(FC.id===id)FC.id=null;render();toast('Consultation deleted')})}
+function fcGo(i){FC.step=Math.max(0,Math.min(FCSTEPS.length-1,i));save();render();window.scrollTo(0,0)}
+function fcPickAthlete(id){const r=fcRec();r.athlete=id;const a=byId('athletes',id);if(a){const d=r.demo;d.name=a.name||d.name;d.gender=a.gender||d.gender;d.height=a.height||d.height;d.phone=a.phone||d.phone;d.email=a.email||d.email;
+  const ag=fcAge(Object.assign({},r,{demo:Object.assign({},d,{age:''})}));if(ag!=null)d.age=String(ag);
+  const w=db.weighins.filter(x=>x.athlete===id).sort((x,y)=>String(y.date).localeCompare(String(x.date)))[0];if(w){d.weight=String(w.weight);const f=r.test.rows.find(x=>x.k==='fat');if(w.bodyfat&&f&&!f.cur)f.cur=String(w.bodyfat)}
+  if(!r.report.clientName)r.report.clientName=a.name}fcSave(r);render()}
+function fcWizard(){const r=fcRec(),C=fcCalc(r),i=FC.step;
+ const steps=`<div class="fc-steps">${FCSTEPS.map((s,k)=>`<button class="${k===i?'on':k<i?'done':''}" onclick="fcGo(${k})"><span>${k+1}</span>${s}</button>`).join('')}</div>`;
+ const top=`<div class="pagehead"><div><div class="eyebrow">Fitness Consultation · ${esc(r.status)}</div><h2>${esc(C.client)}</h2><div class="muted" data-calc="hdr">${fmtDate(r.date)} · by ${esc(C.staffRole)}${r.staffName?': '+esc(r.staffName):''}</div></div><div class="row"><button class="btn" onclick="fcClose()">← All consultations</button><button class="btn pri" onclick="fcPdf('${r.id}')">⬇ Download PDF</button></div></div>`;
+ const nav=`<div class="row" style="justify-content:space-between;margin-top:18px;flex-wrap:wrap;gap:10px"><button class="btn" ${i?'':'disabled'} onclick="fcGo(${i-1})">← Back</button><span class="muted">Step ${i+1} of ${FCSTEPS.length}</span>${i<FCSTEPS.length-1?`<button class="btn pri" onclick="fcGo(${i+1})">Next: ${FCSTEPS[i+1]} →</button>`:`<button class="btn pri" onclick="fcFinish()">✓ Complete & download PDF</button>`}</div>`;
+ const body=[fcS0,fcS1,fcS2,fcS3,fcS4,fcS5,fcS6,fcS7,fcS8,fcS9,fcS10][i](r,C);
+ setTimeout(()=>{fcLive();const o=document.querySelector('.fc-steps .on');if(o&&o.scrollIntoView)o.scrollIntoView({inline:'center',block:'nearest'})},0);
+ return top+steps+`<div class="card fc-card"><div class="fc-title"><span>${i+1}</span>${FCSTEPS[i]}</div>${body}${nav}</div>`}
+function fcS0(r,C){const staff=db.users.filter(u=>u.status!=='Disabled'&&STAFF(u.role));
+ return `<p class="muted" style="margin-top:0">Who is the client, and which staff member is taking this consultation? The staff position and name are printed on the PDF report with the date.</p>
+ <div class="fc-sub">Client</div>${fG(`<div><label>Athlete on roster (optional)</label><select onchange="fcPickAthlete(this.value)"><option value="">— New / walk-in client —</option>${db.athletes.filter(a=>a.status!=='Inactive'||a.id===r.athlete).map(a=>`<option value="${a.id}" ${a.id===r.athlete?'selected':''}>${esc(a.name)}</option>`).join('')}</select></div>`+fI('demo.name','Client full name')+fI('date','Consultation date','date')+fI('place','Venue / address'))}
+ <div class="fc-sub">Consultation taken by</div>${fG(`<div><label>Staff position</label><select onchange="fcSetV('staffRole',this.value)">${FCROLES.map(x=>`<option ${x===r.staffRole?'selected':''}>${x}</option>`).join('')}</select></div>`+(r.staffRole==='Other'?fI('staffRoleOther','Type the position'):'')+
+  `<div><label>Staff name (select or type)</label><input data-p="staffName" list="fcStaffL" value="${esc(r.staffName)}" oninput="fcIn(this)" placeholder="Type or pick a name"><datalist id="fcStaffL">${staff.map(u=>`<option value="${esc(u.name)}">${esc(u.role)}</option>`).join('')}</datalist></div>`)}
+ <div class="fc-note">📄 The report will show: <b>${esc(C.staffRole)}${r.staffName?' — '+esc(r.staffName):''}</b> · ${esc(fcLongDate(r.date))}</div>`}
+function fcS1(r){return `<p class="muted" style="margin-top:0">Basic details of the client.</p>${fG(fI('demo.name','Name')+fI('demo.age','Age (years)','number','min="3" max="100"')+fS('demo.gender','Gender',['Male','Female','Other'])+fI('demo.height','Height (cm)','number','step="0.1"')+fI('demo.weight','Weight (kg)','number','step="0.1"')+fCalc('bmi','BMI (auto)')+
+ fI('demo.occupation','Occupation')+fI('demo.workHours','Working hours','text','placeholder="e.g. 9 am – 6 pm"')+fI('demo.workDays','Working days','text','placeholder="e.g. Mon – Sat"'))}
+ <div class="fc-sub">Availability for training</div>${fG(fI('demo.availDays','Days per week','text','placeholder="e.g. 3 days"')+fI('demo.availTime','Preferred time','text','placeholder="e.g. 4 pm"')+fI('demo.availDur','Session duration','text','placeholder="e.g. 1 hr"'))}
+ <div class="fc-sub">Contact</div>${fG(fI('demo.phone','Contact number','tel')+fI('demo.email','Email address','email')+fI('demo.address','Residential address'))}`}
+function fcS2(r,C){return `<div class="fc-note"><b>Aim:</b> to identify individuals with a known disease, or signs or symptoms of disease, who may be at a higher risk of an adverse event during physical activity / exercise. <b>Step 1 — compulsory.</b></div>
+ <div class="fc-q">${FCPARQ.map((q,k)=>`<div class="fc-qrow"><span class="fc-qn">${String(k+1).padStart(2,'0')}</span><span style="flex:1">${q}</span>${fYN('parq.'+k)}</div>`).join('')}</div>
+ ${C.parqYes?`<div class="fc-note bad">⚠ "Yes" to ${C.parqYes} question(s): the client should seek guidance from their GP or an appropriate allied health professional before starting physical activity / exercise.</div>`:C.parqDone?`<div class="fc-note ok">✓ "No" to all 7 questions: with no other health concerns, the client may proceed to light to moderate intensity physical activity / exercise.</div>`:'<div class="fc-note">Answer all 7 questions.</div>'}`}
+function fcS3(r,C){const P='risk.pa.';return `<p class="muted" style="margin-top:0"><b>Step 2 — risk factors.</b> The score is added up automatically: 2 or more = moderate risk client, under 2 = low risk client.</p>
+ <div class="fc-sub">1 · Age and gender</div><p style="margin:0">${C.age!=null?C.age+' years':'Age not entered'}${r.demo.gender?' · '+esc(r.demo.gender):''} <span class="muted">(from Demographic Information)</span></p>
+ <div class="fc-sub">2 · Family history of heart disease (e.g. stroke, heart attack)</div><div class="fc-fam">${FCREL.map(([k,l])=>{const f=r.risk.fam[k]||{};return `<label class="fc-chk"><input type="checkbox" data-p="risk.fam.${k}.on" ${f.on?'checked':''} onchange="fcIn(this)"> ${l}<input type="number" data-p="risk.fam.${k}.age" value="${esc(f.age||'')}" placeholder="Age" oninput="fcIn(this)"></label>`}).join('')}</div>
+ <div class="fc-sub">3 · Smoking</div><div class="row" style="gap:12px;flex-wrap:wrap"><span>Smokes daily / weekly, or quit in the last 6 months?</span>${fYN('risk.smoke')}${r.risk.smoke==='Y'?`<input style="max-width:220px" data-p="risk.smokeQty" value="${esc(r.risk.smokeQty)}" placeholder="How many per day / week" oninput="fcIn(this)">`:''}</div>
+ <div class="fc-sub">4 · Current physical activity / exercise level</div>${fG(fS(P+'level','Overall level',['Sedentary','Light','Moderate','Vigorous']),200)}
+ <table class="fc-tbl" style="margin-top:10px"><thead><tr><th></th><th>Light</th><th>Moderate</th><th>Vigorous</th></tr></thead><tbody>
+ <tr><td>Sessions / week</td><td><input type="number" data-p="${P}lf" value="${esc(r.risk.pa.lf)}" oninput="fcIn(this)"></td><td><input type="number" data-p="${P}mf" value="${esc(r.risk.pa.mf)}" oninput="fcIn(this)"></td><td><input type="number" data-p="${P}vf" value="${esc(r.risk.pa.vf)}" oninput="fcIn(this)"></td></tr>
+ <tr><td>Minutes / session</td><td><input type="number" data-p="${P}ld" value="${esc(r.risk.pa.ld)}" oninput="fcIn(this)"></td><td><input type="number" data-p="${P}md" value="${esc(r.risk.pa.md)}" oninput="fcIn(this)"></td><td><input type="number" data-p="${P}vd" value="${esc(r.risk.pa.vd)}" oninput="fcIn(this)"></td></tr></tbody></table>
+ ${fCalc('pamin','Weighted activity (vigorous counted x 2)')}
+ <div class="fc-sub">5 · Body mass index</div>${fCalc('bmi','BMI from height and weight (30 or more = +1)')}
+ <div class="fc-sub">6 · 7 · Medical history</div><div class="fc-q"><div class="fc-qrow"><span style="flex:1">Have you been told that you have high cholesterol?</span>${fYN('risk.chol')}</div><div class="fc-qrow"><span style="flex:1">Have you been told that you have high blood sugar?</span>${fYN('risk.sugar')}</div></div>
+ <table class="fc-tbl" style="margin-top:16px"><thead><tr><th>Risk factor</th><th>Client</th><th>Defining criteria</th><th style="width:60px">Score</th></tr></thead><tbody>${C.risk.map(x=>`<tr><td><b>${x.k}</b></td><td>${esc(x.data)}</td><td class="muted">${x.crit}</td><td style="text-align:center;font-weight:700">${x.s>0?'+'+x.s:x.s}</td></tr>`).join('')}
+ <tr><td colspan="3" style="text-align:right"><b>Total risk factor</b></td><td style="text-align:center;font-size:20px;font-weight:800">${C.riskTotal}</td></tr></tbody></table>
+ <div class="fc-note ${C.riskTotal>=2?'bad':'ok'}">Classification: <b>${C.riskLevel} client</b> (2 or more = moderate risk, under 2 = low risk)</div>`}
+function fcS4(r,C){const row=(p,l)=>`<div class="fc-qrow"><span style="flex:1"><b>${l}</b></span>${fYN(p)}</div>`;
+ return `<p class="muted" style="margin-top:0">Medical clearance status. The suggestion follows the health history and the answers below; you can override it.</p>
+ <div class="fc-q">${row('clear.active','Physical activity status — currently physically active (30 min, 3 days/week for 3 months)?')}${row('clear.disease','Covert disease status — known cardiovascular, metabolic or renal disease?')}${row('clear.symptoms','Signs and symptoms of disease present?')}</div>
+ ${fG(fS('clear.intensity','Desired exercise intensity',['Light','Light to moderate','Moderate','Vigorous'])+`<div><label>Medical clearance</label><select data-p="clear.decision" onchange="fcIn(this)">${[['auto','Use suggestion'],['Required','Required'],['Not required','Not required']].map(([v,t])=>`<option value="${v}" ${r.clear.decision===v?'selected':''}>${t}</option>`).join('')}</select></div>`)}
+ ${fCalc('clear','Suggestion')}
+ <div class="fc-big ${C.clear==='Required'?'bad':C.clear?'ok':''}">Medical clearance is <b>${C.clear||'—'}</b></div>
+ ${fG(fT('clear.notes','Related information',3,'e.g. GP letter received on …'))}`}
+function fcS5(r){return `<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:6px"><b>Currently:</b>${['Training','Inactive'].map(s=>`<button type="button" class="btn sm ${r.exh.status===s?'pri':''}" onclick="fcSetV('exh.status','${r.exh.status===s?'':s}')">${s}</button>`).join('')}</div>
+ <div class="fc-sub">What type of training do you prefer?</div><div class="fc-fam">${FCTYPES.map(t=>`<label class="fc-chk"><input type="checkbox" ${r.exh.types.includes(t)?'checked':''} onchange="fcToggleType('${t}')"> ${t}</label>`).join('')}</div>
+ ${r.exh.types.includes('Any other')?fG(fI('exh.other','Other training type')):''}
+ <div class="fc-sub">Details of previous exercise (FITT-V)</div>${fG(fI('exh.freq','Frequency','text','placeholder="e.g. 3 days/week"')+fI('exh.int','Intensity','text','placeholder="e.g. RPE 6, 60% 1RM"')+fI('exh.dur','Duration','text','placeholder="e.g. 45 min"')+fI('exh.type','Type','text','placeholder="e.g. machines, running"')+fI('exh.vol','Volume','text','placeholder="e.g. 3 x 10, 5 km"'))}`}
+function fcS6(r){return `<p class="muted" style="margin-top:0">Classifying resistance training status. Tick the box that fits the client in each column; the level is suggested automatically.</p>
+ <div style="overflow:auto"><table class="fc-tbl fc-rt"><thead><tr><th>Status</th>${FCRT.map(([,l])=>`<th>${l}</th>`).join('')}</tr></thead><tbody>${FCRTL.map((L,lv)=>`<tr><td><b>${L}</b></td>${FCRT.map(([k,,o])=>`<td class="${String(r.rt[k])===String(lv+1)?'on':''}" onclick="fcSetV('rt.${k}','${String(r.rt[k])===String(lv+1)?'':lv+1}')"><span class="fc-box">${String(r.rt[k])===String(lv+1)?'✓':''}</span>${o[lv]}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+ <p class="muted" style="font-size:12px">*Training stress = the degree of physical demand or stimulus of the resistance training program.</p>
+ ${fCalc('rt','Suggested level')}${fG(fI('rt.level','Resistance training level (leave empty to use the suggestion)','text','placeholder="e.g. Beginner, moving toward intermediate"'),300)}`}
+function fcS7(r){const D=r.life.diet;return fG(fI('life.meals','Total meals per day','number')+fI('life.junk','Junk food (times per week)','text')+fI('life.mealTiming','Gap between meals','text','placeholder="e.g. 13 hr"')+fI('life.water','Water intake (litres/day)','number','step="0.1"'))+
+ `<div class="fc-sub">Diet recall chart</div><div style="overflow:auto"><table class="fc-tbl"><thead><tr><th>Meal</th><th>Time</th><th>Carbohydrate</th><th>Protein</th><th>Fat</th><th>What was eaten</th><th></th></tr></thead><tbody>${D.map((m,k)=>`<tr><td>${String(k+1).padStart(2,'0')}</td><td><input type="time" data-p="life.diet.${k}.t" value="${esc(m.t)}" oninput="fcIn(this)"></td>${['c','p','f'].map(x=>`<td style="text-align:center"><input type="checkbox" style="width:20px;height:20px" data-p="life.diet.${k}.${x}" ${m[x]?'checked':''} onchange="fcIn(this)"></td>`).join('')}<td><input data-p="life.diet.${k}.n" value="${esc(m.n)}" oninput="fcIn(this)" placeholder="e.g. 2 chapati, dal, rice"></td><td><button class="btn sm" title="Remove" onclick="fcDiet(${k})">✕</button></td></tr>`).join('')}</tbody></table></div>
+ ${D.length<7?`<button class="btn sm" style="margin-top:8px" onclick="fcDiet(-1)">＋ Add meal</button>`:''}
+ <div class="fc-sub">Sleep routine</div>${fG(fI('life.sleepAt','Time you go to sleep','time')+fI('life.wakeAt','Wake-up time','time')+fCalc('sleep','Sleep from times')+fI('life.total','Total sleep (hours)','text','placeholder="e.g. 6 hr, or split: 8–11 am & 2–5 pm"')+fI('life.quality','Sleep quality (1 – 10)','number','min="1" max="10"')+fI('life.stress','Stress level (1 – 10)','number','min="1" max="10"'))}`}
+function fcDiet(k){const r=fcRec();if(k<0)r.life.diet.push({t:'',c:false,p:false,f:false,n:''});else r.life.diet.splice(k,1);fcSave(r);render()}
+function fcCalcDef(r,C,k){const d=r.demo,row=x=>r.test.rows.find(y=>y.k===x)||{};const n=fcNum;
+ return {h:n(d.height),w:n(d.weight),fw:C.w,fp:n(row('fat').cur),mw:C.fw,mf:C.fatKg!=null?+fcR(C.fatKg,2):null,age:C.age,mhr:C.mhrAuto!=null?+fcR(C.mhrAuto,0):null,rhr:n(row('rhr').cur)}[k]}
+const fcCI=(k,l,u,x='')=>`<div class="fc-ci"><label>${l}</label><div class="fc-ciw"><input type="number" step="any" data-p="calc.${k}" data-ph="${k}" value="${esc(fcV('calc.'+k))}" oninput="fcIn(this)" ${x}><span>${u}</span></div></div>`;
+const fcOp=t=>`<div class="fc-op">${t}</div>`;
+function fcS8(r,C){const L=fcNorms();
+ return `<p class="muted" style="margin-top:0">Enter the current result and the target for each test. The <b>category</b> is worked out automatically from published normative data for the client's <b>age (${C.nAge!=null?C.nAge+' y':'—'})</b> and <b>sex (${esc(r.demo.gender||'—')})</b>. Choose a different test or table in the "Test / normative table" column, or type your own rating to override.</p>
+ <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px"><button class="btn sm" onclick="fcNormLib()">📚 Normative data library</button>${!r.demo.gender||C.nAge==null?'<span class="pill p-warn">Enter age and gender in step 2 to get categories</span>':''}</div>
+ <div style="overflow:auto"><table class="fc-tbl fc-test"><thead><tr><th>#</th><th style="min-width:210px">Variable · test / normative table</th><th>Current</th><th style="min-width:200px">Current category (auto)</th><th>Target</th><th style="min-width:200px">Target category (auto)</th><th>Change</th><th></th></tr></thead><tbody>${r.test.rows.map((x,k)=>{const auto=['bmi','fatkg','ffm'].includes(x.k);const ph=auto?fcRowCur(r,Object.assign({},x,{cur:''}),C):'';const N=fcRowNorm(x);const cur=x.n!==undefined?x.n:(FCMAP[x.k]||'');
+  return `<tr><td>${String(k+1).padStart(2,'0')}</td>
+ <td><input data-p="test.rows.${k}.l" value="${esc(x.l)}" oninput="fcIn(this)" placeholder="Variable" style="font-weight:600"><select style="margin-top:5px;font-size:12px;padding:5px 7px" onchange="fcRowNormSet(${k},this.value)"><option value="">— No normative table —</option>${FCQ.map((q,qi)=>`<optgroup label="${esc(q)}">${L.filter(n=>n.q===qi).map(n=>`<option value="${n.id}" ${n.id===cur?'selected':''}>${esc(n.n)} (${esc(n.u)})</option>`).join('')}</optgroup>`).join('')}</select>${N?`<div class="muted" style="font-size:11px;margin-top:4px">${esc(FCQ[N.q])} · ${esc(FCES[N.es])}</div>`:''}</td>
+ <td><input data-p="test.rows.${k}.cur" value="${esc(x.cur)}" placeholder="${esc(ph)}" oninput="fcIn(this)" style="min-width:76px"><div class="muted" style="font-size:11px;margin-top:3px">${esc(x.u==='ratio'?'ratio':x.u||'')}</div></td>
+ <td><div data-calc="rc:${k}" class="fc-rate"></div><input data-p="test.rows.${k}.curR" value="${esc(x.curR)}" oninput="fcIn(this)" placeholder="Override (optional)" style="margin-top:5px;font-size:12px;padding:5px 7px"></td>
+ <td><input data-p="test.rows.${k}.tgt" value="${esc(x.tgt)}" oninput="fcIn(this)" style="min-width:76px"></td>
+ <td><div data-calc="rt:${k}" class="fc-rate"></div><input data-p="test.rows.${k}.tgtR" value="${esc(x.tgtR)}" oninput="fcIn(this)" placeholder="Override (optional)" style="margin-top:5px;font-size:12px;padding:5px 7px"></td>
+ <td data-calc="chg:${k}" style="white-space:nowrap;font-weight:600"></td><td><button class="btn sm" title="Remove" onclick="fcRow(${k})">✕</button></td></tr>`}).join('')}</tbody></table></div>
+ <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><select id="fcAddT" style="max-width:340px"><option value="">＋ Add a test from the library…</option>${FCQ.map((q,qi)=>`<optgroup label="${esc(q)}">${L.filter(n=>n.q===qi).map(n=>`<option value="${n.id}">${esc(n.n)} (${esc(n.u)})</option>`).join('')}</optgroup>`).join('')}<option value="__">Custom variable (no table)</option></select><button class="btn sm" onclick="fcRowAdd(document.getElementById('fcAddT').value)">Add</button></div>
+ ${fcNormNotes(r,C)}
+ <div class="fc-sub">Calculations — every box can be edited</div><p class="muted" style="margin:-4px 0 10px;font-size:13px">Grey numbers are taken from the earlier steps. Type in any box to use your own number.</p>
+ <div class="fc-formula"><b>BMI</b><div class="fc-frow">${fcCI('w','Weight','kg')}${fcOp('÷')}${fcCI('h','Height','cm')}${fcOp('² =')}<div class="fc-res" data-calc="bmiF"></div></div></div>
+ <div class="fc-formula"><b>Fat mass</b><div class="fc-frow">${fcCI('fw','Body weight','kg')}${fcOp('×')}${fcCI('fp','Body fat','%')}${fcOp('=')}<div class="fc-res" data-calc="fatF"></div></div></div>
+ <div class="fc-formula"><b>Fat-free mass</b><div class="fc-frow">${fcCI('mw','Body weight','kg')}${fcOp('−')}${fcCI('mf','Fat mass','kg')}${fcOp('=')}<div class="fc-res" data-calc="ffmF"></div></div></div>
+ <div class="fc-sub">Karvonen method (target heart rate for SMART goals)</div>
+ <div class="fc-formula"><b>Maximum heart rate</b><div class="fc-frow">${fcCI('age','Age','years')}<div class="fc-ci"><label>Formula</label><select data-p="test.mhrF" onchange="fcIn(this)">${[['220','220 − age (Fox)'],['tanaka','208 − 0.7 × age (Tanaka)'],['gellish','207 − 0.7 × age (Gellish)']].map(([v,t])=>`<option value="${v}" ${String(r.test.mhrF||'220')===v?'selected':''}>${t}</option>`).join('')}</select></div>${fcOp('=')}${fcCI('mhr','MHR (or measured)','bpm')}</div><div class="fc-res" data-calc="mhrF" style="margin-top:6px"></div></div>
+ <div class="fc-formula"><b>Heart rate reserve</b><div class="fc-frow">${fcCI('rhr','Resting HR','bpm')}${fcOp('HRR = MHR − RHR =')}<div class="fc-res" data-calc="hrr"></div></div></div>
+ <div class="fc-formula"><b>Target heart rate = (HRR × intensity %) + RHR</b><div class="fc-frow"><div class="fc-ci"><label>Low intensity</label><div class="fc-ciw"><input type="number" data-p="test.intLo" value="${esc(r.test.intLo)}" oninput="fcIn(this)"><span>% HRR</span></div></div><div class="fc-ci"><label>High intensity</label><div class="fc-ciw"><input type="number" data-p="test.intHi" value="${esc(r.test.intHi)}" oninput="fcIn(this)"><span>% HRR</span></div></div>${fcOp('=')}<div class="fc-res" data-calc="thr"></div></div><div class="fc-res" data-calc="thrF" style="margin-top:6px;font-size:13px"></div></div>`}
+function fcNormNotes(r,C){const L=r.test.rows.map(x=>{const N=fcRowNorm(x);if(!N)return '';const b=fcBand(N,r.demo.gender,C.nAge);if(!b)return '';const R=fcRowRating(r,x,C,'cur');
+  return `<div class="fc-nn"><b>${esc(x.l||N.n)}</b> — ${esc(N.n)} norms for ${esc(fcRate(N,0,r.demo.gender,C.nAge)?fcRate(N,0,r.demo.gender,C.nAge).grp||'':'')}: <span class="muted">${esc(fcBandText(N,b))}</span><br><span class="muted" style="font-size:12px">Reference: ${esc(N.ref)}</span></div>`}).filter(Boolean);
+ return L.length?`<details class="fc-det"><summary>Normative tables used for this client (${L.length})</summary>${L.join('')}</details>`:''}
+function fcRowNormSet(k,id){const r=fcRec();const x=r.test.rows[k];x.n=id;const N=fcNorm(id);if(N){const oldN=FCTEST.find(t=>t[0]===x.k);if(!x.l||(oldN&&x.l===oldN[1])||x._auto)x.l=N.n,x._auto=1;x.u=N.u}fcSave(r);render()}
+function fcRowAdd(id){if(!id)return;const r=fcRec();if(id==='__')r.test.rows.push({k:uid('t'),n:'',l:'',u:'',cur:'',curR:'',tgt:'',tgtR:''});else{const N=fcNorm(id);r.test.rows.push({k:uid('t'),n:id,l:N.n,u:N.u,_auto:1,cur:'',curR:'',tgt:'',tgtR:''})}fcSave(r);render()}
+function fcRow(k){const r=fcRec();if(k<0)return fcRowAdd('__');r.test.rows.splice(k,1);fcSave(r);render()}
+function fcS9(r,C){const sugg=()=>{const L=[];r.test.rows.forEach(x=>{const cu=fcRowCur(r,x,C);if(cu!==''&&x.tgt!==''){const a=fcRowRating(r,x,C,'cur').lab,b=fcRowRating(r,x,C,'tgt').lab;L.push(`${x.l}: ${cu}${a?' ('+a+')':''} → ${x.tgt}${b?' ('+b+')':''} ${x.u==='ratio'?'':x.u||''}`.trim())}});return L.join('\n')};
+ return fG(fT('goal.client','Client goal (in the client’s own words)',2,'e.g. Lose fat, get stronger, improve stamina for football'))+`<div class="fc-sub">S.M.A.R.T goal setting</div>`+
+ fG(fT('goal.specific','Specific — the plan (e.g. GS: 60–70% 1RM, 8–12 reps, 1–3 sets, compound movements, 2–3 min rest for core lifts; CRF: outdoor LSD 3 x 7 min at 120–130 bpm)',4)+
+ `<div style="grid-column:1/-1"><label>Measurable — the numbers that will change</label><textarea data-p="goal.measurable" rows="4" oninput="fcIn(this)" id="fcMeas">${esc(r.goal.measurable)}</textarea><button class="btn sm" style="margin-top:6px" onclick="(()=>{const t=document.getElementById('fcMeas');t.value=${esc(JSON_q(sugg()))};fcIn(t)})()">↻ Fill from the Fitness Test Report</button></div>`+
+ fS('goal.achievable','Achievable',['Yes','No','With support'])+fS('goal.realistic','Realistic',['Yes','No','With support'])+fI('goal.time','Time-bound (weeks)','number')+fI('goal.timeNote','Review / re-test date','date'),240)}
+function JSON_q(s){return "'"+String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n')+"'"}
+function fcS10(r,C){return `<div class="fc-sumbox">${[['Health history',C.parqDone?(C.parqYes?C.parqYes+' "Yes" answer(s) — refer to GP':'No to all 7 questions'):'Incomplete'],['Risk factors',C.riskTotal+' · '+C.riskLevel],['Medical clearance',C.clear||'—'],['Resistance training level',C.rtLevel||'—'],['Desired intensity',r.clear.intensity||'—'],['Target heart rate',C.thrLo!=null?Math.round(C.thrLo)+'–'+Math.round(C.thrHi)+' bpm':'—']].map(([a,b])=>`<div><span class="muted">${a}</span><b>${esc(b)}</b></div>`).join('')}</div>
+ <div style="margin-top:14px"><label>FC report — summary</label><textarea data-p="report.summary" id="fcSum" rows="6" oninput="fcIn(this)" placeholder="Write the consultation summary, or fill it from the answers">${esc(r.report.summary)}</textarea><button class="btn sm" style="margin-top:6px" onclick="fcAutoSum()">↻ Write summary from the answers</button></div>
+ ${fG(fT('report.recs','Recommendations / next steps',4,'e.g. 3 sessions per week: full-body strength + 2 outdoor LSD runs; re-test in 6 weeks')+fI('report.review','Next review date','date'))}
+ <div class="fc-sub">Sign-off — everything printed on the last page can be edited</div>${fG(`<div><label>Conducted by (position)</label><input data-p="report.signRole" list="fcRoleL" value="${esc(r.report.signRole||'')}" placeholder="${esc(r.staffRole==='Other'?(r.staffRoleOther||'Staff'):r.staffRole)}" oninput="fcIn(this)"><datalist id="fcRoleL">${FCROLES.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>`+fI('staffName','Staff name')+fI('date','Report date','date')+`<div><label>Client name (as signed)</label><input data-p="report.clientName" value="${esc(r.report.clientName||'')}" placeholder="${esc(C.client)}" oninput="fcIn(this)" ${r.report.blankClient?'disabled':''}></div>`)}
+ <label class="fc-chk" style="margin-top:10px"><input type="checkbox" data-p="report.blankClient" ${r.report.blankClient?'checked':''} onchange="fcIn(this);render()"> Leave the client name blank on the PDF (client writes it by hand)</label>
+ <label class="fc-chk" style="margin-top:12px"><input type="checkbox" data-p="report.consent" ${r.report.consent?'checked':''} onchange="fcIn(this)"> The client has read this report and agrees with the information and the goals.</label>
+ <p class="muted" style="font-size:12px">Staff and client sign on the printed copy. Changing the position, staff name or date here also changes the cover and the footer on every page.</p>
+ ${r.status==='Completed'?`<div class="fc-note ok">✓ Completed. You can still edit and download again.</div>`:''}`}
+function fcAutoSum(){const r=fcRec(),C=fcCalc(r);const d=r.demo;const bits=[];
+ bits.push(`${/^f/i.test(d.gender)?'Ms.':'Mr.'} ${C.client}${C.age!=null?', '+C.age+' years':''}${d.height?', '+d.height+' cm':''}${d.weight?', '+d.weight+' kg':''}${C.bmi!=null?' (BMI '+fcR(C.bmi)+', '+C.bmiCat.toLowerCase()+')':''}.`);
+ bits.push(r.exh.status==='Training'?'Currently training'+(r.exh.types.length?' ('+r.exh.types.join(', ').toLowerCase()+')':'')+'.':r.exh.status==='Inactive'?'Currently inactive'+(r.exh.types.length?'; prefers '+r.exh.types.join(', ').toLowerCase():'')+'.':'');
+ bits.push(C.parqYes?`Answered "Yes" to ${C.parqYes} health history question(s) and should get guidance from a GP before exercising.`:C.parqDone?'Has no past medical history and no signs or symptoms of disease reported in the health history.':'');
+ bits.push(`Risk factor total ${C.riskTotal}: ${C.riskLevel.toLowerCase()} client. Medical clearance ${C.clear?C.clear.toLowerCase():'not decided'}.`);
+ if(C.rtLevel)bits.push(`Resistance training level: ${C.rtLevel.toLowerCase()}.`);
+ const cats=r.test.rows.map(x=>{const a=fcRowRating(r,x,C,'cur');return a.lab?`${x.l.split(':')[0].replace(/\s*\(.*$/,'')} ${a.lab.toLowerCase()}`:''}).filter(Boolean);if(cats.length)bits.push(`Fitness test categories (age- and sex-matched norms): ${cats.join('; ')}.`);
+ if(r.goal.time)bits.push(`Goals are set for ${r.goal.time} weeks${r.clear.intensity?' at '+r.clear.intensity.toLowerCase()+' intensity':''}${C.thrLo!=null?', target heart rate '+Math.round(C.thrLo)+'–'+Math.round(C.thrHi)+' bpm':''}.`);
+ r.report.summary=bits.filter(Boolean).join(' ');fcSave(r);render()}
+function fcFinish(){const r=fcRec();r.status='Completed';if(!r.report.summary)fcAutoSum();save();render();fcPdf(r.id)}
+function fcLongDate(d){const x=new Date(String(d||today()).slice(0,10)+'T00:00');return isNaN(x)?String(d||''):x.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+
+/* ---------- PDF report (pdf-lib, works offline in the apps) ---------- */
+function fcLib(){if(window.PDFLib)return Promise.resolve(window.PDFLib);
+ const load=src=>new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=()=>window.PDFLib?ok(window.PDFLib):no(new Error('PDF library missing'));s.onerror=()=>no(new Error('Cannot load '+src));document.head.appendChild(s)});
+ return load('assets/vendor/pdf-lib.min.js').catch(()=>load('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js'))}
+const FCWIN=new Set([...'€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ']);
+function fcTx(s){return String(s??'').replace(/[≥]/g,'>=').replace(/[≤]/g,'<=').replace(/[→⟶]/g,'->').replace(/[←]/g,'<-').replace(/[↑]/g,'+').replace(/[↓]/g,'-').replace(/[✓✔]/g,'Yes').replace(/[✕✗×]/g,'x').replace(/[−]/g,'-').replace(/²/g,'2').replace(/[₹]/g,'Rs.').replace(/÷/g,'/').replace(/\t/g,' ')
+ .split('').map(c=>{const n=c.charCodeAt(0);return (n>=32&&n<127)||(n>=160&&n<=255)||FCWIN.has(c)||c==='\n'?c:'?'}).join('')}
+async function fcImg(doc){try{const src=(db.brand&&(db.brand.logo||db.brand.logoUrl))||BM_LOGO;let bytes;
+ if(/^data:/.test(src)){const b=atob(src.split(',')[1]);bytes=new Uint8Array(b.length);for(let i=0;i<b.length;i++)bytes[i]=b.charCodeAt(i)}else{bytes=new Uint8Array(await (await fetch(src)).arrayBuffer())}
+ return bytes[0]===0x89?await doc.embedPng(bytes):await doc.embedJpg(bytes)}catch(e){try{const b=atob(BM_LOGO.split(',')[1]);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return await doc.embedPng(u)}catch(e2){return null}}}
+async function fcPdf(id){if(FC.busy)return;const r=byId('fitConsults',id);if(!r)return;FC.busy=true;toast('Preparing PDF…');
+ try{const L=await fcLib();const bytes=await fcBuild(L,r);const C=fcCalc(r);
+  const name=('Fitness-Consultation_'+C.client+'_'+(r.date||today())).replace(/[^\w.-]+/g,'_')+'.pdf';await fcDownload(bytes,name);toast('PDF ready: '+name)}
+ catch(e){console.error(e);toast('PDF failed: '+(e.message||e))}FC.busy=false}
+async function fcDownload(bytes,name){const cap=window.Capacitor;
+ if(cap&&cap.isNativePlatform&&cap.isNativePlatform()&&cap.Plugins&&cap.Plugins.Filesystem){let b='';for(let i=0;i<bytes.length;i+=0x8000)b+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));
+  const F=cap.Plugins.Filesystem;let res;try{res=await F.writeFile({path:name,data:btoa(b),directory:'DOCUMENTS',recursive:true})}catch(e){res=await F.writeFile({path:name,data:btoa(b),directory:'CACHE'})}
+  if(cap.Plugins.Share)try{await cap.Plugins.Share.share({title:name,files:[res.uri],dialogTitle:'Save or share the report'})}catch(e){}else toast('Saved to Documents: '+name);return}
+ const blob=new Blob([bytes],{type:'application/pdf'}),url=URL.createObjectURL(blob);
+ const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),60000)}
+async function fcBuild(L,r){const {PDFDocument,StandardFonts,rgb}=L;const C=fcCalc(r);const doc=await PDFDocument.create();
+ doc.setTitle(fcTx('Fitness Consultation - '+C.client));doc.setAuthor(fcTx((r.staffName||'')+' ('+C.staffRole+')'));doc.setCreator('BIOMOTOR Sport and Fitness');doc.setSubject('Fitness consultation report');
+ const F=await doc.embedFont(StandardFonts.Helvetica),B=await doc.embedFont(StandardFonts.HelveticaBold),I=await doc.embedFont(StandardFonts.HelveticaOblique);const logo=await fcImg(doc);
+ const W=595.28,H=841.89,M=46,CW=W-2*M,TOP=H-78,BOT=70;
+ const hex=h=>{const n=parseInt(h.slice(1),16);return rgb((n>>16&255)/255,(n>>8&255)/255,(n&255)/255)};
+ const RED=hex('#c8102e'),DARK=hex('#1d1d1f'),MUT=hex('#6b6b70'),LINE=hex('#d9d9de'),SOFT=hex('#fbeef0'),GREEN=hex('#1f8a4c'),WHITE=rgb(1,1,1),ZEBRA=hex('#f6f6f8');
+ let pg,y;const pages=[];
+ const tw=(s,f,z)=>f.widthOfTextAtSize(fcTx(s),z);
+ const wrap=(s,f,z,mw)=>{const out=[];fcTx(s).split('\n').forEach(par=>{let line='';par.split(/\s+/).forEach(w=>{if(!w)return;const t=line?line+' '+w:w;if(tw(t,f,z)<=mw)line=t;else{if(line)out.push(line);if(tw(w,f,z)>mw){let cur='';for(const ch of w){if(tw(cur+ch,f,z)>mw){out.push(cur);cur=ch}else cur+=ch}line=cur}else line=w}});out.push(line)});return out};
+ const T=(s,x,yy,o={})=>pg.drawText(fcTx(s),{x,y:yy,size:o.z||10,font:o.f||F,color:o.c||DARK});
+ const frame=()=>{pg.drawRectangle({x:18,y:18,width:W-36,height:H-36,borderColor:RED,borderWidth:1.6});pg.drawRectangle({x:22,y:22,width:W-44,height:H-44,borderColor:RED,borderWidth:.5})};
+ const newPage=()=>{pg=doc.addPage([W,H]);pages.push(pg);frame();
+  if(logo){const s=Math.min(110/logo.width,30/logo.height);pg.drawImage(logo,{x:M,y:H-64,width:logo.width*s,height:logo.height*s})}
+  const t='FITNESS CONSULTATION';T(t,W-M-tw(t,B,9),H-48,{f:B,z:9,c:RED});const c=C.client;T(c,W-M-tw(c,F,8.5),H-60,{z:8.5,c:MUT});
+  pg.drawLine({start:{x:M,y:H-70},end:{x:W-M,y:H-70},thickness:.6,color:LINE});y=TOP-6};
+ const need=h=>{if(y-h<BOT)newPage()};
+ const sec=t=>{need(60);y-=8;const z=13,bw=tw(t.toUpperCase(),B,z)+28;const x=(W-bw)/2;pg.drawRectangle({x,y:y-22,width:bw,height:24,color:RED});T(t.toUpperCase(),x+14,y-15,{f:B,z,c:WHITE});pg.drawLine({start:{x,y:y-25},end:{x:x+bw,y:y-25},thickness:1.2,color:DARK});y-=40};
+ const sub=t=>{need(30);T(t,M,y,{f:B,z:11,c:RED});y-=16};
+ const para=(s,o={})=>{const z=o.z||10,f=o.f||F,lh=z*1.45;wrap(s,f,z,o.w||CW).forEach(l=>{need(lh);T(l,o.x||M,y,{f,z,c:o.c});y-=lh});y-=o.gap??4};
+ const kv=(pairs,cols=2)=>{const cw=CW/cols,z=10;for(let i=0;i<pairs.length;i+=cols){const row=pairs.slice(i,i+cols);const hts=row.map(([k,v])=>wrap(String(v||'—'),F,z,cw-12).length);const h=Math.max(...hts)*14+16;need(h);
+   row.forEach(([k,v],j)=>{const x=M+j*cw;T(k,x,y,{f:B,z:8,c:MUT});wrap(String(v||'—'),F,z,cw-12).forEach((l,n)=>T(l,x,y-13-n*14,{z}))});y-=h}};
+ const table=(hd,rows,w,o={})=>{const z=o.z||9,pad=5,ws=w.map(p=>p*CW);
+  const drawHead=()=>{const hh=Math.max(...hd.map((h,k)=>wrap(h,B,z,ws[k]-2*pad).length))*12+10;need(hh+20);let x=M;pg.drawRectangle({x:M,y:y-hh,width:CW,height:hh,color:o.hc||RED});hd.forEach((h,k)=>{wrap(h,B,z,ws[k]-2*pad).forEach((l,n)=>T(l,x+pad,y-13-n*12,{f:B,z,c:WHITE}));x+=ws[k]});y-=hh};
+  drawHead();rows.forEach((row,ri)=>{const cells=row.map((c,k)=>{const o2=typeof c==='object'&&c!==null&&!Array.isArray(c)?c:{t:c};return Object.assign(o2,{lines:wrap(String(o2.t??''),o2.b?B:F,o2.z||z,ws[k]-2*pad)})});
+   const rh=Math.max(...cells.map(c=>c.lines.length))*12+10;if(y-rh<BOT){newPage();drawHead()}
+   if(ri%2)pg.drawRectangle({x:M,y:y-rh,width:CW,height:rh,color:ZEBRA});let x=M;
+   cells.forEach((c,k)=>{c.lines.forEach((l,n)=>{const lw=tw(l,c.b?B:F,c.z||z);const xx=c.al==='c'?x+(ws[k]-lw)/2:c.al==='r'?x+ws[k]-pad-lw:x+pad;T(l,xx,y-13-n*12,{f:c.b?B:F,z:c.z||z,c:c.c||DARK})});x+=ws[k]});
+   pg.drawLine({start:{x:M,y:y-rh},end:{x:W-M,y:y-rh},thickness:.5,color:LINE});y-=rh});
+  pg.drawRectangle({x:M,y,width:CW,height:0.01,color:LINE});y-=12};
+ const yn=v=>v==='Y'?'YES':v==='N'?'NO':'—';const ynC=v=>v==='Y'?RED:v==='N'?GREEN:MUT;
+ const box=(t,col)=>{const lines=wrap(t,B,10.5,CW-24);const h=lines.length*15+14;need(h+6);pg.drawRectangle({x:M,y:y-h,width:CW,height:h,color:SOFT,borderColor:col||RED,borderWidth:1});lines.forEach((l,n)=>T(l,M+12,y-18-n*15,{f:B,z:10.5,c:col||RED}));y-=h+12};
+ /* --- cover --- */
+ pg=doc.addPage([W,H]);pages.push(pg);frame();
+ if(logo){const s=Math.min(260/logo.width,110/logo.height);pg.drawImage(logo,{x:(W-logo.width*s)/2,y:H-210,width:logo.width*s,height:logo.height*s})}
+ const ctr=(s,yy,o={})=>T(s,(W-tw(s,o.f||F,o.z||10))/2,yy,o);
+ pg.drawLine({start:{x:M+30,y:H-262},end:{x:W-M-30,y:H-262},thickness:.8,color:MUT});ctr('{ FITNESS CONSULTATION }',H-300,{f:B,z:28,c:DARK});pg.drawLine({start:{x:M+30,y:H-318},end:{x:W-M-30,y:H-318},thickness:.8,color:MUT});
+ ctr(`[ By ${C.staffRole}${r.staffName?' : '+r.staffName:''} ]`,H-346,{f:I,z:13,c:DARK});
+ const cb=[['Client',C.client],['Age / Gender',[C.age!=null?C.age+' years':'',r.demo.gender].filter(Boolean).join(' / ')||'—'],['Risk classification',C.riskTotal+' · '+C.riskLevel],['Medical clearance',C.clear||'—'],['Report status',r.status]];
+ let cy=H-420;pg.drawRectangle({x:M+60,y:cy-cb.length*26+8,width:CW-120,height:cb.length*26+22,color:SOFT,borderColor:LINE,borderWidth:.8});
+ cb.forEach(([k,v])=>{T(k,M+80,cy,{f:B,z:10,c:MUT});T(v,M+230,cy,{f:B,z:11.5});cy-=26});
+ ctr(fcLongDate(r.date).toUpperCase(),150,{f:B,z:14});ctr(`[ ${db.org.name||'BIOMOTOR Sport and Fitness'} ]`,130,{z:11,c:MUT});if(r.place&&r.place!==db.org.name)wrap(r.place,F,10,CW-60).slice(0,2).forEach((l,n)=>ctr(l,113-n*13,{z:10,c:MUT}));
+ /* --- 1 demographic --- */
+ newPage();sec('Demographic Information');const d=r.demo;
+ kv([['Name',C.client],['Age',C.age!=null?C.age+' years':''],['Gender',d.gender],['Height',d.height?d.height+' cm':''],['Weight',d.weight?d.weight+' kg':''],['BMI',C.bmi!=null?fcR(C.bmi)+' kg/m2 ('+C.bmiCat+')':''],['Occupation',d.occupation],['Working hours',d.workHours],['Working days',d.workDays],['Availability',[d.availDays&&('Days: '+d.availDays),d.availTime&&('Time: '+d.availTime),d.availDur&&('Duration: '+d.availDur)].filter(Boolean).join(' · ')],['Contact number',d.phone],['Email address',d.email],['Residential address',d.address],['Consultation venue',r.place]],2);
+ /* --- 2 health history --- */
+ sec('Health History');para('AIM: to identify those individuals with a known disease, or signs or symptoms of disease, who may be at a higher risk of an adverse event during physical activity / exercise. This stage is self administered and self evaluated.',{f:I,z:9,c:MUT});
+ sub('Step 01 - Health history questionnaire (compulsory)');
+ table(['No','Health history questionnaire','Answer'],FCPARQ.map((q,k)=>[{t:String(k+1).padStart(2,'0'),al:'c'},q,{t:yn(r.parq[k]),b:1,al:'c',c:ynC(r.parq[k])}]),[.08,.76,.16]);
+ box(C.parqYes?`"YES" to ${C.parqYes} question(s): seek guidance from your GP or appropriate allied health professional prior to undertaking physical activity / exercise.`:C.parqDone?'"NO" to all 7 questions: with no other concerns about health, the client may proceed to undertake light to moderate intensity physical activity / exercise.':'Health history questionnaire not completed.',C.parqYes?RED:C.parqDone?GREEN:MUT);
+ /* --- 3 risk --- */
+ sec('Risk Factors');sub('Step 02 - Risk factors');
+ const pa=r.risk.pa;table(['Sr','Risk factor','Client','Defining criteria','Score'],C.risk.map((x,k)=>[{t:String(k+1).padStart(2,'0'),al:'c'},{t:x.k,b:1},x.data,x.crit,{t:x.s>0?'+'+x.s:String(x.s),b:1,al:'c'}]).concat([[{t:''},{t:'TOTAL RISK FACTOR',b:1},{t:''},{t:'2 or more = moderate risk client; under 2 = low risk client',z:8},{t:String(C.riskTotal),b:1,al:'c',z:13}]]),[.06,.22,.3,.3,.12]);
+ if(pa.lf||pa.mf||pa.vf)table(['Activity level','Light','Moderate','Vigorous'],[['Sessions / week',pa.lf||'-',pa.mf||'-',pa.vf||'-'],['Minutes / session',pa.ld||'-',pa.md||'-',pa.vd||'-']],[.34,.22,.22,.22],{hc:DARK});
+ box(`Classification: ${C.riskLevel.toUpperCase()} CLIENT (total ${C.riskTotal})`,C.riskTotal>=2?RED:GREEN);
+ /* --- 4 clearance --- */
+ sec('Medical Clearance Status');const cl=r.clear;
+ table(['Status','Answer'],[['Physical activity status (currently physically active)',{t:yn(cl.active),b:1,al:'c',c:ynC(cl.active==='Y'?'N':cl.active==='N'?'Y':'')}],['Covert disease status (known cardiovascular, metabolic or renal disease)',{t:yn(cl.disease),b:1,al:'c',c:ynC(cl.disease)}],['Signs and symptoms',{t:yn(cl.symptoms),b:1,al:'c',c:ynC(cl.symptoms)}],['Desired exercise intensity status',{t:cl.intensity||'-',b:1,al:'c'}]],[.75,.25]);
+ box(`MEDICAL CLEARANCE IS ${C.clear?C.clear.toUpperCase():'NOT DECIDED'}`,C.clear==='Required'?RED:C.clear?GREEN:MUT);
+ if(C.clearWhy&&cl.decision==='auto')para(C.clearWhy,{f:I,z:9,c:MUT});if(cl.notes){sub('Related information');para(cl.notes)}
+ /* --- 5 exercise history --- */
+ sec('Exercise History');const ex=r.exh;
+ kv([['Currently',ex.status||'—'],['Preferred training',ex.types.map(t=>t==='Any other'&&ex.other?ex.other:t).join(', ')||'—']],2);
+ sub('Details of previous exercise (FITT-V)');table(['Frequency','Intensity','Duration','Type','Volume'],[[ex.freq||'-',ex.int||'-',ex.dur||'-',ex.type||'-',ex.vol||'-']],[.2,.2,.2,.2,.2],{hc:DARK});
+ /* --- 6 RT status --- */
+ sec('Resistance Training Status');sub('Classifying resistance training status');
+ table(['Criteria','Beginner (untrained)','Intermediate','Advanced'],FCRT.map(([k,l,o])=>[{t:l,b:1}].concat(o.map((txt,lv)=>{const on=String(r.rt[k])===String(lv+1);return {t:(on?'[X] ':'[  ] ')+txt,b:on,c:on?RED:DARK}}))),[.22,.26,.26,.26],{z:8.5});
+ para('* Training stress refers to the degree of physical demand or stimulus of the resistance training program.',{f:I,z:8,c:MUT});box('Resistance training level: '+(C.rtLevel||'not classified'));
+ /* --- 7 lifestyle --- */
+ sec('Life Style History');const lf=r.life;
+ kv([['Total number of meals per day',lf.meals],['Junk food (times per week)',lf.junk],['Gap between meals',lf.mealTiming],['Water intake',lf.water?lf.water+' L/day':'']],2);
+ const dr=lf.diet.filter(m=>m.t||m.c||m.p||m.f||m.n);if(dr.length){sub('Diet recall chart');table(['Meal','Time','Carbohydrate','Protein','Fat','Food'],dr.map((m,k)=>[{t:String(k+1).padStart(2,'0'),al:'c'},m.t||'-',{t:m.c?'YES':'-',al:'c',b:m.c},{t:m.p?'YES':'-',al:'c',b:m.p},{t:m.f?'YES':'-',al:'c',b:m.f},m.n||''].map(x=>typeof x==='string'?{t:x}:x)),[.08,.12,.14,.12,.1,.44])}
+ sub('Sleep routine');kv([['Goes to sleep',lf.sleepAt],['Wake-up time',lf.wakeAt],['Total sleep',lf.total||(C.sleep!=null?fcR(C.sleep)+' h':'')],['Sleep quality (1-10)',lf.quality],['Stress level (1-10)',lf.stress]],3);
+ /* --- 8 fitness test --- */
+ sec('Fitness Test Report');const trs=r.test.rows.filter(x=>fcRowCur(r,x,C)!==''||x.tgt!=='');const TR=trs.length?trs:r.test.rows;
+ para(`Categories are based on published normative data for ${r.demo.gender?r.demo.gender.toLowerCase()+'s':'adults'} aged ${C.nAge!=null?C.nAge:'—'} years (see "Normative interpretation" below).`,{f:I,z:8.5,c:MUT});
+ table(['Sr','Biomotor variable','Current','Current category','Target','Target category','Change'],TR.map((x,k)=>{const cu=fcRowCur(r,x,C),cn=fcNum(cu),tn=fcNum(x.tgt);const uu=x.u==='ratio'?'':' '+(x.u||'');const ch=cn!=null&&tn!=null?(tn>=cn?'+ ':'- ')+fcR(Math.abs(tn-cn),2)+uu:'-';
+  const a=fcRowRating(r,x,C,'cur'),b=fcRowRating(r,x,C,'tgt');const col=R=>R.R&&R.R.best?GREEN:R.R&&R.R.i===0?RED:DARK;
+  return [{t:String(k+1).padStart(2,'0'),al:'c'},{t:x.l+(x.u&&x.u!=='ratio'?' ('+x.u+')':x.u==='ratio'?' (ratio)':''),b:1},{t:cu||'-',al:'c'},{t:a.lab||'-',b:1,c:col(a)},{t:x.tgt||'-',al:'c'},{t:b.lab||'-',b:1,c:col(b)},{t:ch,al:'c',b:1,c:ch==='-'?MUT:RED}]}),[.05,.27,.1,.19,.1,.17,.12],{z:8.5});
+ const NI=TR.map(x=>{const N=fcRowNorm(x);if(!N)return null;const cu=fcNum(fcRowCur(r,x,C));const Rt=fcRowRating(r,x,C,'cur');const b=fcBand(N,r.demo.gender,C.nAge);if(!b)return null;
+  const Rr=cu!=null?fcRate(N,cu,r.demo.gender,C.nAge):null;const tx=cu==null?'No result entered.':Rt.manual?`${cu}: rated "${Rt.lab}" by the assessor.`:`${cu}${N.u==='ratio'?'':' '+N.u} = ${fcRateText(N,Rr,cu)}.`;
+  return {x,N,b,tx,grp:Rr&&Rr.grp||''}}).filter(Boolean);
+ if(NI.length){sub('Normative interpretation');NI.forEach(o=>{need(60);T(fcTx(o.x.l||o.N.n),M,y,{f:B,z:10,c:RED});y-=13;para('Result: '+o.tx,{z:9.5,gap:1});para(`${o.N.n} norms (${o.grp}): ${fcBandText(o.N,o.b)}`,{z:8.5,c:MUT,gap:1});para('Reference: '+o.N.ref,{f:I,z:8,c:MUT,gap:6})})}
+ const ES=TR.map(x=>{const N=fcRowNorm(x);if(!N||N.es==='na')return null;const a=fcRowRating(r,x,C,'cur');return {x,N,a}}).filter(Boolean);
+ if(ES.length){sub('Energy system and conditioning focus');table(['Variable','Fitness quality','Energy system','Category','Conditioning focus'],ES.map(o=>[{t:o.x.l,b:1},FCQ[o.N.q],FCES[o.N.es],{t:o.a.lab||'-',b:1},o.a.R&&!o.a.R.best&&o.a.R.i<=Math.floor((o.a.R.n-1)/2)?FCCOND[o.N.es]:'Maintain; progress gradually.']),[.18,.17,.15,.13,.37],{z:8,hc:DARK})}
+ sub('Calculations');table(['Measure','Formula','Working','Value'],[['BMI','weight (kg) / height (m)2',C.h&&C.w?`${fcR(C.w,1)} / (${fcR(C.h/100,2)})2`:'-',C.bmi!=null?fcR(C.bmi,2)+' kg/m2 ('+C.bmiCat+')':'-'],['Fat mass','body weight x body fat %',C.fatKg!=null?`${fcR(C.fw,1)} x ${fcR(C.fp,1)}%`:'-',C.fatKg!=null?fcR(C.fatKg,2)+' kg':'-'],['Fat-free mass','body weight - fat mass',C.ffm!=null?`${fcR(C.mw,1)} - ${fcR(C.mf,2)}`:'-',C.ffm!=null?fcR(C.ffm,2)+' kg':'-']].map(rw=>[{t:rw[0],b:1},rw[1],rw[2],{t:rw[3],b:1}]),[.18,.3,.27,.25],{hc:DARK});
+ const mfT=C.mhrF==='tanaka'?'208 - 0.7 x age':C.mhrF==='gellish'?'207 - 0.7 x age':'220 - age';
+ sub("Karvonen's method (use for SMART goal)");table(['Age','MHR ('+mfT+')','RHR','HRR (MHR - RHR)','Intensity','THR'],[[C.kAge??'-',C.mhr!=null?fcR(C.mhr,0):'-',C.rhr??'-',C.hrr!=null?fcR(C.hrr,0):'-',(r.test.intLo||'-')+'% - '+(r.test.intHi||'-')+'%',{t:C.thrLo!=null?Math.round(C.thrLo)+' - '+Math.round(C.thrHi)+' bpm':'-',b:1,c:RED}]].map(rw=>rw.map(c=>typeof c==='object'?Object.assign(c,{al:'c'}):{t:String(c),al:'c'})),[.12,.2,.12,.18,.18,.2],{hc:DARK});
+ if(C.thrLo!=null)para(`THR = (HRR x intensity) + RHR = (${fcR(C.hrr,0)} x ${r.test.intLo}%) + ${fcR(C.rhr,0)} = ${Math.round(C.thrLo)} bpm  to  (${fcR(C.hrr,0)} x ${r.test.intHi}%) + ${fcR(C.rhr,0)} = ${Math.round(C.thrHi)} bpm`,{z:9,c:MUT});
+ /* --- 9 goals --- */
+ sec('Goal Setting');const G=r.goal;sub('Client goal');para(G.client||'—');sub('S.M.A.R.T goal setting');
+ table(['','Goal'],[['Specific',G.specific||'-'],['Measurable',G.measurable||'-'],['Achievable',G.achievable||'-'],['Realistic',G.realistic||'-'],['Time',(G.time?G.time+' weeks':'-')+(G.timeNote?' (review '+fmtDate(G.timeNote)+')':'')]].map(rw=>[{t:rw[0],b:1,c:RED},rw[1]]),[.2,.8]);
+ /* --- 10 report --- */
+ sec('FC Report');para(r.report.summary||'—',{z:11});if(r.report.recs){sub('Recommendations');para(r.report.recs)}if(r.report.review)kv([['Next review date',fmtDate(r.report.review)]],1);
+ need(190);y-=16;const sx=W-M-230;T(C.staffRole+'.',sx,y,{f:B,z:14});T(r.staffName||'',sx,y-20,{z:13});T(fcLongDate(r.date),sx,y-38,{z:10,c:MUT});y-=70;
+ const line=(lab,val)=>{T(lab,M,y,{f:B,z:11});pg.drawLine({start:{x:M+120,y:y-2},end:{x:M+330,y:y-2},thickness:.6,color:DARK});if(val)T(val,M+124,y+2,{z:11});y-=30};
+ line('Staff sign :-','');line('Client name :-',r.report.blankClient?'':(r.report.clientName||C.client));line('Client sign :-','');
+ if(r.report.consent)para('The client has read this report and agrees with the information and goals.',{f:I,z:9,c:MUT});
+ /* footers */
+ const foot=`${C.staffRole}${r.staffName?': '+r.staffName:''}  ·  ${fcLongDate(r.date)}`;
+ pages.forEach((p,k)=>{if(!k)return;p.drawLine({start:{x:M,y:50},end:{x:W-M,y:50},thickness:.5,color:LINE});p.drawText(fcTx('Conducted by '+foot),{x:M,y:36,size:8,font:F,color:MUT});const pn=`Page ${k+1} of ${pages.length}`;p.drawText(pn,{x:W-M-F.widthOfTextAtSize(pn,8),y:36,size:8,font:F,color:MUT})});
+ return await doc.save()}
+
+/* ---------- Fitness Consultation: normative data library (age + sex) ---------- */
+/* dir: 'hi' = higher is better, 'lo' = lower is better, 'cat' = categories (BMI).
+   Each band: s = M/F/A (sex), a = [minAge,maxAge], c = cut-points (ascending).
+   hi : value >= c[i]  -> L[i+1]  (L ordered worst -> best)
+   lo : value <= c[i]  -> L[L.length-1-i]
+   cat: value <  c[i]  -> L[i]    (L in ascending order of the measure)            */
+const FCQ=['Cardiorespiratory fitness (aerobic)','Anaerobic power / capacity','Power (ATP-CP)','Speed (ATP-CP)','Agility','Muscular strength','Muscular endurance','Flexibility','Body composition','Cardiovascular health'];
+const FCES={aer:'Aerobic (oxidative)',gly:'Anaerobic glycolytic',atp:'ATP-CP (phosphagen)',mix:'Mixed / neuromuscular',na:'—'};
+const FCCOND={aer:'Aerobic conditioning: continuous 20–60 min at 60–80% HRR, or 3–5 min intervals at 1:1 work:rest (≈20–30% of max power, work:rest 1:1 to 1:3).',
+ gly:'Anaerobic (lactic) conditioning: 15–60 s efforts at 75–90% of max, work:rest 1:3 to 1:5; 1–3 min efforts at 30–75%, work:rest 1:3 to 1:4.',
+ atp:'Speed / power (ATP-CP) conditioning: 5–10 s maximal efforts at 90–100%, full recovery, work:rest 1:12 to 1:20.',
+ mix:'Strength and neuromuscular training: progressive resistance training (e.g. 60–85% 1RM), technique and movement-quality work.',na:''};
+const FCNORMS0=[
+ {id:'vo2',n:'VO2max',q:0,es:'aer',u:'ml/kg/min',dir:'hi',L:['Poor','Fair','Good','Excellent','Superior'],ref:'The Cooper Institute fitness norms (ACSM). Fair = 40th, Good = 60th, Excellent = 80th, Superior = 95th percentile.',B:[
+  {s:'M',a:[0,29],c:[41.7,45.4,51.1,55.4]},{s:'M',a:[30,39],c:[40.5,44.0,48.3,54.0]},{s:'M',a:[40,49],c:[38.5,42.4,46.4,52.5]},{s:'M',a:[50,59],c:[35.6,39.2,43.4,48.9]},{s:'M',a:[60,69],c:[32.3,35.5,39.5,45.7]},{s:'M',a:[70,120],c:[29.4,32.3,36.7,42.1]},
+  {s:'F',a:[0,29],c:[36.1,39.5,43.9,49.6]},{s:'F',a:[30,39],c:[34.4,37.8,42.4,47.4]},{s:'F',a:[40,49],c:[33.0,36.3,39.7,45.3]},{s:'F',a:[50,59],c:[30.1,33.0,36.7,41.1]},{s:'F',a:[60,69],c:[27.5,30.0,33.0,37.8]},{s:'F',a:[70,120],c:[25.9,28.1,30.9,36.7]}]},
+ {id:'cooper',n:'Cooper 12-minute run',q:0,es:'aer',u:'m',dir:'hi',L:['Poor','Below average','Average','Above average','Excellent'],ref:'Cooper 12-minute run norms (Cooper 1968; Topend Sports / Brianmac tables; yards converted to metres).',B:[
+  {s:'M',a:[0,19],c:[2300,2500,2700,3001]},{s:'M',a:[20,29],c:[1600,2200,2400,2801]},{s:'M',a:[30,39],c:[1500,1900,2300,2701]},{s:'M',a:[40,49],c:[1400,1700,2100,2500]},{s:'M',a:[50,120],c:[1300,1600,2000,2400]},
+  {s:'F',a:[0,19],c:[1700,1800,2100,2301]},{s:'F',a:[20,29],c:[1500,1800,2200,2701]},{s:'F',a:[30,39],c:[1400,1700,2000,2500]},{s:'F',a:[40,49],c:[1200,1500,1900,2300]},{s:'F',a:[50,120],c:[1100,1400,1700,2201]}]},
+ {id:'rast',n:'RAST relative peak power',q:1,es:'gly',u:'W/kg',dir:'hi',L:['Below average','Average','Good','Excellent','Elite'],ref:'RAST, Draper & Whyte (1997); ratings from the Topend Sports RAST guide (Elite > 17, Excellent 14–17, below average < 8 W/kg; Average and Good bands set between these).',B:[{s:'A',a:[0,120],c:[8,11,14,17]}]},
+ {id:'vj',n:'Vertical jump (countermovement)',q:2,es:'atp',u:'cm',dir:'hi',L:['Very poor','Poor','Below average','Average','Above average','Very good','Excellent'],ref:'Adults: Topend Sports vertical jump norms (R. Wood). Under 20: Davis et al. (2000) national norms for 16–19 year olds.',B:[
+  {s:'M',a:[0,19],c:[20,30,40,50,66,66]},{s:'F',a:[0,19],c:[11,21,31,46,61,61]},{s:'M',a:[20,120],c:[21,31,41,51,61,71]},{s:'F',a:[20,120],c:[11,21,31,41,51,61]}]},
+ {id:'s30',n:'30 m sprint',q:3,es:'atp',u:'s',dir:'lo',L:['Poor','Below average','Average','Above average','Excellent'],ref:'30 m sprint norms (Brianmac / University of Gloucestershire fitness testing booklet).',B:[{s:'M',a:[0,120],c:[3.99,4.2,4.4,4.6]},{s:'F',a:[0,120],c:[4.49,4.6,4.8,5.0]}]},
+ {id:'illinois',n:'Illinois agility run',q:4,es:'atp',u:'s',dir:'lo',L:['Poor','Below average','Average','Above average','Excellent'],ref:'Illinois agility run, Davis et al. (2000) national norms (16–19 years).',B:[{s:'M',a:[0,120],c:[15.19,16.1,18.1,19.3]},{s:'F',a:[0,120],c:[16.99,17.9,21.7,23.0]}]},
+ {id:'bench',n:'1RM bench press ÷ body weight',q:5,es:'mix',u:'ratio',dir:'hi',L:['Very poor','Poor','Fair','Good','Excellent','Superior'],ref:'The Cooper Institute (ACSM / ACE). Poor = 20th, Fair = 40th, Good = 60th, Excellent = 80th, Superior = 95th percentile.',B:[
+  {s:'M',a:[0,19],c:[0.89,1.06,1.19,1.34,1.76]},{s:'M',a:[20,29],c:[0.88,0.99,1.14,1.32,1.63]},{s:'M',a:[30,39],c:[0.78,0.88,0.98,1.12,1.35]},{s:'M',a:[40,49],c:[0.72,0.80,0.88,1.00,1.20]},{s:'M',a:[50,59],c:[0.63,0.71,0.79,0.90,1.05]},{s:'M',a:[60,120],c:[0.57,0.66,0.72,0.82,0.94]},
+  {s:'F',a:[0,19],c:[0.53,0.58,0.65,0.77,0.88]},{s:'F',a:[20,29],c:[0.51,0.59,0.70,0.80,1.01]},{s:'F',a:[30,39],c:[0.47,0.53,0.60,0.70,0.82]},{s:'F',a:[40,49],c:[0.43,0.50,0.54,0.62,0.77]},{s:'F',a:[50,59],c:[0.39,0.44,0.48,0.55,0.68]},{s:'F',a:[60,120],c:[0.38,0.43,0.47,0.54,0.72]}]},
+ {id:'legpress',n:'1RM leg press ÷ body weight',q:5,es:'mix',u:'ratio',dir:'hi',L:['Well below average','Below average','Average','Above average','Well above average'],ref:'ACSM / The Cooper Institute leg press norms. Below average = 10th, Average = 30th, Above average = 70th, Well above average = 90th percentile.',B:[
+  {s:'M',a:[0,29],c:[1.51,1.74,2.05,2.27]},{s:'M',a:[30,39],c:[1.43,1.59,1.85,2.07]},{s:'M',a:[40,49],c:[1.35,1.51,1.74,1.92]},{s:'M',a:[50,59],c:[1.22,1.39,1.64,1.80]},{s:'M',a:[60,120],c:[1.16,1.30,1.56,1.73]},
+  {s:'F',a:[0,29],c:[1.14,1.27,1.58,1.82]},{s:'F',a:[30,39],c:[1.00,1.15,1.39,1.61]},{s:'F',a:[40,49],c:[0.94,1.08,1.29,1.48]},{s:'F',a:[50,59],c:[0.78,0.95,1.17,1.37]},{s:'F',a:[60,120],c:[0.72,0.88,1.13,1.32]}]},
+ {id:'grip',n:'Handgrip strength (both hands combined)',q:5,es:'mix',u:'kg',dir:'hi',L:['Needs improvement','Fair','Good','Very good','Excellent'],ref:'Canadian Society for Exercise Physiology (CSEP-PATH), reprinted by ACSM. Sum of best right + best left hand.',B:[
+  {s:'M',a:[0,29],c:[84,95,104,115]},{s:'M',a:[30,39],c:[84,95,104,115]},{s:'M',a:[40,49],c:[80,88,97,108]},{s:'M',a:[50,59],c:[76,84,92,101]},{s:'M',a:[60,120],c:[73,84,91,100]},
+  {s:'F',a:[0,29],c:[52,58,63,71]},{s:'F',a:[30,39],c:[51,58,63,71]},{s:'F',a:[40,49],c:[49,54,61,69]},{s:'F',a:[50,59],c:[45,49,54,61]},{s:'F',a:[60,120],c:[41,45,48,54]}]},
+ {id:'pushup',n:'Push-ups (to fatigue)',q:6,es:'gly',u:'reps',dir:'hi',L:['Needs improvement','Fair','Good','Very good','Excellent'],ref:'Canadian Society for Exercise Physiology (CSEP), reprinted by ACSM / ACE. Men: standard push-ups; women: modified (knee) push-ups.',B:[
+  {s:'M',a:[0,19],c:[18,23,29,39]},{s:'M',a:[20,29],c:[17,22,29,36]},{s:'M',a:[30,39],c:[12,17,22,30]},{s:'M',a:[40,49],c:[10,13,17,25]},{s:'M',a:[50,59],c:[7,10,13,21]},{s:'M',a:[60,120],c:[5,8,11,18]},
+  {s:'F',a:[0,19],c:[12,18,25,33]},{s:'F',a:[20,29],c:[10,15,21,30]},{s:'F',a:[30,39],c:[8,13,20,27]},{s:'F',a:[40,49],c:[5,11,15,24]},{s:'F',a:[50,59],c:[2,7,11,21]},{s:'F',a:[60,120],c:[2,5,12,17]}]},
+ {id:'sitreach',n:'Sit-and-reach (box zero at 26 cm)',q:7,es:'na',u:'cm',dir:'hi',L:['Needs improvement','Fair','Good','Very good','Excellent'],ref:'CSEP-PATH trunk forward flexion norms, reprinted in ACSM Guidelines. For a box with zero at 23 cm, subtract 3 cm from each value.',B:[
+  {s:'M',a:[0,29],c:[25,30,34,40]},{s:'M',a:[30,39],c:[23,28,33,38]},{s:'M',a:[40,49],c:[18,24,29,35]},{s:'M',a:[50,59],c:[16,24,28,35]},{s:'M',a:[60,120],c:[15,20,25,33]},
+  {s:'F',a:[0,29],c:[28,33,37,41]},{s:'F',a:[30,39],c:[27,32,36,41]},{s:'F',a:[40,49],c:[25,30,34,38]},{s:'F',a:[50,59],c:[25,30,33,39]},{s:'F',a:[60,120],c:[23,27,31,35]}]},
+ {id:'bf',n:'Body fat',q:8,es:'na',u:'%',dir:'lo',L:['Very poor','Poor','Fair','Good','Excellent','Very lean'],ref:'ACSM Guidelines for Exercise Testing and Prescription (10th ed.), Cooper Institute percentiles: Very lean ≥95th, Excellent 80–90th, Good 60–75th, Fair 40–55th, Poor 20–35th, Very poor ≤15th.',B:[
+  {s:'M',a:[0,29],c:[6.4,10.5,14.8,18.6,25.0]},{s:'M',a:[30,39],c:[10.3,14.9,18.4,21.6,26.3]},{s:'M',a:[40,49],c:[13.0,17.5,20.8,23.5,27.6]},{s:'M',a:[50,59],c:[14.9,19.4,22.3,24.9,29.1]},{s:'M',a:[60,120],c:[16.1,20.2,23.0,25.6,29.7]},
+  {s:'F',a:[0,29],c:[14.0,16.7,20.0,23.5,30.4]},{s:'F',a:[30,39],c:[13.9,17.4,21.0,24.8,31.4]},{s:'F',a:[40,49],c:[15.2,19.4,23.6,27.4,33.3]},{s:'F',a:[50,59],c:[16.9,22.2,26.6,30.0,34.9]},{s:'F',a:[60,120],c:[17.7,23.1,27.5,30.8,35.5]}]},
+ {id:'bmi',n:'BMI (WHO)',q:8,es:'na',u:'kg/m²',dir:'cat',best:1,L:['Underweight','Normal weight','Overweight','Obese'],ref:'World Health Organization adult BMI classification: < 18.5 underweight, 18.5–24.9 normal, 25–29.9 overweight, ≥ 30 obese.',B:[{s:'A',a:[18,120],c:[18.5,25,30]}]},
+ {id:'bmias',n:'BMI (WHO Asian cut-points)',q:8,es:'na',u:'kg/m²',dir:'cat',best:1,L:['Underweight','Normal weight','Increased risk (overweight)','High risk (obese)'],ref:'WHO Expert Consultation (2004) BMI cut-points for Asian populations: 23 and 27.5 kg/m² as public-health action points.',B:[{s:'A',a:[18,120],c:[18.5,23,27.5]}]},
+ {id:'rhr',n:'Resting heart rate',q:9,es:'na',u:'bpm',dir:'cat',best:1,L:['Below 60 (bradycardia / athletic)','Normal','High (tachycardia)'],ref:'American Heart Association: normal adult resting heart rate 60–100 bpm (well-trained athletes are often below 60).',B:[{s:'A',a:[0,120],c:[60,100.01]}]}];
+const FCMAP={vo2:'vo2',me:'pushup',msu:'bench',msl:'legpress',bmi:'bmi',fat:'bf',rhr:'rhr'};
+function fcNorms(){const E=(db.fcNormEdits)||{};const base=FCNORMS0.map(n=>E[n.id]?Object.assign({},n,{B:E[n.id].B||n.B,L:E[n.id].L||n.L,ref:E[n.id].ref||n.ref}):n);return base.concat((db.fcNormCustom||[]))}
+const fcNorm=id=>fcNorms().find(n=>n.id===id);
+function fcRowNorm(x){const id=x.n!==undefined?x.n:FCMAP[x.k];return id?fcNorm(id):null}
+function fcBand(N,sex,age){const s=/^f/i.test(sex||'')?'F':/^m/i.test(sex||'')?'M':'';const L=N.B.filter(b=>(b.s==='A'||b.s===s));if(!L.length)return null;const a=age==null?25:age;
+ return L.find(b=>a>=b.a[0]&&a<=b.a[1])||L.slice().sort((x,y)=>Math.abs((x.a[0]+x.a[1])/2-a)-Math.abs((y.a[0]+y.a[1])/2-a))[0]}
+function fcRate(N,v,sex,age){if(!N||v==null||!isFinite(v))return null;const b=fcBand(N,sex,age);if(!b)return {err:'No '+(sex?sex.toLowerCase():'')+' table for this test'};const c=b.c,L=N.L;let i;
+ if(N.dir==='hi'){i=0;while(i<c.length&&v>=c[i])i++}else if(N.dir==='lo'){let k=c.findIndex(t=>v<=t);i=k<0?0:L.length-1-k}else{let k=c.findIndex(t=>v<t);i=k<0?c.length:k}
+ const lab=L[i];let next=null,gap=null,toward='';
+ if(N.dir==='hi'&&i<L.length-1){next=L[i+1];gap=c[i]-v;const lo=i?c[i-1]:null;if(lo!=null&&c[i]>lo&&(v-lo)/(c[i]-lo)>=.6)toward=next}
+ else if(N.dir==='lo'&&i<L.length-1){const k=L.length-1-i;next=L[i+1];gap=v-c[k-1];const hi=c[k]!=null?c[k]:null;if(hi!=null&&hi>c[k-1]&&(hi-v)/(hi-c[k-1])>=.6)toward=next}
+ else if(N.dir==='cat'&&i!==N.best){next=L[N.best];gap=i>N.best?v-c[N.best]:c[N.best-1]-v;toward=''}
+ const sx=b.s==='A'?'all adults':(b.s==='M'?'men':'women'),ag=b.a[0]<=0&&b.a[1]>=120?'all ages':b.a[0]<=0?`up to ${b.a[1]} years`:b.a[1]>=120?`${b.a[0]}+ years`:`${b.a[0]}–${b.a[1]} years`;
+ return {lab,i,n:L.length,next,gap,toward,band:b,grp:`${sx}, ${ag}`,best:N.dir==='cat'?i===N.best:i===L.length-1}}
+function fcBandText(N,b){const c=b.c,L=N.L,u=N.u==='ratio'?'':' '+N.u,f=x=>String(+(+x).toFixed(2));
+ if(N.dir==='hi')return L.map((l,i)=>i===0?`${l} < ${f(c[0])}`:i===L.length-1?`${l} ≥ ${f(c[i-1])}`:c[i-1]>=c[i]?'':`${l} ${f(c[i-1])}–<${f(c[i])}`).filter(Boolean).join(' · ')+u;
+ if(N.dir==='lo')return L.slice().reverse().map((l,k)=>k===0?`${l} ≤ ${f(c[0])}`:k===L.length-1?`${l} > ${f(c[k-1])}`:`${l} ${f(c[k-1])}–${f(c[k])}`).join(' · ')+u;
+ return L.map((l,i)=>i===0?`${l} < ${f(c[0])}`:i===L.length-1?`${l} ≥ ${f(c[i-1])}`:`${l} ${f(c[i-1])}–<${f(c[i])}`).join(' · ')+u}
+function fcRateText(N,R,v){if(!R)return '';if(R.err)return R.err;const u=N.u==='ratio'?'':' '+N.u,f=x=>String(+(+x).toFixed(2));
+ let t=R.lab+(R.toward?` — moving toward ${R.toward}`:'');
+ if(R.next&&R.gap!=null&&R.gap>0&&N.dir!=='cat')t+=` (${f(R.gap)}${u} ${N.dir==='lo'?(N.u==='s'?'faster':'lower'):'more'} needed for ${R.next})`;
+ if(N.dir==='cat'&&R.next)t+=` (${f(R.gap)}${u} from ${R.next})`;return t}
+function fcRowRating(r,x,C,which){const N=fcRowNorm(x);const manual=which==='cur'?x.curR:x.tgtR;const v=fcNum(which==='cur'?fcRowCur(r,x,C):x.tgt);
+ if(manual)return {txt:manual,lab:manual,manual:true,N};if(!N||v==null)return {txt:'',N};const R=fcRate(N,v,r.demo.gender,C.nAge);return {txt:fcRateText(N,R,v),lab:R&&R.lab,R,N}}
+/* normative library editor */
+function fcNormLib(sel){const L=fcNorms();const id=sel||L[0].id;const N=fcNorm(id);const ed=(db.fcNormEdits||{})[id];
+ modal(`<div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><div><div class="eyebrow">Fitness Consultation</div><h3 style="margin:4px 0">Normative data library</h3><div class="muted" style="font-size:13px">Categories are worked out from these tables by the client's age and sex. You can edit any cut-point.</div></div><button class="btn sm" onclick="closeModal()">Close</button></div>
+ <select style="margin:12px 0" onchange="fcNormLib(this.value)">${FCQ.map((q,qi)=>`<optgroup label="${esc(q)}">${L.filter(n=>n.q===qi).map(n=>`<option value="${n.id}" ${n.id===id?'selected':''}>${esc(n.n)} (${esc(n.u)})</option>`).join('')}</optgroup>`).join('')}</select>
+ <div class="fc-note" style="margin-top:0"><b>${esc(N.n)}</b> · ${esc(FCQ[N.q])} · energy system: ${esc(FCES[N.es]||'—')} · ${N.dir==='hi'?'higher is better':N.dir==='lo'?'lower is better':'categories'}<br><span class="muted" style="font-size:13px">${esc(N.ref)}</span></div>
+ <div style="overflow:auto"><table class="fc-tbl"><thead><tr><th>Sex</th><th>Age</th>${(N.dir==='lo'?N.L.slice().reverse().slice(0,-1).map(l=>l+' up to'):N.L.slice(1).map(l=>l+' from')).map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${N.B.map((b,bi)=>`<tr><td>${b.s==='A'?'All':b.s==='M'?'Men':'Women'}</td><td style="white-space:nowrap">${b.a[0]}–${b.a[1]>=120?'+':b.a[1]}</td>${b.c.map((v,ci)=>`<td><input type="number" step="any" value="${v}" style="min-width:70px" onchange="fcNormSet('${id}',${bi},${ci},this.value)"></td>`).join('')}</tr>`).join('')}</tbody></table></div>
+ <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">${ed?`<button class="btn sm" onclick="fcNormReset('${id}')">↺ Reset to published values</button>`:''}<span class="muted" style="font-size:12px">${ed?'Edited by your organisation.':'Published values.'}</span></div>`);document.getElementById('modalBody').style.width='min(900px,96vw)'}
+function fcNormSet(id,bi,ci,v){const n=parseFloat(v);if(!isFinite(n))return;db.fcNormEdits=db.fcNormEdits||{};const N=fcNorm(id);const B=JSON.parse(JSON.stringify(N.B));B[bi].c[ci]=n;db.fcNormEdits[id]=Object.assign({},db.fcNormEdits[id],{B});save();if(FC.id)fcLive();toast('Cut-point saved')}
+function fcNormReset(id){if(db.fcNormEdits)delete db.fcNormEdits[id];save();fcNormLib(id);render();toast('Published values restored')}
+
+/* ============ PERIODISATION PROGRAM DESIGN (editable page sequence + PDF) ============ */
+const PDROLES=['Sports Scientist','Strength & Conditioning Coach','Coach','Head Coach','Exercise Specialist','Physiotherapist','Personal Trainer','Other'];
+const pdKV=(k,rows,cols=2)=>({t:'kv',k,cols,rows:rows.map(r=>Array.isArray(r)?r:[r,''])});
+const pdTX=(k,label,value='',lines=3)=>({t:'text',k,label,value,lines});
+const pdTB=(k,head,rows,label='')=>({t:'table',k,label,head:head.slice(),rows:rows.map(r=>Array.isArray(r)?{c:r.concat(Array(Math.max(0,head.length-r.length)).fill('')),s:false}:{c:[r.s].concat(Array(head.length-1).fill('')),s:true})});
+const pdH=(text)=>({t:'h',text});
+const pdCK=(k,label,items)=>({t:'checks',k,label,items:items.map(i=>[i,false])});
+const pdLS=(k,label,items)=>({t:'list',k,label,items:items.slice()});
+const pdSG=(k,items)=>({t:'sign',k,items:items.map(i=>Array.isArray(i)?i:[i,''])});
+const PDCONSENT={p:'I hereby consent to voluntarily engage in an acceptable plan of personal fitness training. I also give consent to be placed in fitness test activities which are recommended to measure my cardiorespiratory fitness, body composition, muscular strength, muscular endurance and flexibility.\n\nI have been informed that during my participation in the above-described fitness tests / fitness programme I will be asked to complete physical activities unless symptoms such as fatigue, shortness of breath, chest discomfort or similar occurrences appear. At this point I have been advised that it is my complete right to decrease or stop exercise, and that it is my obligation to inform the personal fitness training staff of any symptoms that develop. I understand that the trainer may reduce or stop my exercise programme when any such finding indicates that this should be done for my safety and benefit. I also understand that physical touching and positioning of my body may be necessary to assess my muscular and bodily reaction to specific exercises and to ensure correct technique and body alignment, and I consent to this physical contact.',
+ r:'It is my understanding, and I have been informed, that there is a remote possibility during exercise of adverse changes including, but not limited to, abnormal blood pressure, fainting, dizziness, disorders of heart rhythm and, in very rare instances, heart attack, stroke or even death. I further understand that there is a risk of bodily injury including, but not limited to, injuries to the muscles, ligaments, tendons and joints. Every effort will be made to minimise these occurrences by proper staff assessment of my condition before each training session, staff supervision during exercise and my own careful control of exercise efforts. I fully understand the risks associated with exercise, and knowing these risks it is my desire to participate as indicated.',
+ b:'I understand that this fitness test session will show my stronger and weaker areas, which will be used for goal setting, and that test results may or may not benefit my physical fitness or general health. I recognise that involvement in the personal fitness training session will allow me to learn proper ways to perform conditioning exercise, use fitness equipment and regulate physical effort, and that these experiences should benefit me by indicating how my physical limitations may affect my ability to perform various physical activities. I further understand that if I closely follow the programme instructions I will likely improve my exercise capacity and fitness level after a period of 3 to 6 months.',
+ d:'I have read this informed consent form, fully understand its terms, understand that I have given up substantial rights by signing it, and sign it freely and voluntarily, without inducement.'};
+const PDTPL=[
+ ['consent','Informed Consent',()=>[pdKV('who',[['Name',''],['Date','']]),pdTX('purpose','1. Purpose and explanation of procedure',PDCONSENT.p,8),pdTX('risks','2. Risks',PDCONSENT.r,6),pdTX('benefits','3. Benefits to be expected and alternatives available to exercise',PDCONSENT.b,6),pdTX('declare','Declaration',PDCONSENT.d,2),pdSG('sign',["Participant's signature",'Witness signature','Date'])]],
+ ['fcr','Fitness Consultation Report',()=>[pdTB('summary',['Date','Name','Medical clearance','Exercise experience','Fitness goal'],[['','','','','']]),pdTX('conclusion','Conclusion','',5)]],
+ ['smart','S.M.A.R.T Goal Setting',()=>[pdKV('date',[['Date','']],1),pdTX('s','Specific','',2),pdTX('m','Measurable','',2),pdTX('a','Achievable','',1),pdTX('r','Realistic','',1),pdTX('t','Time','',1)]],
+ ['hsf','HSF Assessment Template',()=>[pdTB('client',['Client name','Height (cm)','Age (yrs)','Body weight (kg)'],[['','','','']]),pdCK('bio','Bio-motor ability',['C.R.F','M.E','Flexibility','M.S','Body composition']),pdH('Body Composition'),pdKV('bcp',[['Test protocol',''],['Day / date / time','']]),pdTB('bcv',['B.W (kg)','HT (cm)','BMI','Abdomen (cm)','Iliac (cm)','Calf R (cm)','Calf L (cm)','Fat %','Fat (kg)','FFM %','FFM (kg)'],[['','','','','','','','','','','']],'Test variables measured'),pdTX('bci','Interpretation','',3)]],
+ ['crfms','Cardiorespiratory Fitness & Muscular Strength',()=>[pdH('Cardio Respiratory Fitness'),pdKV('crfp',[['Test protocol',''],['Day & date & time','']]),pdTB('crfv',['VO2max (ml/kg/min)','RHR (bpm)','THR (bpm)','Time (min/sec)','Distance (mi/km)'],[['','','','','']],'Test variables measured'),pdTX('crfi','Interpretation','',3),
+  pdH('Muscular Strength (Lower Body)'),pdKV('msp',[['Test protocol',''],['Day / date / time','']]),pdTB('msv',['Exercise','Sets','Reps','Load (kg)','Body weight / max load'],[['','','','',''],['','','','','']],'Test variables measured'),pdTX('msi','Interpretation','',3)]],
+ ['meflex','Muscular Endurance & Flexibility',()=>[pdH('Muscular Endurance'),pdKV('mep',[['Test protocol',''],['Day / date / time','']]),pdTB('mev',['Exercise','Reps'],[['1. Push-ups',''],['Knee push-ups',''],['2. Partial curl-up','']],'Test variables measured'),pdTX('mei','Interpretation','',3),
+  pdH('Flexibility'),pdKV('flp',[['Test protocol',''],['Day / date / time','']]),pdTB('flv',['Trial 1 (cm)','Trial 2 (cm)'],[['','']],'Test variables measured'),pdTX('fli','Interpretation','',3)]],
+ ['profile','Athlete Profile & Testing Summary',()=>[pdH('Demographic Information'),pdKV('demo',[['Sport',''],['Occupation',''],['Name',''],['DOB',''],['Gender',''],['Age',''],['Sports training age',''],['Sports category','']]),
+  pdLS('health','Health history',['','','']),pdKV('exh',[['Exercise history (since)',''],['Frequency',''],['Intensity',''],['Type of training methods',''],['Volume','']],1),
+  pdTB('tests',['Fitness variable','Test results'],[['Cardio respiratory fitness',''],['YYIR1',''],['Muscular strength',''],['Muscular endurance',''],['MAS',''],['Acc_Speed',''],['YBT',''],['FMS','']],'Fitness testing'),
+  pdLS('goal','Goal — 8 weeks',['','','','','','','']),pdLS('rec','Recommendation',['','','','',''])]],
+ ['cover','Section Cover',()=>[{t:'cover',text:'C.R.F PROGRAM DESIGN',sub:''}]],
+ ['plan','Periodise Plan (C.R.F)',()=>[pdKV('pn',[['Name',''],['Goal',''],['Fitness goal','']],1),pdTB('grid',['Periodise variables','Week 1','Week 2','Week 3','Week 4'],[['Months','','','',''],['Weeks — start date','','','',''],['Week no.','1','2','3','4'],['Phase','','','',''],['Meso-cycle','','','',''],['Micro-cycle','','','',''],['Bio-motor abilities','','','',''],{s:'Training load'},['Frequency','','','',''],['Intensity','','','',''],['Type','','','',''],['Volume','','','',''],['Time','','','',''],['Progression','','','',''],['Periodise plan & loading paradigm','','','','']])]],
+ ['workout','Workout Sheet',()=>[pdKV('ws',[['Date',''],['Day',''],['Duration',''],['Session no.',''],['Goal',''],['Ex.Rx',''],['Start time','']]),pdTB('wt',['Sr. no','Exercise','Sets','Reps / min','Load','Remark / RPE'],[{s:'Warm-up'},['Light aerobic 1','','','','',''],['Light aerobic 2','','','','',''],['Joint movement 1','','','','',''],['Specific muscle 1','','','','',''],{s:'Condition'},['1','','','','',''],['2','','','','',''],['3','','','','',''],['4','','','','',''],{s:'Cool down'},['1','','','','',''],['2','','','','','']])]],
+ ['week','Weekly Training Program',()=>[pdKV('wk',[['Week','Week 1 & 2'],['Fitness variable','']],1),pdTB('wp',['Exercises','Sets','Reps / dis / time','Intensity','KPI','Remark'],[{s:'Warm up'},['a. ','','','','',''],['b. ','','','','',''],['c. ','','','','',''],{s:'Main workout — (1) CRF'},['','','','% HRR','',''],['','','','','',''],{s:'(2) MS + Power (UB + LB)'},['','','','% of 1RM','',''],['','','','','',''],['','','','m/s','',''],{s:'Cool down'},['','','','','','']]),pdSG('by',['Plan & program designed by','Position','Organisation','Date'])]],
+ ['blank','Blank page',()=>[pdH('Heading'),pdKV('f',[['Field','']]),pdTX('n','Notes','',3)]]];
+const PDSEQ=['consent','fcr','smart','hsf','crfms','meflex','profile','cover','plan','workout','week'];
+let PD={id:null,pg:0,q:''};
+function pdDb(){db.pdPrograms=db.pdPrograms||[];return db.pdPrograms}
+const pdRec=()=>PD.id?byId('pdPrograms',PD.id):null;
+function pdPage(tpl){const t=PDTPL.find(x=>x[0]===tpl)||PDTPL[PDTPL.length-1];return {id:uid('pg'),tpl:t[0],title:t[1],blocks:t[2]()}}
+function pdNewRec(o={}){const me=authUser()||{};return Object.assign({id:uid('pd'),title:'Periodisation Program',status:'Draft',created:new Date().toISOString(),updated:new Date().toISOString(),date:today(),athlete:'',client:'',
+ role:STAFF(me.role)&&PDROLES.includes(me.role)?me.role:'Sports Scientist',name:me.name||db.profile.name||'',org:db.org.name||'BIOMOTOR Sport and Fitness',pages:PDSEQ.map(pdPage)},o)}
+let pdT=null;function pdSave(r){r.updated=new Date().toISOString();clearTimeout(pdT);pdT=setTimeout(()=>save(),350)}
+function pdIn(el){const r=pdRec();if(!r)return;fcPut(r,el.dataset.p,el.type==='checkbox'?el.checked:el.value);pdSave(r);if(el.dataset.p==='client'||el.dataset.p==='title'){const h=document.getElementById('pdHdr');if(h)h.textContent=r.title+(r.client&&!r.title.includes(r.client)?' · '+r.client:'')}}
+function pdDo(fn){const r=pdRec();if(!r)return;fn(r,r.pages[PD.pg]);pdSave(r);render()}
+const pdBlk=(i)=>`pages.${PD.pg}.blocks.${i}`;
+/* ---------- list ---------- */
+P['periodisation']=()=>{pdDb();const me=authUser()||{};
+ if(me.role&&!STAFF(me.role)&&!me.owner)return head('Train','Periodisation Program Design','')+`<div class="card"><p class="muted" style="margin:0">Programs are designed by BIOMOTOR staff. Ask your coach for your program.</p></div>`;
+ if(PD.id&&!pdRec())PD.id=null;return PD.id?pdEditor():pdList()};
+function pdList(){const q=PD.q.toLowerCase();const L=pdDb().slice().sort((a,b)=>String(b.updated).localeCompare(String(a.updated))).filter(r=>!q||[r.title,r.client,r.name,r.role].join(' ').toLowerCase().includes(q));
+ return head('Train','Periodisation Program Design','Informed consent → consultation report → SMART goals → assessments → athlete profile → periodised plan → workout sheets. Every page, heading, row and cell can be edited, and the whole program downloads as a PDF.',`<button class="btn" onclick="pdNewFromFC()">⇢ From a fitness consultation</button><button class="btn pri" onclick="pdNew()">＋ New program</button>`)+
+ `<div class="card"><div class="row" style="justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px"><h3 style="margin:0">All programs (${pdDb().length})</h3><input style="max-width:280px" placeholder="Search client or staff…" value="${esc(PD.q)}" data-pdq oninput="PD.q=this.value;clearTimeout(window._pdq);window._pdq=setTimeout(()=>{render();const s=document.querySelector('[data-pdq]');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length)}},250)"></div>
+ ${L.length?`<div style="overflow:auto"><table><thead><tr><th>Program</th><th>Client</th><th>Designed by</th><th>Pages</th><th>Updated</th><th></th></tr></thead><tbody>${L.map(r=>`<tr><td><b>${esc(r.title)}</b><div class="muted" style="font-size:12px">${fmtDate(r.date)}</div></td><td>${esc(r.client||'—')}</td><td>${esc(r.name||'—')}<div class="muted" style="font-size:12px">${esc(r.role)}</div></td><td>${r.pages.length}</td><td>${fmtDate(String(r.updated).slice(0,10))}</td>
+  <td style="white-space:nowrap;text-align:right"><button class="btn sm" onclick="pdOpen('${r.id}')">Open</button> <button class="btn sm pri" onclick="pdPdf('${r.id}')">⬇ PDF</button> <button class="btn sm" title="Duplicate" onclick="pdDup('${r.id}')">⧉</button> <button class="btn sm" title="Delete" onclick="pdDel('${r.id}')">🗑</button></td></tr>`).join('')}</tbody></table></div>`
+ :`<div style="text-align:center;padding:28px 10px"><div style="font-size:40px">📈</div><h3 style="margin:8px 0 4px">No programs yet</h3><p class="muted" style="margin:0 0 14px">Start a blank program, or create one from a completed fitness consultation so the name, goals and test results are filled in.</p><div class="row" style="justify-content:center;gap:8px"><button class="btn" onclick="pdNewFromFC()">⇢ From a fitness consultation</button><button class="btn pri" onclick="pdNew()">＋ New program</button></div></div>`}</div>`}
+function pdNew(o){const r=pdNewRec(o);pdDb().unshift(r);save();PD.id=r.id;PD.pg=0;render();window.scrollTo(0,0);return r}
+function pdOpen(id){PD.id=id;PD.pg=0;render();window.scrollTo(0,0)}
+function pdDup(id){const s=byId('pdPrograms',id);const c=JSON.parse(Shubham.stringify(s));c.id=uid('pd');c.title=s.title+' (copy)';c.created=c.updated=new Date().toISOString();c.pages.forEach(p=>p.id=uid('pg'));pdDb().unshift(c);save();render();toast('Program duplicated')}
+function pdDel(id){confirmBox('Delete this program? This cannot be undone.',()=>{db.pdPrograms=pdDb().filter(r=>r.id!==id);save();if(PD.id===id)PD.id=null;render();toast('Program deleted')})}
+function pdNewFromFC(){const L=fcDb?fcDb():[];if(!L.length){toast('No fitness consultations yet — starting a blank program');return pdNew()}
+ modal(`<h3 style="margin-top:0">Create from a fitness consultation</h3><p class="muted">Name, date, medical clearance, goals, SMART goal, body composition and CRF results are copied in. You can edit everything afterwards.</p>
+ <select id="pdFc">${L.map(r=>{const C=fcCalc(r);return `<option value="${r.id}">${esc(C.client)} — ${fmtDate(r.date)} (${esc(r.status)})</option>`}).join('')}</select>
+ <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn pri" onclick="pdFromFC(document.getElementById('pdFc').value)">Create program</button></div>`)}
+function pdFromFC(fid){closeModal();const f=byId('fitConsults',fid);if(!f)return;const C=fcCalc(f);const d=f.demo,G=f.goal;
+ const r=pdNew({client:C.client,athlete:f.athlete,title:'Periodisation Program — '+C.client,role:C.staffRole,name:f.staffName||''});
+ const pg=t=>r.pages.find(p=>p.tpl===t),bk=(p,k)=>p&&p.blocks.find(b=>b.k===k),kv=(b,l,v)=>{if(!b)return;const row=b.rows.find(x=>x[0]===l);if(row&&v!=null&&v!=='')row[1]=String(v)};
+ const dt=fmtDate(f.date),row=k=>(f.test.rows.find(x=>x.k===k)||{});
+ kv(bk(pg('consent'),'who'),'Name',C.client);kv(bk(pg('consent'),'who'),'Date',dt);
+ const s=bk(pg('fcr'),'summary');if(s)s.rows[0].c=[dt,C.client,C.clear||'',[f.exh.status,(f.exh.types||[]).join(', ')].filter(Boolean).join(' — ')||'Nil',G.client||''];
+ const cc=bk(pg('fcr'),'conclusion');if(cc)cc.value=f.report.summary||'';
+ const sm=pg('smart');if(sm){kv(bk(sm,'date'),'Date',dt);bk(sm,'s').value=G.specific||'';bk(sm,'m').value=G.measurable||'';bk(sm,'a').value=G.achievable||'';bk(sm,'r').value=G.realistic||'';bk(sm,'t').value=G.time?G.time+' weeks':''}
+ const h=pg('hsf');if(h){bk(h,'client').rows[0].c=[C.client,d.height||'',C.age!=null?String(C.age):'',d.weight||''];
+  bk(h,'bcv').rows[0].c=[C.w!=null?fcR(C.w,1):'',C.h!=null?fcR(C.h,1):'',C.bmi!=null?fcR(C.bmi,1):'','','','','',C.fp!=null?fcR(C.fp,1):'',C.fatKg!=null?fcR(C.fatKg,1):'',C.ffm!=null&&C.w?fcR(C.ffm/C.w*100,1):'',C.ffm!=null?fcR(C.ffm,1):''];
+  const bi=fcRowRating(f,row('fat'),C,'cur');bk(h,'bci').value=[C.bmi!=null?`BMI ${fcR(C.bmi,1)} (${C.bmiCat})`:'',bi.lab?`Body fat ${C.fp}% (${bi.lab})`:''].filter(Boolean).join('. ')}
+ const c=pg('crfms');if(c){bk(c,'crfv').rows[0].c=[row('vo2').cur||'',C.rhr!=null?String(C.rhr):'',C.thrLo!=null?Math.round(C.thrLo)+'–'+Math.round(C.thrHi):'','',''];const v=fcRowRating(f,row('vo2'),C,'cur');if(v.txt)bk(c,'crfi').value='VO2max '+v.txt}
+ const pf=pg('profile');if(pf){const D=bk(pf,'demo');kv(D,'Name',C.client);kv(D,'Occupation',d.occupation);kv(D,'Gender',d.gender);kv(D,'Age',C.age);
+  const at=byId('athletes',f.athlete);if(at){kv(D,'Sport',at.sport);kv(D,'DOB',at.dob?fmtDate(at.dob):'')}
+  const E=bk(pf,'exh');kv(E,'Frequency',f.exh.freq);kv(E,'Intensity',f.exh.int);kv(E,'Type of training methods',f.exh.type);kv(E,'Volume',f.exh.vol);
+  const T=bk(pf,'tests');const add=[];f.test.rows.forEach(x=>{const cu=fcRowCur(f,x,C);if(cu==='')return;const a=fcRowRating(f,x,C,'cur');add.push({c:[x.l,`${cu}${x.u&&x.u!=='ratio'?' '+x.u:''}${a.lab?' ('+a.lab+')':''}`],s:false})});if(add.length)T.rows=add;
+  if(G.measurable){bk(pf,'goal').items=G.measurable.split('\n').filter(Boolean);bk(pf,'goal').label='Goal — '+(G.time||'8')+' weeks'}if(f.report.recs)bk(pf,'rec').items=f.report.recs.split('\n').filter(Boolean)}
+ const pl=pg('plan');if(pl){kv(bk(pl,'pn'),'Name',C.client);kv(bk(pl,'pn'),'Goal',G.client);kv(bk(pl,'pn'),'Fitness goal',G.specific)}
+ const by=bk(pg('week'),'by');if(by){by.items[0][1]=r.name;by.items[1][1]=r.role;by.items[2][1]=r.org;by.items[3][1]=dt}
+ save();render();toast('Program created from the consultation')}
+/* ---------- editor ---------- */
+function pdEditor(){const r=pdRec();PD.pg=Math.max(0,Math.min(PD.pg,r.pages.length-1));const p=r.pages[PD.pg];
+ const tabs=`<div class="fc-steps">${r.pages.map((x,i)=>`<button class="${i===PD.pg?'on':''}" onclick="PD.pg=${i};render();window.scrollTo(0,0)"><span>${i+1}</span>${esc(x.title)}</button>`).join('')}<button onclick="pdAddPage()" title="Add page"><span>＋</span>Add page</button></div>`;
+ const top=`<div class="pagehead"><div><div class="eyebrow">Periodisation Program Design</div><h2 id="pdHdr">${esc(r.title)}${r.client&&!r.title.includes(r.client)?' · '+esc(r.client):''}</h2></div><div class="row"><button class="btn" onclick="save();PD.id=null;render()">← All programs</button><button class="btn pri" onclick="pdPdf('${r.id}')">⬇ Download PDF</button></div></div>`;
+ const info=`<details class="fc-det" style="margin:0 0 14px" ${r.client?'':'open'}><summary>Program details — shown on the cover and the footer of every PDF page</summary><div class="fc-g" style="grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr));margin-top:10px">
+  ${[['title','Program title'],['client','Client / athlete name'],['org','Organisation']].map(([k,l])=>`<div><label>${l}</label><input data-p="${k}" value="${esc(r[k]||'')}" oninput="pdIn(this)"></div>`).join('')}
+  <div><label>Athlete on roster</label><select onchange="pdPickAth(this.value)"><option value="">— None —</option>${db.athletes.map(a=>`<option value="${a.id}" ${a.id===r.athlete?'selected':''}>${esc(a.name)}</option>`).join('')}</select></div>
+  <div><label>Designed by (position)</label><input data-p="role" list="pdRoleL" value="${esc(r.role||'')}" oninput="pdIn(this)"><datalist id="pdRoleL">${PDROLES.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>
+  <div><label>Designer name</label><input data-p="name" list="pdStaffL" value="${esc(r.name||'')}" oninput="pdIn(this)"><datalist id="pdStaffL">${db.users.filter(u=>STAFF(u.role)).map(u=>`<option value="${esc(u.name)}">`).join('')}</datalist></div>
+  <div><label>Program date</label><input type="date" data-p="date" value="${esc(r.date||'')}" oninput="pdIn(this)"></div></div></details>`;
+ const pbar=`<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px"><input data-p="pages.${PD.pg}.title" value="${esc(p.title)}" oninput="pdIn(this);const b=document.querySelector('.fc-steps .on');if(b)b.lastChild.textContent=this.value" style="flex:1;min-width:200px;font-size:18px;font-weight:700">
+  <button class="btn sm" ${PD.pg?'':'disabled'} onclick="pdMovePage(-1)" title="Move page earlier">◀</button><button class="btn sm" ${PD.pg<r.pages.length-1?'':'disabled'} onclick="pdMovePage(1)" title="Move page later">▶</button><button class="btn sm" onclick="pdDupPage()">⧉ Duplicate page</button><button class="btn sm" onclick="pdDelPage()">🗑 Delete page</button></div>`;
+ const blocks=p.blocks.map((b,i)=>pdBlockHtml(b,i,p.blocks.length)).join('');
+ const add=`<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:14px"><span class="muted" style="font-size:13px">Add to this page:</span>${[['h','Heading'],['kv','Fields'],['text','Text box'],['table','Table'],['checks','Checklist'],['list','Numbered list'],['sign','Signature lines']].map(([t,l])=>`<button class="btn sm" onclick="pdAddBlock('${t}')">＋ ${l}</button>`).join('')}</div>`;
+ const nav=`<div class="row" style="justify-content:space-between;margin-top:18px"><button class="btn" ${PD.pg?'':'disabled'} onclick="PD.pg--;render();window.scrollTo(0,0)">← Previous page</button><span class="muted">Page ${PD.pg+1} of ${r.pages.length}</span>${PD.pg<r.pages.length-1?`<button class="btn pri" onclick="PD.pg++;render();window.scrollTo(0,0)">Next: ${esc(r.pages[PD.pg+1].title)} →</button>`:`<button class="btn pri" onclick="pdPdf('${r.id}')">⬇ Download PDF</button>`}</div>`;
+ return top+info+tabs+`<div class="card fc-card">${pbar}${blocks}${add}${nav}</div>`}
+function pdPickAth(id){const r=pdRec();r.athlete=id;const a=byId('athletes',id);if(a&&!r.client)r.client=a.name;pdSave(r);render()}
+function pdBlockTools(i,n){return `<div class="pd-bt"><button title="Move up" ${i?'':'disabled'} onclick="pdMoveBlock(${i},-1)">↑</button><button title="Move down" ${i<n-1?'':'disabled'} onclick="pdMoveBlock(${i},1)">↓</button><button title="Remove block" onclick="pdDelBlock(${i})">✕</button></div>`}
+function pdBlockHtml(b,i,n){const P=pdBlk(i),T=pdBlockTools(i,n);const inp=(p,v,ph='',x='')=>`<input data-p="${P}.${p}" value="${esc(v??'')}" placeholder="${esc(ph)}" oninput="pdIn(this)" ${x}>`;
+ if(b.t==='h')return `<div class="pd-b pd-h">${T}<input data-p="${P}.text" value="${esc(b.text)}" oninput="pdIn(this)" class="pd-hin"></div>`;
+ if(b.t==='cover')return `<div class="pd-b pd-cover">${T}<label>Cover title</label><input data-p="${P}.text" value="${esc(b.text)}" oninput="pdIn(this)" style="font-size:24px;font-weight:800;text-align:center"><label style="margin-top:8px">Subtitle (optional)</label>${inp('sub',b.sub,'e.g. 8-week block')}</div>`;
+ if(b.t==='kv')return `<div class="pd-b">${T}<div class="pd-kv" style="grid-template-columns:repeat(${b.cols||2},minmax(0,1fr))">${b.rows.map((r,j)=>`<div class="pd-kvr"><input class="pd-lab" data-p="${P}.rows.${j}.0" value="${esc(r[0])}" oninput="pdIn(this)"><div class="row" style="gap:4px;flex-wrap:nowrap">${inp('rows.'+j+'.1',r[1])}<button class="btn sm" title="Remove field" onclick="pdArr(${i},'rows',${j})">✕</button></div></div>`).join('')}</div>
+  <div class="row" style="gap:6px;margin-top:6px"><button class="btn sm" onclick="pdPush(${i},'rows',['New field',''])">＋ Field</button><button class="btn sm" onclick="pdSet(${i},'cols',${(b.cols||2)===1?2:1})">${(b.cols||2)===1?'2 columns':'1 column'}</button></div></div>`;
+ if(b.t==='text')return `<div class="pd-b">${T}<input class="pd-lab" data-p="${P}.label" value="${esc(b.label)}" oninput="pdIn(this)"><textarea data-p="${P}.value" rows="${Math.max(2,Math.min(12,b.lines||3))}" oninput="pdIn(this)">${esc(b.value)}</textarea></div>`;
+ if(b.t==='checks')return `<div class="pd-b">${T}<input class="pd-lab" data-p="${P}.label" value="${esc(b.label)}" oninput="pdIn(this)"><div class="fc-fam">${b.items.map((it,j)=>`<div class="fc-chk"><input type="checkbox" data-p="${P}.items.${j}.1" ${it[1]?'checked':''} onchange="pdIn(this)"><input data-p="${P}.items.${j}.0" value="${esc(it[0])}" oninput="pdIn(this)" style="flex:1;padding:5px 7px"><button class="btn sm" onclick="pdArr(${i},'items',${j})">✕</button></div>`).join('')}</div><button class="btn sm" style="margin-top:6px" onclick="pdPush(${i},'items',['New item',false])">＋ Item</button></div>`;
+ if(b.t==='list')return `<div class="pd-b">${T}<input class="pd-lab" data-p="${P}.label" value="${esc(b.label)}" oninput="pdIn(this)">${b.items.map((it,j)=>`<div class="row" style="gap:6px;margin:4px 0;flex-wrap:nowrap"><span class="fc-qn">${j+1}</span><input data-p="${P}.items.${j}" value="${esc(it)}" oninput="pdIn(this)"><button class="btn sm" onclick="pdArr(${i},'items',${j})">✕</button></div>`).join('')}<button class="btn sm" style="margin-top:4px" onclick="pdPush(${i},'items','')">＋ Line</button></div>`;
+ if(b.t==='sign')return `<div class="pd-b">${T}<div class="pd-kv" style="grid-template-columns:repeat(2,minmax(0,1fr))">${b.items.map((r,j)=>`<div class="pd-kvr"><input class="pd-lab" data-p="${P}.items.${j}.0" value="${esc(r[0])}" oninput="pdIn(this)"><div class="row" style="gap:4px;flex-wrap:nowrap">${inp('items.'+j+'.1',r[1],'Leave blank to sign by hand')}<button class="btn sm" onclick="pdArr(${i},'items',${j})">✕</button></div></div>`).join('')}</div><button class="btn sm" style="margin-top:6px" onclick="pdPush(${i},'items',['Signature',''])">＋ Line</button></div>`;
+ if(b.t==='table'){const W=b.head.length;return `<div class="pd-b">${T}<input class="pd-lab" data-p="${P}.label" value="${esc(b.label||'')}" placeholder="Table title (optional)" oninput="pdIn(this)"><div style="overflow:auto"><table class="fc-tbl pd-tbl"><thead><tr><th style="width:34px"></th>${b.head.map((h,c)=>`<th><div class="row" style="gap:3px;flex-wrap:nowrap"><input data-p="${P}.head.${c}" value="${esc(h)}" oninput="pdIn(this)"><button class="pd-x" title="Remove column" onclick="pdDelCol(${i},${c})">✕</button></div></th>`).join('')}<th style="width:36px"><button class="pd-x" title="Add column" onclick="pdAddCol(${i})" style="color:#fff">＋</button></th></tr></thead><tbody>
+  ${b.rows.map((r,j)=>r.s?`<tr class="pd-sec"><td><button class="pd-x" title="Normal row" onclick="pdTog(${i},${j})">§</button></td><td colspan="${W}"><input data-p="${P}.rows.${j}.c.0" value="${esc(r.c[0])}" oninput="pdIn(this)"></td><td><button class="pd-x" onclick="pdArr(${i},'rows',${j})">✕</button></td></tr>`
+   :`<tr><td><button class="pd-x" title="Make section row" onclick="pdTog(${i},${j})">§</button></td>${r.c.slice(0,W).map((v,c)=>`<td><input data-p="${P}.rows.${j}.c.${c}" value="${esc(v)}" oninput="pdIn(this)"></td>`).join('')}<td><button class="pd-x" title="Remove row" onclick="pdArr(${i},'rows',${j})">✕</button></td></tr>`).join('')}</tbody></table></div>
+  <div class="row" style="gap:6px;margin-top:6px"><button class="btn sm" onclick="pdAddRow(${i},false)">＋ Row</button><button class="btn sm" onclick="pdAddRow(${i},true)">＋ Section row</button><button class="btn sm" onclick="pdAddCol(${i})">＋ Column</button></div></div>`}
+ return ''}
+const pdB=i=>pdRec().pages[PD.pg].blocks[i];
+function pdArr(i,key,j){pdDo(()=>{pdB(i)[key].splice(j,1)})}
+function pdPush(i,key,v){pdDo(()=>{pdB(i)[key].push(Array.isArray(v)?v.slice():v)})}
+function pdSet(i,key,v){pdDo(()=>{pdB(i)[key]=v})}
+function pdTog(i,j){pdDo(()=>{const r=pdB(i).rows[j];r.s=!r.s})}
+function pdAddRow(i,sec){pdDo(()=>{const b=pdB(i);b.rows.push({c:sec?['Section'].concat(Array(b.head.length-1).fill('')):Array(b.head.length).fill(''),s:!!sec})})}
+function pdAddCol(i){pdDo(()=>{const b=pdB(i);const n=b.head.length;b.head.push(/^Week \d+$/.test(b.head[n-1]||'')?'Week '+(+b.head[n-1].split(' ')[1]+1):'Column '+(n+1));b.rows.forEach(r=>r.c.push(''))})}
+function pdDelCol(i,c){const b=pdB(i);if(b.head.length<=1)return toast('A table needs at least one column');pdDo(()=>{b.head.splice(c,1);b.rows.forEach(r=>r.c.splice(c,1))})}
+function pdMoveBlock(i,d){pdDo((r,p)=>{const B=p.blocks;[B[i],B[i+d]]=[B[i+d],B[i]]})}
+function pdDelBlock(i){confirmBox('Remove this block from the page?',()=>pdDo((r,p)=>{p.blocks.splice(i,1)}))}
+function pdAddBlock(t){pdDo((r,p)=>{p.blocks.push(t==='h'?pdH('Heading'):t==='kv'?pdKV(uid('k'),[['Field','']]):t==='text'?pdTX(uid('k'),'Title','',3):t==='table'?pdTB(uid('k'),['Column 1','Column 2','Column 3'],[['','',''],['','','']]):t==='checks'?pdCK(uid('k'),'Checklist',['Item 1','Item 2']):t==='list'?pdLS(uid('k'),'List',['','']):pdSG(uid('k'),['Signature','Date']))})}
+function pdAddPage(){modal(`<h3 style="margin-top:0">Add a page</h3><p class="muted">The page is added after page ${PD.pg+1}. Every part of it can be edited.</p><div class="fc-g" style="grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr))">${PDTPL.map(t=>`<button class="btn" style="text-align:left" onclick="pdInsPage('${t[0]}')">${esc(t[1])}</button>`).join('')}</div><div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" onclick="closeModal()">Cancel</button></div>`)}
+function pdInsPage(t){closeModal();pdDo(r=>{r.pages.splice(PD.pg+1,0,pdPage(t));PD.pg++});window.scrollTo(0,0)}
+function pdDupPage(){pdDo((r,p)=>{const c=JSON.parse(Shubham.stringify(p));c.id=uid('pg');c.title=p.title+' (copy)';r.pages.splice(PD.pg+1,0,c);PD.pg++});toast('Page duplicated')}
+function pdDelPage(){const r=pdRec();if(r.pages.length<=1)return toast('A program needs at least one page');confirmBox(`Delete page "${r.pages[PD.pg].title}"?`,()=>pdDo(r=>{r.pages.splice(PD.pg,1);PD.pg=Math.max(0,PD.pg-1)}))}
+function pdMovePage(d){pdDo(r=>{const P=r.pages,i=PD.pg;[P[i],P[i+d]]=[P[i+d],P[i]];PD.pg=i+d})}
+/* ---------- PDF ---------- */
+function pdPdf(id){modal(`<h3 style="margin-top:0">Download PDF</h3><p class="muted">Choose the kind of PDF.</p>
+ <div class="fc-g" style="grid-template-columns:1fr"><button class="btn pri" style="text-align:left;padding:14px" onclick="closeModal();pdPdfGo('${id}',true)"><b>✎ Editable PDF</b><div style="font-size:13px;opacity:.9;margin-top:4px">Every value, table cell, list line, signature line and tick box is a fillable box. Edit it in Chrome, Edge, Adobe Acrobat Reader or a phone PDF app, then save.</div></button>
+ <button class="btn" style="text-align:left;padding:14px" onclick="closeModal();pdPdfGo('${id}',false)"><b>⬇ Print PDF</b><div class="muted" style="font-size:13px;margin-top:4px">Fixed text, for printing or sending.</div></button></div>
+ <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" onclick="closeModal()">Cancel</button></div>`)}
+async function pdPdfGo(id,ed){if(PD.busy)return;const r=byId('pdPrograms',id);if(!r)return;PD.busy=true;toast('Preparing PDF…');
+ try{const L=await fcLib();const bytes=await pdBuild(L,r,ed);const name=('Program_'+(r.client||r.title)+'_'+(r.date||today())+(ed?'_editable':'')).replace(/[^\w.-]+/g,'_')+'.pdf';await fcDownload(bytes,name);toast('PDF ready: '+name)}catch(e){console.error(e);toast('PDF failed: '+(e.message||e))}PD.busy=false}
+async function pdBuild(Lb,r,ED){const {PDFDocument,StandardFonts,rgb,degrees}=Lb;const doc=await PDFDocument.create();doc.setTitle(fcTx(r.title+' - '+(r.client||'')));doc.setAuthor(fcTx((r.name||'')+' ('+(r.role||'')+')'));doc.setCreator('BIOMOTOR Sport and Fitness');
+ const F=await doc.embedFont(StandardFonts.Helvetica),B=await doc.embedFont(StandardFonts.HelveticaBold),I=await doc.embedFont(StandardFonts.HelveticaOblique);const logo=await fcImg(doc);
+ const hex=h=>{const n=parseInt(h.slice(1),16);return rgb((n>>16&255)/255,(n>>8&255)/255,(n&255)/255)};const RED=hex('#c8102e'),DARK=hex('#1d1d1f'),MUT=hex('#6b6b70'),LINE=hex('#d9d9de'),SOFT=hex('#fbeef0'),WHITE=rgb(1,1,1),ZEBRA=hex('#f6f6f8'),SEC=hex('#e9e9ee');
+ const pages=[];let pg,y,W,H,M,CW,BOT;const form=ED?doc.getForm():null;let fN=0;const FB=rgb(.96,.97,1);
+ const fld=(txt,x,yy,w,h,z=10,o={})=>{if(!form||w<6||h<6)return;const t=String(fcTx(txt??''));const f=form.createTextField('f'+(++fN));const ml=o.ml||t.includes('\n')||h>z*2.2;if(ml)f.enableMultiline();f.setText(t);
+  f.addToPage(pg,{x,y:yy,width:w,height:h,font:o.b?B:F,textColor:o.c||DARK,backgroundColor:FB,borderWidth:0});f.setFontSize(z)};
+ const cbx=(on,x,yy)=>{if(!form)return;const c=form.createCheckBox('c'+(++fN));c.addToPage(pg,{x,y:yy,width:10,height:10,borderColor:DARK,borderWidth:.8,backgroundColor:rgb(1,1,1)});if(on)c.check()};
+ const tw=(s,f,z)=>f.widthOfTextAtSize(fcTx(s),z);
+ const wrap=(s,f,z,mw)=>{const out=[];fcTx(s).split('\n').forEach(par=>{let line='';par.split(/\s+/).forEach(w=>{if(!w)return;const t=line?line+' '+w:w;if(tw(t,f,z)<=mw)line=t;else{if(line)out.push(line);if(tw(w,f,z)>mw){let cur='';for(const ch of w){if(tw(cur+ch,f,z)>mw){out.push(cur);cur=ch}else cur+=ch}line=cur}else line=w}});out.push(line)});return out};
+ const T=(s,x,yy,o={})=>pg.drawText(fcTx(s),{x,y:yy,size:o.z||10,font:o.f||F,color:o.c||DARK});
+ const by=`${r.role||''}${r.name?': '+r.name:''}`;
+ const newPage=(land)=>{W=land?841.89:595.28;H=land?595.28:841.89;M=40;CW=W-2*M;BOT=60;pg=doc.addPage([W,H]);pages.push(pg);
+  pg.drawRectangle({x:16,y:16,width:W-32,height:H-32,borderColor:RED,borderWidth:1.4});pg.drawRectangle({x:20,y:20,width:W-40,height:H-40,borderColor:RED,borderWidth:.5});
+  if(logo){const s=Math.min(100/logo.width,28/logo.height);pg.drawImage(logo,{x:M,y:H-58,width:logo.width*s,height:logo.height*s})}
+  const t='PERIODISATION PROGRAM DESIGN';T(t,W-M-tw(t,B,8.5),H-42,{f:B,z:8.5,c:RED});const c=r.client||'';T(c,W-M-tw(c,F,8.5),H-54,{z:8.5,c:MUT});pg.drawLine({start:{x:M,y:H-64},end:{x:W-M,y:H-64},thickness:.6,color:LINE});y=H-84};
+ const need=h=>{if(y-h<BOT)newPage(W>H)};
+ const title=t=>{const z=15,bw=Math.min(CW,tw(t.toUpperCase(),B,z)+30),x=(W-bw)/2;pg.drawRectangle({x,y:y-24,width:bw,height:26,color:RED});T(t.toUpperCase(),x+(bw-tw(t.toUpperCase(),B,z))/2,y-16,{f:B,z,c:WHITE});y-=44};
+ const para=(s,o={})=>{const z=o.z||10,f=o.f||F,lh=z*1.45;wrap(s,f,z,o.w||CW).forEach(l=>{need(lh);T(l,o.x||M,y,{f,z,c:o.c});y-=lh});y-=o.gap??4};
+ const lab=s=>{if(!s)return;need(26);T(s,M,y,{f:B,z:11,c:RED});y-=16};
+ const lines=n=>{for(let k=0;k<n;k++){need(20);pg.drawLine({start:{x:M,y:y-4},end:{x:W-M,y:y-4},thickness:.5,color:MUT,dashArray:[1.5,2.5]});y-=20}};
+ const table=(hd,rows,o={})=>{const n=hd.length,z=n>8?7:n>6?8:9,pad=4;const ws=o.w||Array(n).fill(CW/n);
+  const drawHead=()=>{const hh=Math.max(...hd.map((h,k)=>wrap(h,B,z,ws[k]-2*pad).length))*(z+3)+9;need(hh+18);let x=M;pg.drawRectangle({x:M,y:y-hh,width:CW,height:hh,color:o.hc||RED});hd.forEach((h,k)=>{wrap(h,B,z,ws[k]-2*pad).forEach((l,q)=>T(l,x+pad,y-z-4-q*(z+3),{f:B,z,c:WHITE}));x+=ws[k]});y-=hh};
+  drawHead();rows.forEach((row,ri)=>{if(row.s){const L=wrap(row.c[0]||'',B,z+.5,CW-2*pad);const rh=L.length*(z+3)+9;if(y-rh<BOT){newPage(W>H);drawHead()}pg.drawRectangle({x:M,y:y-rh,width:CW,height:rh,color:SEC});if(form)fld(row.c[0],M+1.5,y-rh+1.5,CW-3,rh-3,z+.5,{b:1});else L.forEach((l,q)=>T(l,M+pad,y-z-4-q*(z+3),{f:B,z:z+.5}));y-=rh;return}
+   const cells=row.c.slice(0,n).map((c,k)=>wrap(String(c??''),k===0&&o.b0?B:F,z,ws[k]-2*pad));const rh=Math.max(1,...cells.map(c=>c.length))*(z+3)+9;if(y-rh<BOT){newPage(W>H);drawHead()}
+   if(ri%2)pg.drawRectangle({x:M,y:y-rh,width:CW,height:rh,color:ZEBRA});let x=M;cells.forEach((L,k)=>{if(form)fld(row.c[k],x+1.5,y-rh+1.5,ws[k]-3,rh-3,z,{b:k===0&&o.b0,ml:L.length>1});else L.forEach((l,q)=>T(l,x+pad,y-z-4-q*(z+3),{f:k===0&&o.b0?B:F,z}));pg.drawLine({start:{x,y},end:{x,y:y-rh},thickness:.4,color:LINE});x+=ws[k]});pg.drawLine({start:{x:M+CW,y},end:{x:M+CW,y:y-rh},thickness:.4,color:LINE});
+   pg.drawLine({start:{x:M,y:y-rh},end:{x:W-M,y:y-rh},thickness:.4,color:LINE});y-=rh});y-=12};
+ /* cover */
+ newPage(false);if(logo){const s=Math.min(240/logo.width,100/logo.height);pg.drawImage(logo,{x:(W-logo.width*s)/2,y:H-230,width:logo.width*s,height:logo.height*s})}
+ const ctr=(s,yy,o={})=>{wrap(s,o.f||F,o.z||10,CW-40).forEach((l,k)=>T(l,(W-tw(l,o.f||F,o.z||10))/2,yy-k*(o.z||10)*1.25,o))};
+ pg.drawLine({start:{x:M+30,y:H-280},end:{x:W-M-30,y:H-280},thickness:.8,color:MUT});ctr(r.title||'Periodisation Program',H-318,{f:B,z:24});pg.drawLine({start:{x:M+30,y:H-350},end:{x:W-M-30,y:H-350},thickness:.8,color:MUT});
+ if(r.client)ctr(r.client,H-385,{f:B,z:16,c:RED});ctr(`[ Designed by ${by} ]`,H-412,{f:I,z:12});
+ let cy=H-470;T('CONTENTS',M+60,cy,{f:B,z:10,c:MUT});cy-=18;r.pages.forEach((p,k)=>{if(cy<170)return;T(`${k+1}.  ${p.title}`,M+60,cy,{z:10});cy-=15});
+ ctr(fcLongDate(r.date).toUpperCase(),120,{f:B,z:13});ctr(r.org||'',100,{z:11,c:MUT});
+ /* pages */
+ r.pages.forEach(p=>{const wide=p.blocks.some(b=>b.t==='table'&&b.head.length>6);const cov=p.blocks.length&&p.blocks.every(b=>b.t==='cover');newPage(wide);
+  if(cov){const b=p.blocks[0];ctr(b.text||p.title,H/2+30,{f:B,z:34});if(b.sub)ctr(b.sub,H/2-30,{z:14,c:MUT});return}
+  title(p.title);
+  p.blocks.forEach(b=>{
+   if(b.t==='h'){need(40);y-=4;T(b.text,M,y,{f:B,z:13});pg.drawLine({start:{x:M,y:y-5},end:{x:M+tw(b.text,B,13),y:y-5},thickness:1,color:DARK});y-=24}
+   else if(b.t==='kv'){const cols=b.cols||2,cw=CW/cols;for(let i=0;i<b.rows.length;i+=cols){const row=b.rows.slice(i,i+cols);const hs=row.map(([k,v])=>wrap(String(v||''),F,10,cw-12).length);const h=Math.max(1,...hs)*13+20;need(h);
+     row.forEach(([k,v],j)=>{const x=M+j*cw;T(k+' :',x,y,{f:B,z:9,c:MUT});const n=Math.max(1,wrap(String(v||''),F,10,cw-12).length);if(form)fld(v,x,y-14-(n-1)*13-5,cw-16,n*13+6,10);else if(v)wrap(String(v),F,10,cw-12).forEach((l,q)=>T(l,x,y-14-q*13,{z:10}));else pg.drawLine({start:{x,y:y-16},end:{x:x+cw-16,y:y-16},thickness:.5,color:LINE})});y-=h}y-=4}
+   else if(b.t==='text'){lab(b.label);if(form){const n=b.value?wrap(b.value,F,10,CW-8).length:Math.max(2,b.lines||3);let left=n;while(left>0){const fit=Math.max(1,Math.min(left,Math.floor((y-BOT-12)/14.5)));if(fit<1||y-BOT<30){newPage(W>H);continue}
+     const all=wrap(b.value||'',F,10,CW-8),start=n-left,chunk=b.value?all.slice(start,start+fit).join('\n'):'';const h=fit*14.5+8;fld(chunk,M,y+9-h,CW,h,10,{ml:true});y-=h+2;left-=fit;if(left>0)newPage(W>H)}y-=8}
+    else if(b.value)para(b.value,{z:10,gap:8});else{lines(Math.max(2,b.lines||3));y-=4}}
+   else if(b.t==='checks'){lab(b.label);const L=b.items;const cols=Math.min(3,L.length),cw=CW/cols;for(let i=0;i<L.length;i+=cols){need(18);L.slice(i,i+cols).forEach(([t,on],j)=>{const x=M+j*cw;if(form){cbx(on,x,y-2);T(t,x+16,y,{z:10});return}pg.drawRectangle({x,y:y-2,width:10,height:10,borderColor:DARK,borderWidth:.8});if(on){pg.drawLine({start:{x:x+2,y:y+3},end:{x:x+4.5,y:y},thickness:1.3,color:RED});pg.drawLine({start:{x:x+4.5,y},end:{x:x+9,y:y+7},thickness:1.3,color:RED})}T(t,x+16,y,{z:10,f:on?B:F})});y-=18}y-=6}
+   else if(b.t==='list'){lab(b.label);b.items.forEach((t,k)=>{need(16);T((k+1)+'.',M,y,{f:B,z:10,c:RED});if(form){const n=Math.max(1,wrap(t||'',F,10,CW-26).length);fld(t,M+16,y-4-(n-1)*14,CW-16,n*14+4,10);y-=(n-1)*14}else if(t){const L=wrap(t,F,10,CW-22);L.forEach((l,q)=>{if(q){y-=14;need(14)}T(l,M+18,y,{z:10})})}else pg.drawLine({start:{x:M+18,y:y-2},end:{x:W-M,y:y-2},thickness:.5,color:LINE,dashArray:[1.5,2.5]});y-=16});y-=6}
+   else if(b.t==='sign'){need(b.items.length*28+14);y-=10;b.items.forEach(([k,v])=>{need(28);T(k+' :',M,y,{f:B,z:10.5});pg.drawLine({start:{x:M+190,y:y-2},end:{x:M+430>W-M?W-M:M+430,y:y-2},thickness:.6,color:DARK});if(form)fld(v,M+190,y-1,Math.min(240,W-M-M-190),16,10.5);else if(v)T(v,M+194,y+2,{z:10.5});y-=28})}
+   else if(b.t==='table'){lab(b.label);const n=b.head.length;const ws=n===2?[CW*.38,CW*.62]:/periodise variables/i.test(b.head[0]||'')?[CW*.24].concat(Array(n-1).fill(CW*.76/(n-1))):null;table(b.head,b.rows,{b0:true,w:ws})}
+   else if(b.t==='cover'){need(90);ctr(b.text,y-20,{f:B,z:24});y-=60;if(b.sub){ctr(b.sub,y,{z:12,c:MUT});y-=24}}})});
+ const foot=`Designed by ${by}  ·  ${fcLongDate(r.date)}`;pages.forEach((p,k)=>{if(!k)return;const w=p.getWidth();p.drawLine({start:{x:40,y:42},end:{x:w-40,y:42},thickness:.5,color:LINE});p.drawText(fcTx(foot),{x:40,y:30,size:8,font:F,color:MUT});const pn=`Page ${k+1} of ${pages.length}`;p.drawText(pn,{x:w-40-F.widthOfTextAtSize(pn,8),y:30,size:8,font:F,color:MUT})});
+ if(form)form.updateFieldAppearances(F);
+ return await doc.save()}
+
+/* ============ SPORTS SPECIFIC TEST (sport folders → protocols → templates → norms → PDF report) ============ */
+const STQ=['Aerobic / CRF','Intermittent aerobic','Anaerobic / repeated sprint','Speed','Agility / COD','Power','Strength','Muscular endurance','Flexibility / mobility','Body composition','Movement & injury risk','Sport-specific skill / pace'];
+const stP=(purpose,equip,proc,score,notes='')=>({purpose,equip,proc,score,notes});
+/* test library. n = trials, best = min|max|mean|last, nid = normative table id (FCNORMS0 or STN), inp = calculator inputs, time = mm:ss entry */
+const STN=[
+ {id:'yyir1',n:'Yo-Yo IR1 distance',q:1,es:'aer',u:'m',dir:'hi',L:['Very poor','Below average','Average','Good','Excellent','Elite'],ref:'Bangsbo, Iaia & Krustrup (2008), Sports Med 38:37-51; adult rating table published by FIH (Yo-Yo test standards).',B:[{s:'M',a:[0,120],c:[520,1040,1520,2000,2440]},{s:'F',a:[0,120],c:[320,680,1000,1320,1640]}]},
+ {id:'yylvl',n:'Yo-Yo IR1 speed level',q:1,es:'aer',u:'level',dir:'hi',L:['Very poor','Below average','Average','Good','Excellent','Elite'],ref:'Bangsbo et al. (2008); level equivalents of the FIH Yo-Yo IR1 adult rating table. Levels are read as speed.shuttle (e.g. 17.1).',B:[{s:'M',a:[0,120],c:[14.2,15.7,17.3,18.7,20.2]},{s:'F',a:[0,120],c:[13.1,14.6,15.6,16.6,17.6]}]},
+ {id:'yybcci',n:'Yo-Yo IR1 — BCCI standard',q:1,es:'aer',u:'level',dir:'hi',L:['Below BCCI standard','Meets BCCI standard (17.1)'],ref:'BCCI fitness standard for Indian team selection: minimum Yo-Yo level 17.1 (reported by ESPNcricinfo, Feb 2021).',B:[{s:'A',a:[0,120],c:[17.1]}]},
+ {id:'tt2k',n:'2 km time trial — BCCI standard',q:0,es:'aer',u:'s',dir:'lo',L:['Below BCCI standard','Meets standard (8:30 batters, spinners, keepers)','Meets fast-bowler standard (8:15)'],ref:'BCCI 2 km time trial: 8 min 15 s for fast bowlers, 8 min 30 s for batters, spinners and wicketkeepers (ESPNcricinfo, Feb 2021).',B:[{s:'A',a:[0,120],c:[495,510]}]},
+ {id:'vift',n:'30-15 IFT final velocity (VIFT)',q:1,es:'aer',u:'km/h',dir:'hi',L:['Below developing level','Youth / developing','Intermediate / club','Advanced / collegiate','Elite / professional'],ref:'Buchheit (2008) 30-15 Intermittent Fitness Test; typical VIFT ranges by level summarised by Topend Sports.',B:[{s:'M',a:[0,120],c:[14.0,15.5,17.5,19.5]},{s:'F',a:[0,120],c:[12.0,13.5,15.0,17.0]}]},
+ {id:'ttest',n:'Agility T-test',q:4,es:'atp',u:'s',dir:'lo',L:['Poor','Average','Good','Excellent'],ref:'NSCA norms for adult team-sport athletes (Semenick 1990; Pauole et al. 2000), as published by Topend Sports.',B:[{s:'M',a:[0,120],c:[9.49,10.5,11.5]},{s:'F',a:[0,120],c:[10.49,11.5,12.5]}]},
+ {id:'a505',n:'505 agility (best side)',q:4,es:'atp',u:'s',dir:'lo',L:['Below average','Average','Good','Excellent (elite)'],ref:'Draper & Lancaster (1985) 505 test. Guide bands: elite soccer/basketball players often under 2.20 s (men) and 2.50 s (women) — Topend Sports; lower bands are coaching guide values.',B:[{s:'M',a:[0,120],c:[2.20,2.40,2.60]},{s:'F',a:[0,120],c:[2.50,2.70,2.90]}]},
+ {id:'ybt',n:'Y-Balance Test composite',q:10,es:'na',u:'% limb length',dir:'hi',L:['Increased injury risk (< 94%)','Acceptable (≥ 94%)'],ref:'Plisky et al. (2006) J Orthop Sports Phys Ther 36:911-919 — composite reach below 94% of limb length linked with higher lower-limb injury risk.',B:[{s:'A',a:[0,120],c:[94]}]},
+ {id:'fms',n:'Functional Movement Screen total',q:10,es:'na',u:'/21',dir:'hi',L:['Increased injury risk (≤ 14)','Acceptable (> 14)'],ref:'Kiesel, Plisky & Voight (2007) N Am J Sports Phys Ther 2:147-158 — FMS score of 14 or less linked with higher injury risk.',B:[{s:'A',a:[0,120],c:[15]}]}];
+const stNorm=id=>STN.find(n=>n.id===id)||(typeof fcNorm==='function'?fcNorm(id):null);
+const STT={
+ vo2:{n:'VO2max (lab or estimated)',q:0,es:'aer',u:'ml/kg/min',best:'max',nid:'vo2',p:stP('Maximal aerobic capacity.','Metabolic cart, or a validated field estimate.',['Warm up 10 min.','Graded treadmill or cycle protocol to volitional exhaustion, or use a field-test estimate.','Record the highest 30 s VO2 value.'],'Highest VO2 in ml/kg/min.'),m:'The engine for repeated efforts and recovery between them.'},
+ cooper:{n:'Cooper 12-minute run',q:0,es:'aer',u:'m',best:'max',nid:'cooper',p:stP('Aerobic endurance; estimates VO2max.','400 m track, cones, stopwatch.',['Warm up 10 min.','Run as far as possible in 12 minutes.','Record the distance to the nearest 10 m.'],'Distance (m). VO2max ≈ (distance − 504.9) ÷ 44.73.'),m:'Sustained aerobic running ability.'},
+ yyir1:{n:'Yo-Yo IR1',q:1,es:'aer',u:'m',best:'max',nid:'yyir1',p:stP('Ability to repeat high-intensity running with short recovery.','20 m shuttle + 5 m recovery zone, cones, Yo-Yo IR1 audio.',['Warm up with the first 4 levels.','Run 2 × 20 m shuttles on the beeps, then 10 s active recovery in the 5 m zone.','Speed increases each level.','Stop after the second failure to reach the line in time.'],'Total distance (m) and level. VO2max ≈ distance × 0.0084 + 36.4 (Bangsbo 2008).'),m:'Match-related intermittent endurance — the key engine test for team sports.'},
+ yylvl:{n:'Yo-Yo IR1 (level)',q:1,es:'aer',u:'level',best:'max',nid:'yylvl',p:stP('Intermittent endurance reported as speed level.','As Yo-Yo IR1.',['As Yo-Yo IR1.','Record the last level completed as speed.shuttle (e.g. 17.1).'],'Level reached.'),m:'Intermittent endurance.'},
+ yybcci:{n:'Yo-Yo IR1 (BCCI level)',q:1,es:'aer',u:'level',best:'max',nid:'yybcci',p:stP('BCCI selection standard for intermittent endurance.','As Yo-Yo IR1.',['As Yo-Yo IR1.','Record the level reached (e.g. 17.4).'],'Level; standard is 17.1.'),m:'Selection fitness standard for Indian cricket.'},
+ tt2k:{n:'2 km time trial',q:0,es:'aer',u:'s',time:1,best:'min',nid:'tt2k',p:stP('Aerobic running speed and pacing.','400 m track (5 laps), stopwatch.',['Warm up 10–15 min.','Run 2 km as fast as possible, evenly paced.','Record the time (min:sec).'],'Time (min:sec). BCCI standard 8:15 fast bowlers, 8:30 others.'),m:'Threshold running speed — BCCI selection standard.'},
+ vift:{n:'30-15 Intermittent Fitness Test',q:1,es:'aer',u:'km/h',best:'max',nid:'vift',p:stP('Intermittent aerobic + COD + recovery capacity; sets interval speeds.','40 m shuttle, cones (zones every 3 m), 30-15 IFT audio.',['Run 30 s shuttles across 40 m on the beeps, then 15 s walking recovery.','Start at 8 km/h; speed rises 0.5 km/h every stage.','Stop after failing to reach a 3 m zone at 3 consecutive beeps.'],'VIFT = speed of the last completed stage (km/h).'),m:'Gives the speed used to prescribe interval training (e.g. 90–95% VIFT).'},
+ rast:{n:'RAST (6 × 35 m)',q:2,es:'gly',u:'W/kg',best:'last',nid:'rast',inp:[['bw','Body weight','kg'],['t1','Sprint 1','s'],['t2','Sprint 2','s'],['t3','Sprint 3','s'],['t4','Sprint 4','s'],['t5','Sprint 5','s'],['t6','Sprint 6','s']],
+  calc:v=>{const ts=['t1','t2','t3','t4','t5','t6'].map(k=>+v[k]).filter(x=>x>0);if(!(+v.bw>0)||ts.length<2)return null;const P=ts.map(t=>v.bw*35*35/(t**3));const pk=Math.max(...P),mn=Math.min(...P),av=P.reduce((a,b)=>a+b,0)/P.length;return {v:pk/v.bw,x:`Peak ${Math.round(pk)} W · mean ${Math.round(av)} W · min ${Math.round(mn)} W · fatigue index ${((pk-mn)/ts.reduce((a,b)=>a+b,0)).toFixed(2)} W/s`}},
+  p:stP('Anaerobic power and fatigue resistance in running.','35 m track, cones, timing gates or 2 stopwatches, scales.',['Weigh the athlete.','6 × 35 m maximal sprints with 10 s recovery between each.','Record each sprint time.'],'Power = BW × 35² ÷ time³. Relative peak power (W/kg); fatigue index = (peak − min) ÷ total time.'),m:'Repeated-sprint power and how quickly it drops.'},
+ rsa:{n:'Repeated sprint ability (6 × 30 m)',q:2,es:'gly',u:'% decrement',best:'last',inp:[['t1','Sprint 1','s'],['t2','Sprint 2','s'],['t3','Sprint 3','s'],['t4','Sprint 4','s'],['t5','Sprint 5','s'],['t6','Sprint 6','s']],dir:'lo',
+  calc:v=>{const ts=['t1','t2','t3','t4','t5','t6'].map(k=>+v[k]).filter(x=>x>0);if(ts.length<2)return null;const b=Math.min(...ts),tot=ts.reduce((a,c)=>a+c,0);return {v:(tot/(b*ts.length)-1)*100,x:`Best ${b.toFixed(2)} s · mean ${(tot/ts.length).toFixed(2)} s · total ${tot.toFixed(2)} s`}},
+  p:stP('Ability to repeat maximal sprints with short recovery.','30 m lane, timing gates, cones.',['6 × 30 m maximal sprints, departing every 20 s (≈ 15 s active recovery).','Record each time.'],'Percentage decrement = (total ÷ (best × 6) − 1) × 100. Lower is better; < 5% is usually considered good.'),m:'Recovery between repeated sprints.'},
+ s10:{n:'10 m sprint',q:3,es:'atp',u:'s',n2:3,best:'min',p:stP('Acceleration.','Timing gates (or video), cones.',['Start 0.5 m behind the first gate from a standing split stance.','Sprint maximally through 10 m.','3 trials, 2–3 min rest.'],'Best time (s).'),m:'First-step acceleration.'},
+ s20:{n:'20 m sprint',q:3,es:'atp',u:'s',n2:3,best:'min',p:stP('Acceleration to near-maximal speed.','Timing gates, cones.',['Standing start 0.5 m behind the line.','Sprint maximally through 20 m.','3 trials, full recovery.'],'Best time (s).'),m:'Short-sprint speed.'},
+ s30:{n:'30 m sprint',q:3,es:'atp',u:'s',n2:3,best:'min',nid:'s30',p:stP('Speed.','Timing gates or stopwatch, cones.',['Standing start.','Sprint maximally through 30 m.','3 trials, full recovery.'],'Best time (s).'),m:'Acceleration and speed.'},
+ s40:{n:'40 m sprint',q:3,es:'atp',u:'s',n2:3,best:'min',p:stP('Maximal speed.','Timing gates, cones.',['Standing start.','Sprint maximally through 40 m (split at 10 m and 20 m if possible).','3 trials, full recovery.'],'Best time (s).'),m:'Top speed.'},
+ ttest:{n:'Agility T-test',q:4,es:'atp',u:'s',n2:3,best:'min',nid:'ttest',p:stP('Multi-directional agility (forward, lateral, backward).','4 cones in a T (10 yd forward, 5 yd either side), stopwatch/gates.',['Sprint forward 10 yd and touch the middle cone.','Shuffle 5 yd left, touch; shuffle 10 yd right, touch; shuffle 5 yd back to middle.','Backpedal to the start.','3 trials; no crossing feet when shuffling.'],'Best time (s).'),m:'Lateral and multi-directional movement.'},
+ illinois:{n:'Illinois agility run',q:4,es:'atp',u:'s',n2:2,best:'min',nid:'illinois',p:stP('Running agility with turns and weaving.','10 × 5 m course, 8 cones, stopwatch.',['Start lying face down at the start line.','On "go", run the course: forward, weave through the centre cones and back.','2 trials.'],'Best time (s).'),m:'Change of direction while running.'},
+ a505:{n:'505 agility test',q:4,es:'atp',u:'s',best:'min',inp:[['l','Left turn','s'],['r','Right turn','s']],calc:v=>{const a=+v.l,b=+v.r;if(!(a>0||b>0))return null;const best=Math.min(...[a,b].filter(x=>x>0));return {v:best,x:a>0&&b>0?`Asymmetry ${(Math.abs(a-b)/Math.min(a,b)*100).toFixed(1)}% (${a<b?'left':'right'} faster)`:''}},nid:'a505',
+  p:stP('180° change-of-direction speed.','Timing gates at 10 m, line at 15 m, cones.',['Accelerate from 10 m behind the gate.','Run through the gate to the line 5 m beyond, plant and turn 180°, sprint back through the gate.','Time is the 5 m in + 5 m out. Test both turning legs.'],'Best time (s) and left/right asymmetry.'),m:'Turning speed and turning-leg balance.'},
+ spider:{n:'Spider drill (tennis)',q:4,es:'atp',u:'s',n2:2,best:'min',p:stP('Tennis-specific court coverage.','Singles court, 5 balls, racket, stopwatch.',['Place 5 balls on the baseline/singles lines; start on the centre mark.','Sprint to each ball one at a time and return it to the racket on the centre mark.','2 trials.'],'Best time (s). Used by the USTA; no universal adult norm — compare with previous tests and squad.'),m:'On-court multi-directional speed.'},
+ hexagon:{n:'Hexagon test',q:4,es:'atp',u:'s',n2:2,best:'min',p:stP('Foot speed and agility.','Hexagon with 66 cm sides taped on the floor, stopwatch.',['Stand in the centre facing one side.','Jump out over each side and back in, clockwise, 3 full revolutions.','2 trials.'],'Best time (s).'),m:'Foot speed and quick changes of direction.'},
+ badm:{n:'Badminton 4-corner footwork',q:4,es:'atp',u:'s',n2:2,best:'min',p:stP('Badminton-specific court movement.','Court, 4 shuttles/targets in the corners, base marker, stopwatch.',['Start at the base.','Move to each corner (front left, front right, back left, back right) in a set order, touch the target and return to base.','Repeat the circuit 2 times; 2 trials.'],'Best time (s). No universal norm — compare with previous tests and squad.'),m:'Court coverage and lunge/recovery speed.'},
+ lane:{n:'Lane agility drill (basketball)',q:4,es:'atp',u:'s',n2:2,best:'min',p:stP('Basketball defensive movement.','Key/lane, 4 cones, stopwatch.',['Sprint forward, defensive slide across, backpedal, slide back; then reverse the pattern.','2 trials.'],'Best time (s).'),m:'Defensive footwork.'},
+ cmj:{n:'Countermovement jump',q:5,es:'atp',u:'cm',n2:3,best:'max',nid:'vj',p:stP('Lower-body explosive power.','Jump mat, force plate, app or wall/Vertec.',['Hands on hips (or arm swing — keep it the same each test).','Fast dip and jump as high as possible.','3 trials, 30–60 s rest.'],'Best height (cm). Peak power (Sayers) = 60.7 × height + 45.3 × body mass − 2055.'),m:'Vertical power.'},
+ sbj:{n:'Standing broad jump',q:5,es:'atp',u:'cm',n2:3,best:'max',p:stP('Horizontal power.','Tape measure, mat or sand.',['Toes behind the line, two-foot take-off with arm swing.','Jump as far as possible and land on both feet.','Measure to the back of the nearest heel; 3 trials.'],'Best distance (cm).'),m:'Horizontal power for acceleration.'},
+ mbthrow:{n:'Medicine ball throw',q:5,es:'atp',u:'m',n2:3,best:'max',p:stP('Upper-body / rotational power.','Medicine ball (3 kg women, 4–5 kg men — keep constant), tape.',['Seated chest pass or standing rotational throw (record which).','Throw for maximal distance.','3 trials.'],'Best distance (m).'),m:'Upper-body and trunk power for throwing, striking and hitting.'},
+ grip:{n:'Handgrip (both hands combined)',q:6,es:'mix',u:'kg',best:'last',inp:[['r','Right (best)','kg'],['l','Left (best)','kg']],calc:v=>{const a=+v.r||0,b=+v.l||0;if(!a&&!b)return null;return {v:a+b,x:a&&b?`Right ${a} kg · left ${b} kg · difference ${(Math.abs(a-b)/Math.max(a,b)*100).toFixed(0)}%`:''}},nid:'grip',p:stP('Grip and general strength.','Hand dynamometer.',['Stand, arm by the side, elbow straight.','Squeeze maximally for 2–3 s.','2 trials per hand, alternating.'],'Sum of best right + best left (kg).'),m:'General strength and grip for racket, stick and grappling sports.'},
+ bench:{n:'1RM bench press ÷ body weight',q:6,es:'mix',u:'ratio',best:'last',inp:[['load','1RM load','kg'],['bw','Body weight','kg']],calc:v=>+v.load>0&&+v.bw>0?{v:v.load/v.bw,x:`${v.load} kg ÷ ${v.bw} kg`}:null,nid:'bench',p:stP('Upper-body maximal strength.','Barbell, bench, spotters.',['Warm up with progressive loads.','Increase load until one full repetition with good technique; 3–5 attempts, 3–5 min rest.'],'1RM ÷ body weight.'),m:'Upper-body strength.'},
+ legpress:{n:'1RM leg press ÷ body weight',q:6,es:'mix',u:'ratio',best:'last',inp:[['load','1RM load','kg'],['bw','Body weight','kg']],calc:v=>+v.load>0&&+v.bw>0?{v:v.load/v.bw,x:`${v.load} kg ÷ ${v.bw} kg`}:null,nid:'legpress',p:stP('Lower-body maximal strength.','Leg press machine.',['Warm up with progressive loads.','Find the heaviest load for one full repetition; 3–5 attempts.'],'1RM ÷ body weight.'),m:'Lower-body strength.'},
+ squat:{n:'1RM back squat ÷ body weight',q:6,es:'mix',u:'ratio',best:'last',inp:[['load','1RM load','kg'],['bw','Body weight','kg']],calc:v=>+v.load>0&&+v.bw>0?{v:v.load/v.bw,x:`${v.load} kg ÷ ${v.bw} kg`}:null,p:stP('Lower-body maximal strength.','Squat rack, barbell, spotters.',['Progressive warm-up sets.','Find the heaviest single to parallel depth with good technique.'],'1RM ÷ body weight. Common S&C targets: 1.5× BW (developing) to 2.0× BW (advanced) for men.'),m:'Lower-body strength.'},
+ pushup:{n:'Push-ups to fatigue',q:7,es:'gly',u:'reps',best:'max',nid:'pushup',p:stP('Upper-body muscular endurance.','Mat.',['Men: standard push-ups; women: knee push-ups.','Chin to the mat each rep, continuous, no rest.','Stop at failure or 2 consecutive poor reps.'],'Total reps.'),m:'Upper-body endurance.'},
+ pullup:{n:'Pull-ups (max reps)',q:7,es:'gly',u:'reps',best:'max',p:stP('Upper-body pulling endurance / relative strength.','Pull-up bar.',['Overhand grip, dead hang.','Chin over the bar each rep, full extension at the bottom.'],'Total reps.'),m:'Pulling strength relative to body weight.'},
+ plank:{n:'Prone plank hold',q:7,es:'gly',u:'s',best:'max',p:stP('Trunk endurance.','Mat, stopwatch.',['Forearms and toes, straight line from head to heels.','Hold as long as form is kept.'],'Time (s).'),m:'Trunk endurance.'},
+ hang:{n:'Dead hang',q:7,es:'gly',u:'s',best:'max',p:stP('Grip endurance.','Bar or hangboard edge (record size).',['Hang with straight arms.','Hold until release.'],'Time (s).'),m:'Grip endurance — key for climbing and grappling.'},
+ sitreach:{n:'Sit-and-reach',q:8,es:'na',u:'cm',n2:2,best:'max',nid:'sitreach',p:stP('Hamstring and lower-back flexibility.','Sit-and-reach box (record zero point).',['Shoes off, legs straight, feet against the box.','Reach forward slowly with hands together and hold 2 s.','2 trials.'],'Best reach (cm).'),m:'Posterior-chain flexibility.'},
+ shoulder:{n:'Shoulder rotation ROM (IR + ER)',q:8,es:'na',u:'°',best:'last',inp:[['ir','Internal rotation','°'],['er','External rotation','°']],calc:v=>+v.ir>0||+v.er>0?{v:(+v.ir||0)+(+v.er||0),x:`IR ${v.ir||'—'}° · ER ${v.er||'—'}°`}:null,p:stP('Total shoulder rotation range.','Goniometer or inclinometer, plinth.',['Supine, shoulder at 90° abduction, elbow 90°.','Measure passive internal and external rotation.','Compare with the other side.'],'Total arc (°). A loss of > 5° total arc vs the other side is a common flag in throwing and swimming.'),m:'Shoulder mobility for overhead and swimming athletes.'},
+ bf:{n:'Body fat',q:9,es:'na',u:'%',best:'last',nid:'bf',p:stP('Body composition.','Skinfold calipers / BIA / DXA (record method).',['Same method, time of day and hydration each test.'],'Body fat %.'),m:'Body composition.'},
+ bmi:{n:'BMI',q:9,es:'na',u:'kg/m²',best:'last',inp:[['w','Weight','kg'],['h','Height','cm']],calc:v=>+v.w>0&&+v.h>0?{v:v.w/((v.h/100)**2),x:`${v.w} ÷ (${(v.h/100).toFixed(2)})²`}:null,nid:'bmi',p:stP('Weight-for-height screen.','Scales, stadiometer.',['Light clothing, no shoes.'],'BMI = kg ÷ m². Not a body-fat measure in muscular athletes.'),m:'Size screen.'},
+ ybt:{n:'Y-Balance Test (lower quarter)',q:10,es:'na',u:'% limb length',best:'last',inp:[['ll','Limb length','cm'],['ant','Anterior reach','cm'],['pm','Posteromedial reach','cm'],['pl','Posterolateral reach','cm']],calc:v=>+v.ll>0&&+v.ant>0?{v:((+v.ant)+(+v.pm||0)+(+v.pl||0))/(3*v.ll)*100,x:'Composite = (ANT + PM + PL) ÷ (3 × limb length) × 100. Test both legs; anterior difference > 4 cm is also a risk flag.'}:null,nid:'ybt',
+  p:stP('Dynamic balance and lower-limb injury risk.','Y-Balance kit or tape Y, tape measure.',['Measure limb length (ASIS to medial malleolus).','Stand on one leg and reach in the anterior, posteromedial and posterolateral directions.','3 trials each; record the best. Test both legs.'],'Composite score (% limb length).'),m:'Balance, control and injury-risk screen.'},
+ fms:{n:'Functional Movement Screen',q:10,es:'na',u:'/21',best:'last',nid:'fms',p:stP('Movement quality screen.','FMS kit.',['7 movements scored 0–3: deep squat, hurdle step, in-line lunge, shoulder mobility, active straight-leg raise, trunk stability push-up, rotary stability.','Note any pain (scores 0).'],'Total /21; also note asymmetries.'),m:'Movement quality and injury-risk screen.'},
+ css:{n:'Critical Swim Speed (400 m + 200 m)',q:11,es:'aer',u:'s/100 m',best:'last',inp:[['t400','400 m time','mm:ss'],['t200','200 m time','mm:ss']],dir:'lo',
+  calc:v=>{const a=stSec(v.t400),b=stSec(v.t200);if(!(a>0&&b>0&&a>b))return null;const c=(a-b)/2;return {v:c,x:`CSS pace ${stMMSS(c)} /100 m. Training zones: aerobic endurance CSS + 5–10 s; threshold CSS ± 2 s; VO2max CSS − 3–5 s per 100 m.`}},
+  p:stP('Swimming aerobic threshold pace; sets training zones.','25/50 m pool, stopwatch / pace clock.',['Warm up 600–800 m.','Swim 400 m freestyle all-out, evenly paced; record the time.','Recover easily for 5–10 min.','Swim 200 m all-out; record the time.'],'CSS (s/100 m) = (T400 − T200) ÷ 2.','Compare with the athlete\'s previous CSS; a faster (lower) value means improved aerobic swimming speed.'),m:'Sustainable swimming threshold pace.'},
+ swim400:{n:'400 m freestyle time trial',q:11,es:'aer',u:'s',time:1,best:'min',p:stP('Middle-distance swim performance.','Pool, stopwatch.',['Warm up.','400 m freestyle all-out, push start.'],'Time (min:sec).'),m:'Aerobic swimming performance.'},
+ swim50:{n:'50 m sprint (main stroke)',q:11,es:'atp',u:'s',best:'min',n2:2,p:stP('Swimming speed.','Pool, stopwatch / touch pads.',['Dive or push start (record which).','50 m maximal in the main stroke; 2 trials, full recovery.'],'Best time (s).'),m:'Swimming sprint speed.'},
+ t30:{n:'T-30 swim (30 minutes)',q:11,es:'aer',u:'m',best:'max',p:stP('Aerobic swimming endurance and threshold pace.','Pool, lap counter, pace clock.',['Swim continuously for 30 min at the best sustainable pace.','Count the total distance.'],'Distance (m); threshold pace /100 m = 1800 s ÷ (distance ÷ 100).'),m:'Aerobic swimming endurance.'},
+ runa3:{n:'Run-a-three (cricket)',q:11,es:'atp',u:'s',n2:2,best:'min',p:stP('Running between the wickets.','Pitch (17.68 m between creases), bat, stopwatch.',['Start in batting stance with the bat.','Run three runs, grounding the bat at each crease.','2 trials (turn on both sides).'],'Best time (s). Compare with squad and previous tests.'),m:'Speed between the wickets.'},
+ bowlspd:{n:'Bowling / throwing / serve speed',q:11,es:'atp',u:'km/h',n2:6,best:'max',p:stP('Release velocity.','Radar gun.',['Full warm-up.','6 maximal deliveries/throws/serves; record each.'],'Best speed (km/h) and the mean of the best 3.'),m:'Sport-specific velocity.'},
+ erg2k:{n:'2000 m ergometer',q:11,es:'aer',u:'s',time:1,best:'min',p:stP('Rowing / paddling performance.','Concept2 (or kayak) ergometer; record drag factor.',['Standard warm-up.','2000 m all-out.'],'Time (min:sec) and average split /500 m.'),m:'Rowing / paddling engine.'},
+ ftp:{n:'Functional threshold power (20 min × 0.95)',q:11,es:'aer',u:'W/kg',best:'last',inp:[['p20','20-min average power','W'],['bw','Body weight','kg']],calc:v=>+v.p20>0&&+v.bw>0?{v:v.p20*0.95/v.bw,x:`FTP ${Math.round(v.p20*0.95)} W = 0.95 × ${v.p20} W`}:null,p:stP('Cycling threshold power.','Power meter or smart trainer.',['Warm up 20 min including 3 × 1 min efforts.','Ride 20 min at the highest sustainable power.'],'FTP = 0.95 × 20-min power; reported in W/kg.'),m:'Sustainable cycling power.'},
+ sjft:{n:'Special Judo Fitness Test',q:11,es:'gly',u:'index',best:'last',inp:[['n','Total throws (A+B+C)','throws'],['hr1','HR immediately after','bpm'],['hr2','HR 1 min after','bpm']],dir:'lo',calc:v=>+v.n>0&&+v.hr1>0&&+v.hr2>0?{v:((+v.hr1)+(+v.hr2))/v.n,x:`Index = (${v.hr1} + ${v.hr2}) ÷ ${v.n}`}:null,p:stP('Judo-specific anaerobic and aerobic fitness.','Tatami, 2 partners of similar mass 6 m apart, HR monitor.',['Three bouts (15 s, 30 s, 30 s) with 10 s rest between.','Throw the partners alternately with ippon-seoi-nage as many times as possible.','Record throws and HR immediately and 1 min after.'],'Index = (HR after + HR 1 min) ÷ total throws. Lower is better (Sterkowicz 1995).'),m:'Combat-specific repeated-effort capacity.'},
+ rhr:{n:'Resting heart rate',q:0,es:'na',u:'bpm',best:'min',nid:'rhr',p:stP('Recovery and cardiovascular status.','HR monitor.',['Morning, lying 5 min, before getting up.'],'bpm.'),m:'Recovery marker.'}};
+/* Olympic sports (LA 2028 programme) + Indian sports. Test lists put the most specific tests first. */
+const STSPORTS=[
+ ['swimming','Swimming','🏊',['css','swim400','swim50','t30','cmj','sbj','pullup','grip','shoulder','sitreach','bf']],
+ ['diving','Diving','🤽',['cmj','sbj','sitreach','shoulder','plank','grip','bf']],
+ ['artswim','Artistic Swimming','🏊‍♀️',['css','swim400','cmj','sitreach','shoulder','plank','bf']],
+ ['waterpolo','Water Polo','🤽‍♂️',['css','swim50','swim400','mbthrow','grip','bench','cmj','shoulder']],
+ ['athletics','Athletics','🏃',['s10','s30','s40','cmj','sbj','cooper','tt2k','vo2','rast','squat','sitreach','bf']],
+ ['football','Football','⚽',['yyir1','vift','s10','s30','a505','ttest','rsa','cmj','ybt','fms','bf']],
+ ['cricket','Cricket','🏏',['yybcci','tt2k','runa3','s10','s20','a505','cmj','sbj','bowlspd','grip','ybt','fms']],
+ ['tennis','Tennis','🎾',['spider','hexagon','s20','a505','ttest','cmj','mbthrow','bowlspd','grip','vift','shoulder','sitreach']],
+ ['badminton','Badminton','🏸',['badm','ttest','illinois','hexagon','s10','cmj','sbj','vift','yyir1','grip','sitreach']],
+ ['tabletennis','Table Tennis','🏓',['hexagon','ttest','s10','cmj','grip','sitreach','plank']],
+ ['squash','Squash','🎾',['ttest','a505','hexagon','s10','cmj','vift','yyir1','grip']],
+ ['basketball','Basketball','🏀',['cmj','lane','a505','s20','ttest','yyir1','vift','sbj','bench','squat','ybt']],
+ ['volleyball','Volleyball','🏐',['cmj','sbj','ttest','s10','mbthrow','vift','shoulder','ybt']],
+ ['handball','Handball','🤾',['vift','yyir1','s10','s30','a505','cmj','mbthrow','bowlspd','bench','squat']],
+ ['hockey','Hockey','🏑',['yyir1','s10','s30','a505','rsa','cmj','sbj','ybt','grip']],
+ ['rugby','Rugby Sevens','🏉',['yyir1','vift','s10','s40','a505','rsa','cmj','bench','squat','bf']],
+ ['flagfootball','Flag Football','🏈',['s10','s40','a505','ttest','cmj','sbj','rsa']],
+ ['lacrosse','Lacrosse','🥍',['yyir1','s10','s30','a505','cmj','mbthrow','bowlspd']],
+ ['baseball','Baseball / Softball','⚾',['s10','s30','a505','mbthrow','bowlspd','grip','shoulder','cmj']],
+ ['boxing','Boxing','🥊',['rast','rsa','cmj','mbthrow','grip','pushup','yyir1','bf']],
+ ['judo','Judo','🥋',['sjft','grip','hang','pullup','cmj','rast','bench','squat','bf']],
+ ['wrestling','Wrestling','🤼',['grip','hang','pullup','cmj','rast','bench','squat','plank','bf']],
+ ['taekwondo','Taekwondo','🥋',['cmj','s10','a505','rast','sitreach','yyir1','bf']],
+ ['fencing','Fencing','🤺',['s10','a505','ttest','cmj','sbj','grip','sitreach']],
+ ['weightlifting','Weightlifting','🏋️',['squat','cmj','sbj','sitreach','shoulder','grip','bf']],
+ ['gymnastics','Gymnastics','🤸',['cmj','sbj','pullup','hang','grip','sitreach','shoulder','plank']],
+ ['climbing','Sport Climbing','🧗',['hang','pullup','grip','cmj','sitreach','plank','bf']],
+ ['cycling','Cycling','🚴',['ftp','vo2','cmj','squat','rhr','bf']],
+ ['triathlon','Triathlon','🏊‍♂️',['css','swim400','ftp','tt2k','cooper','vo2','rhr','bf']],
+ ['pentathlon','Modern Pentathlon','🤺',['css','swim400','cooper','tt2k','s10','a505','grip']],
+ ['rowing','Rowing','🚣',['erg2k','vo2','legpress','squat','pullup','plank','bf']],
+ ['canoe','Canoe / Kayak','🛶',['erg2k','pullup','bench','grip','shoulder','plank','vo2']],
+ ['sailing','Sailing','⛵',['grip','plank','hang','vo2','sitreach','bf']],
+ ['surfing','Surfing','🏄',['css','swim50','pullup','cmj','ybt','sitreach','shoulder']],
+ ['skateboarding','Skateboarding','🛹',['cmj','ybt','sbj','plank','sitreach']],
+ ['breaking','Breaking','🕺',['cmj','pushup','plank','sitreach','grip','vift']],
+ ['archery','Archery','🏹',['grip','plank','shoulder','rhr','sitreach']],
+ ['shooting','Shooting','🎯',['plank','grip','rhr','ybt']],
+ ['golf','Golf','⛳',['mbthrow','cmj','grip','sitreach','shoulder','ybt']],
+ ['equestrian','Equestrian','🏇',['plank','ybt','grip','sitreach','vo2']],
+ ['kabaddi','Kabaddi (Indian sport)','🤼‍♂️',['illinois','s30','cmj','sbj','yyir1','grip','squat','bf']],
+ ['khokho','Kho-Kho (Indian sport)','🏃‍♂️',['illinois','s30','a505','cmj','yyir1','sitreach']]];
+let ST={sport:null,sid:null,q:''};
+function stDb(){db.sportTests=db.sportTests||[];return db.sportTests}
+const stSport=id=>STSPORTS.find(s=>s[0]===id);
+function stSec(v){if(v==null||v==='')return null;const s=String(v).trim();if(s.includes(':')){const p=s.split(':').map(Number);if(p.some(isNaN))return null;return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+p[1]}const n=parseFloat(s);return isFinite(n)?n:null}
+function stMMSS(s){if(s==null||!isFinite(s))return '';const m=Math.floor(s/60),r=s-m*60;return m+':'+(r<10?'0':'')+r.toFixed(r%1?1:0)}
+function stDir(t){return t.dir||(t.nid&&stNorm(t.nid)&&stNorm(t.nid).dir)||(t.best==='min'?'lo':'hi')}
+function stVal(t,e){if(t.inp&&t.calc){const r=t.calc(e.inp||{});return r?{v:r.v,x:r.x}:null}const vals=(e.tr||[]).map(x=>t.time?stSec(x):parseFloat(x)).filter(x=>x!=null&&isFinite(x));if(!vals.length)return null;
+ const v=t.best==='min'?Math.min(...vals):t.best==='mean'?vals.reduce((a,b)=>a+b,0)/vals.length:t.best==='last'?vals[vals.length-1]:Math.max(...vals);return {v,x:vals.length>1?`Best of ${vals.length} trials${t.best==='min'?' (fastest)':''}`:''}}
+const stU=(t,v)=>t.u==='ratio'||((t.time||t.u==='s/100 m')&&v>=60)?(t.u==='s/100 m'&&v>=60?' /100 m':''):' '+t.u;
+const stFmt=(t,v)=>v==null?'—':(t.time||t.u==='s/100 m')&&v>=60?stMMSS(v):String(+(+v).toFixed(t.u==='ratio'||t.u==='index'?2:t.u==='s'||t.u==='% decrement'||t.u==='W/kg'?2:1));
+function stEval(r,e){const t=STT[e.t];if(!t)return {};const V=stVal(t,e);const N=t.nid?stNorm(t.nid):null;let R=null;if(V&&N)R=fcRate(N,V.v,r.gender,fcNum(r.age));
+ const prev=stPrev(r,e.t);return {t,V,N,R,cat:e.cat||(R&&!R.err?R.lab:''),prev}}
+function stPrev(r,tid){if(!r.athlete&&!r.name)return null;const L=stDb().filter(x=>x.id!==r.id&&String(x.date)<String(r.date)&&(r.athlete?x.athlete===r.athlete:x.name===r.name)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ for(const x of L){const e=(x.tests||[]).find(y=>y.t===tid);if(e){const V=stVal(STT[tid],e);if(V)return {v:V.v,date:x.date}}}return null}
+/* ---------- pages ---------- */
+P['sports-tests']=()=>{stDb();const me=authUser()||{};const staff=!me.role||STAFF(me.role)||me.owner;
+ if(ST.sid&&!byId('sportTests',ST.sid))ST.sid=null;if(ST.sid)return stSession();if(ST.sport)return stFolder(ST.sport,staff);
+ const q=ST.q.toLowerCase();const L=STSPORTS.filter(s=>!q||s[1].toLowerCase().includes(q));
+ return head('Test','Sports Specific Test','A folder for every Olympic sport (LA 2028 programme) plus cricket, kabaddi and kho-kho. Each folder has the sport\'s test protocols, a data-entry template, normative data with automatic interpretation, and a PDF report.')+
+ `<div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:14px"><input style="max-width:320px" placeholder="Search sport…" value="${esc(ST.q)}" data-stq oninput="ST.q=this.value;render();const s=document.querySelector('[data-stq]');s.focus();s.setSelectionRange(s.value.length,s.value.length)"><span class="muted">${STSPORTS.length} sports · ${Object.keys(STT).length} test protocols · ${stDb().length} sessions</span></div>
+ <div class="st-grid">${L.map(([id,n,ic,ts])=>{const c=stDb().filter(x=>x.sport===id).length;return `<button class="st-folder" onclick="ST.sport='${id}';render();window.scrollTo(0,0)"><span class="st-ic">${ic}</span><b>${esc(n)}</b><span class="muted">${ts.length} tests${c?' · '+c+' session'+(c>1?'s':''):''}</span></button>`}).join('')}</div>`};
+function stFolder(sid,staff){const S=stSport(sid);if(!S){ST.sport=null;return P['sports-tests']()}const[id,n,ic,ts]=S;const sess=stDb().filter(x=>x.sport===id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ return `<div class="pagehead"><div><div class="eyebrow">Sports Specific Test</div><h2>${ic} ${esc(n)}</h2><div class="muted">${ts.length} test protocols with templates, normative data and interpretation</div></div><div class="row"><button class="btn" onclick="ST.sport=null;render()">← All sports</button>${staff?`<button class="btn pri" onclick="stNew('${id}')">＋ New test session</button>`:''}</div></div>
+ ${sess.length?`<div class="card"><h3 style="margin-top:0">Test sessions (${sess.length})</h3><div style="overflow:auto"><table><thead><tr><th>Athlete</th><th>Date</th><th>Tests</th><th>Tested by</th><th></th></tr></thead><tbody>${sess.map(x=>`<tr><td><b>${esc(x.name||'—')}</b><div class="muted" style="font-size:12px">${esc([x.gender,x.age?x.age+' y':'',x.level].filter(Boolean).join(' · '))}</div></td><td>${fmtDate(x.date)}</td><td>${(x.tests||[]).filter(e=>stVal(STT[e.t]||{},e)).length}/${(x.tests||[]).length}</td><td>${esc(x.staffName||'—')}<div class="muted" style="font-size:12px">${esc(x.staffRole||'')}</div></td>
+  <td style="white-space:nowrap;text-align:right">${staff?`<button class="btn sm" onclick="ST.sid='${x.id}';render();window.scrollTo(0,0)">Open</button> `:''}<button class="btn sm pri" onclick="stPdf('${x.id}')">⬇ PDF</button>${staff?` <button class="btn sm" title="Delete" onclick="stDel('${x.id}')">🗑</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>`:''}
+ <h3>Test protocols</h3>${ts.map(t=>stProtoCard(t)).join('')}`}
+function stProtoCard(tid){const t=STT[tid];if(!t)return '';const N=t.nid?stNorm(t.nid):null;const P=t.p;
+ return `<details class="card st-proto"><summary><span class="pill p-blue">${esc(STQ[t.q])}</span> <b>${esc(t.n)}</b> <span class="muted">· ${esc(t.u)}${N?' · normative table':' · progress tracking'}</span></summary>
+ <div class="fc-g" style="grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));margin-top:10px"><div><div class="fc-sub" style="margin-top:0">Purpose</div>${esc(P.purpose)}<div class="fc-sub">Equipment</div>${esc(P.equip)}<div class="fc-sub">Scoring</div>${esc(P.score)}${P.notes?`<p class="muted">${esc(P.notes)}</p>`:''}<div class="fc-sub">Energy system</div>${esc(FCES[t.es]||'—')}</div>
+ <div><div class="fc-sub" style="margin-top:0">Procedure</div><ol style="margin:0;padding-left:20px">${P.proc.map(s=>`<li>${esc(s)}</li>`).join('')}</ol></div></div>
+ ${N?`<div class="fc-sub">Normative data</div>${stNormTable(N)}<p class="muted" style="font-size:12px;margin-bottom:0">Reference: ${esc(N.ref)}</p>`:`<p class="muted" style="font-size:13px">No universal published norm for this test — results are interpreted against the athlete's previous tests (change and % change).</p>`}</details>`}
+function stNormTable(N){return `<div style="overflow:auto"><table class="fc-tbl"><thead><tr><th>Group</th><th>Categories</th></tr></thead><tbody>${N.B.map(b=>`<tr><td style="white-space:nowrap">${b.s==='A'?'All':b.s==='M'?'Men':'Women'}${b.a[0]>0||b.a[1]<120?` ${b.a[0]}–${b.a[1]>=120?'+':b.a[1]}`:''}</td><td style="font-size:13px">${esc(fcBandText(N,b))}</td></tr>`).join('')}</tbody></table></div>`}
+function stNew(sid){const S=stSport(sid);const me=authUser()||{};const r={id:uid('st'),sport:sid,date:today(),athlete:'',name:'',gender:'',age:'',level:'',position:'',venue:'',conditions:'',staffRole:me.role&&me.role!=='Owner'?me.role:'Sports Scientist',staffName:me.name||db.profile.name||'',
+ tests:S[3].map(t=>({t,tr:[],inp:{},note:'',cat:''})),summary:'',recs:'',created:new Date().toISOString()};stDb().unshift(r);save();ST.sid=r.id;render();window.scrollTo(0,0)}
+function stDel(id){confirmBox('Delete this test session?',()=>{db.sportTests=stDb().filter(x=>x.id!==id);save();if(ST.sid===id)ST.sid=null;render();toast('Session deleted')})}
+const stRec=()=>byId('sportTests',ST.sid);
+let stT=null;function stIn(el){const r=stRec();fcPut(r,el.dataset.p,el.value);clearTimeout(stT);stT=setTimeout(()=>save(),350);stLive()}
+function stLive(){const r=stRec();if(!r)return;r.tests.forEach((e,i)=>{const o=stEval(r,e);const el=document.querySelector(`[data-stres="${i}"]`);if(!el)return;el.innerHTML=stResHtml(r,e,o)})}
+function stResHtml(r,e,o){const{t,V,N,R,prev}=o;if(!V)return '<span class="muted">Enter the result to see the category.</span>';const u=stU(t,V.v);
+ let h=`<div><b style="font-size:20px">${stFmt(t,V.v)}</b>${u}</div>`;if(V.x)h+=`<div class="muted" style="font-size:12px">${esc(V.x)}</div>`;
+ if(e.cat)h+=`<div class="fc-rate">${esc(e.cat)} <span class="muted">(assessor)</span></div>`;else if(R&&!R.err)h+=`<div class="fc-rate ${R.best?'ok':R.i===0?'bad':''}">${esc(fcRateText(N,R,V.v))}</div><div class="muted" style="font-size:11px">${esc(N.n)} norms · ${esc(R.grp)}</div>`;else if(R&&R.err)h+=`<div class="muted">${esc(R.err)}</div>`;
+ if(prev){const d=V.v-prev.v,pc=prev.v?d/prev.v*100:0;const better=stDir(t)==='lo'?d<0:d>0;h+=`<div style="font-size:12px;margin-top:3px" class="${better?'fc-rate ok':d?'fc-rate bad':'muted'}">vs ${fmtDate(prev.date)}: ${d>0?'+':d<0?'−':''}${stFmt(t,Math.abs(d))}${stU(t,Math.abs(d))} (${pc>0?'+':''}${pc.toFixed(1)}%) ${better?'improved':d?'declined':'no change'}</div>`}
+ return h}
+function stSession(){const r=stRec();const S=stSport(r.sport)||['','Sport','🏅',[]];
+ const top=`<div class="pagehead"><div><div class="eyebrow">Sports Specific Test · ${esc(S[1])}</div><h2>${S[2]} ${esc(r.name||'New test session')}</h2></div><div class="row"><button class="btn" onclick="save();ST.sid=null;render()">← ${esc(S[1])}</button><button class="btn pri" onclick="stPdf('${r.id}')">⬇ Download PDF report</button></div></div>`;
+ const f=(k,l,t='text',x='')=>`<div><label>${l}</label><input type="${t}" data-p="${k}" value="${esc(r[k]??'')}" oninput="stIn(this)" ${x}></div>`;
+ const info=`<div class="card"><h3 style="margin-top:0">Athlete & session</h3><div class="fc-g" style="grid-template-columns:repeat(auto-fill,minmax(min(200px,100%),1fr))">
+ <div><label>Athlete on roster</label><select onchange="stPickAth(this.value)"><option value="">— Type below —</option>${db.athletes.map(a=>`<option value="${a.id}" ${a.id===r.athlete?'selected':''}>${esc(a.name)}</option>`).join('')}</select></div>
+ ${f('name','Athlete name')}<div><label>Gender</label><select data-p="gender" onchange="stIn(this);render()"><option value=""></option>${['Male','Female'].map(g=>`<option ${r.gender===g?'selected':''}>${g}</option>`).join('')}</select></div>${f('age','Age (years)','number')}
+ ${f('position','Position / event')}${f('level','Level','text','list="stLvl"')}<datalist id="stLvl">${['Club','District','State','National','International','School','University'].map(x=>`<option value="${x}">`).join('')}</datalist>
+ ${f('date','Test date','date')}${f('venue','Venue')}${f('conditions','Conditions (surface, temp.)')}
+ <div><label>Tested by (position)</label><input data-p="staffRole" list="pdRoleL2" value="${esc(r.staffRole)}" oninput="stIn(this)"><datalist id="pdRoleL2">${PDROLES.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>${f('staffName','Staff name')}</div>
+ ${!r.gender||!r.age?'<p class="pill p-warn" style="margin:10px 0 0;display:inline-block">Enter gender and age so the normative category can be worked out.</p>':''}</div>`;
+ const tests=r.tests.map((e,i)=>{const t=STT[e.t];if(!t)return '';const o=stEval(r,e);const nt=t.n2||(t.time?1:3);
+  const inputs=t.inp?`<div class="fc-g" style="grid-template-columns:repeat(auto-fill,minmax(min(140px,100%),1fr))">${t.inp.map(([k,l,u])=>`<div><label>${esc(l)} <span class="muted">(${esc(u)})</span></label><input data-p="tests.${i}.inp.${k}" value="${esc((e.inp||{})[k]??'')}" placeholder="${u==='mm:ss'?'e.g. 5:20':''}" oninput="stIn(this)"></div>`).join('')}</div>`
+   :`<div class="fc-g" style="grid-template-columns:repeat(auto-fill,minmax(min(120px,100%),1fr))">${Array.from({length:Math.max(nt,(e.tr||[]).length)},(_,k)=>`<div><label>${nt>1?'Trial '+(k+1):'Result'} <span class="muted">(${t.time?'min:sec':esc(t.u)})</span></label><input data-p="tests.${i}.tr.${k}" value="${esc((e.tr||[])[k]??'')}" placeholder="${t.time?'e.g. 8:10':''}" oninput="stIn(this)"></div>`).join('')}</div>`;
+  return `<div class="card st-test"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><div><span class="pill p-blue">${esc(STQ[t.q])}</span> <b style="font-size:17px">${i+1}. ${esc(t.n)}</b></div><div class="row" style="gap:4px"><button class="btn sm" ${i?'':'disabled'} onclick="stMove(${i},-1)">↑</button><button class="btn sm" ${i<r.tests.length-1?'':'disabled'} onclick="stMove(${i},1)">↓</button><button class="btn sm" onclick="stRemove(${i})">✕</button></div></div>
+  <details style="margin:6px 0"><summary class="muted" style="cursor:pointer;font-size:13px">Protocol</summary><ol style="margin:6px 0;padding-left:20px;font-size:13px">${t.p.proc.map(s=>`<li>${esc(s)}</li>`).join('')}</ol><div class="muted" style="font-size:13px">Scoring: ${esc(t.p.score)}</div></details>
+  <div class="st-row"><div style="flex:2;min-width:240px">${inputs}</div><div class="st-res" data-stres="${i}">${stResHtml(r,e,o)}</div></div>
+  <div class="fc-g" style="grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));margin-top:8px"><div><label>Category override (optional)</label><input data-p="tests.${i}.cat" value="${esc(e.cat||'')}" placeholder="Leave empty to use the norms" oninput="stIn(this)"></div><div><label>Notes</label><input data-p="tests.${i}.note" value="${esc(e.note||'')}" oninput="stIn(this)"></div></div></div>`}).join('');
+ const L=Object.keys(STT).filter(k=>!r.tests.some(e=>e.t===k));
+ const add=`<div class="row" style="gap:8px;flex-wrap:wrap;margin:6px 0 16px"><select id="stAdd" style="max-width:360px"><option value="">＋ Add a test from the library…</option>${STQ.map((q,qi)=>`<optgroup label="${esc(q)}">${L.filter(k=>STT[k].q===qi).map(k=>`<option value="${k}">${esc(STT[k].n)}</option>`).join('')}</optgroup>`).join('')}</select><button class="btn sm" onclick="stAdd(document.getElementById('stAdd').value)">Add</button></div>`;
+ const fin=`<div class="card"><h3 style="margin-top:0">Interpretation & recommendations</h3><label>Summary</label><textarea id="stSum" data-p="summary" rows="5" oninput="stIn(this)">${esc(r.summary)}</textarea><button class="btn sm" style="margin:6px 0 12px" onclick="stAuto()">↻ Write from the results</button>
+ <label>Recommendations</label><textarea id="stRecs" data-p="recs" rows="5" oninput="stIn(this)">${esc(r.recs)}</textarea></div>`;
+ return top+info+`<h3>Tests (${r.tests.length})</h3>`+tests+add+fin+`<div class="row" style="justify-content:flex-end"><button class="btn pri" onclick="stPdf('${r.id}')">⬇ Download PDF report</button></div>`}
+function stPickAth(id){const r=stRec();r.athlete=id;const a=byId('athletes',id);if(a){r.name=a.name;r.gender=a.gender||r.gender;r.position=a.position||r.position;if(a.dob){const d=new Date(a.dob),n=new Date(r.date||today());let y=n.getFullYear()-d.getFullYear();if(n<new Date(n.getFullYear(),d.getMonth(),d.getDate()))y--;r.age=String(y)}}save();render()}
+function stMove(i,d){const r=stRec();[r.tests[i],r.tests[i+d]]=[r.tests[i+d],r.tests[i]];save();render()}
+function stRemove(i){const r=stRec();r.tests.splice(i,1);save();render()}
+function stAdd(k){if(!k)return;stRec().tests.push({t:k,tr:[],inp:{},note:'',cat:''});save();render()}
+function stAuto(){const r=stRec();const S=stSport(r.sport);const ok=[],low=[],mid=[],pro=[];const focus=new Set();
+ r.tests.forEach(e=>{const o=stEval(r,e);if(!o.V)return;const nm=o.t.n;if(o.cat){const R=o.R;const n=R?R.n:3;const i=R&&!e.cat?R.i:null;
+   if(i!=null&&i<(n-1)/2&&!R.best){low.push(`${nm}: ${o.cat}`);if(o.t.es!=='na')focus.add(o.t.es)}else if(R&&R.best)ok.push(`${nm}: ${o.cat}`);else mid.push(`${nm}: ${o.cat}`)}
+  else if(o.prev){const d=o.V.v-o.prev.v;const better=stDir(o.t)==='lo'?d<0:d>0;pro.push(`${nm} ${better?'improved':'declined'} by ${Math.abs(d/o.prev.v*100).toFixed(1)}%`)}});
+ const nm=r.name||'The athlete';
+ r.summary=[`${nm}${r.age?' ('+r.age+' y'+(r.gender?', '+r.gender.toLowerCase():'')+')':''} completed ${r.tests.filter(e=>stVal(STT[e.t],e)).length} ${S?S[1].toLowerCase():''}-specific tests on ${fmtDate(r.date)}.`,ok.length?`Strengths: ${ok.join('; ')}.`:'',mid.length?`Around the reference level: ${mid.join('; ')}.`:'',low.length?`Priority areas: ${low.join('; ')}.`:'',pro.length?`Progress since the last test: ${pro.join('; ')}.`:''].filter(Boolean).join(' ');
+ r.recs=[...focus].map(f=>FCCOND[f]).concat(low.length?[]:['Maintain current qualities; progress training load gradually and re-test in 6–8 weeks.']).concat(['Re-test under the same conditions (time of day, surface, warm-up) in 6–8 weeks.']).join('\n');
+ save();render()}
+/* ---------- PDF report ---------- */
+async function stPdf(id){const r=byId('sportTests',id);if(!r)return;toast('Preparing PDF…');try{const L=await fcLib();const bytes=await stBuild(L,r);const name=('Sport-Test_'+(stSport(r.sport)||['','Sport'])[1]+'_'+(r.name||'Athlete')+'_'+(r.date||today())).replace(/[^\w.-]+/g,'_')+'.pdf';await fcDownload(bytes,name);toast('PDF ready: '+name)}catch(e){console.error(e);toast('PDF failed: '+(e.message||e))}}
+async function stBuild(Lb,r){const {PDFDocument,StandardFonts,rgb}=Lb;const S=stSport(r.sport)||['','Sport','',[]];const doc=await PDFDocument.create();doc.setTitle(fcTx(S[1]+' specific test report - '+(r.name||'')));doc.setCreator('BIOMOTOR Sport and Fitness');
+ const F=await doc.embedFont(StandardFonts.Helvetica),B=await doc.embedFont(StandardFonts.HelveticaBold),I=await doc.embedFont(StandardFonts.HelveticaOblique);const logo=await fcImg(doc);
+ const hex=h=>{const n=parseInt(h.slice(1),16);return rgb((n>>16&255)/255,(n>>8&255)/255,(n&255)/255)};const RED=hex('#c8102e'),DARK=hex('#1d1d1f'),MUT=hex('#6b6b70'),LINE=hex('#d9d9de'),SOFT=hex('#fbeef0'),GREEN=hex('#1f8a4c'),WHITE=rgb(1,1,1),ZEBRA=hex('#f6f6f8');
+ const W=595.28,H=841.89,M=42,CW=W-2*M,BOT=62;const pages=[];let pg,y;
+ const tw=(s,f,z)=>f.widthOfTextAtSize(fcTx(s),z);
+ const wrap=(s,f,z,mw)=>{const out=[];fcTx(s).split('\n').forEach(par=>{let line='';par.split(/\s+/).forEach(w=>{if(!w)return;const t=line?line+' '+w:w;if(tw(t,f,z)<=mw)line=t;else{if(line)out.push(line);line=w}});out.push(line)});return out};
+ const T=(s,x,yy,o={})=>pg.drawText(fcTx(s),{x,y:yy,size:o.z||10,font:o.f||F,color:o.c||DARK});
+ const newPage=()=>{pg=doc.addPage([W,H]);pages.push(pg);pg.drawRectangle({x:16,y:16,width:W-32,height:H-32,borderColor:RED,borderWidth:1.4});pg.drawRectangle({x:20,y:20,width:W-40,height:H-40,borderColor:RED,borderWidth:.5});
+  if(logo){const s=Math.min(100/logo.width,28/logo.height);pg.drawImage(logo,{x:M,y:H-58,width:logo.width*s,height:logo.height*s})}const t=(S[1]+' SPECIFIC TEST REPORT').toUpperCase();T(t,W-M-tw(t,B,8.5),H-42,{f:B,z:8.5,c:RED});T(r.name||'',W-M-tw(r.name||'',F,8.5),H-54,{z:8.5,c:MUT});pg.drawLine({start:{x:M,y:H-64},end:{x:W-M,y:H-64},thickness:.6,color:LINE});y=H-86};
+ const need=h=>{if(y-h<BOT)newPage()};
+ const sec=t=>{need(56);const z=13,bw=tw(t.toUpperCase(),B,z)+28,x=(W-bw)/2;pg.drawRectangle({x,y:y-22,width:bw,height:24,color:RED});T(t.toUpperCase(),x+14,y-15,{f:B,z,c:WHITE});y-=40};
+ const para=(s,o={})=>{const z=o.z||10,f=o.f||F,lh=z*1.45;wrap(s,f,z,o.w||CW-(o.x?o.x-M:0)).forEach(l=>{need(lh);T(l,o.x||M,y,{f,z,c:o.c});y-=lh});y-=o.gap??4};
+ const table=(hd,rows,ws,z=8.5)=>{const pad=4;const drawHead=()=>{const hh=Math.max(...hd.map((h,k)=>wrap(h,B,z,ws[k]-2*pad).length))*(z+3)+9;need(hh+18);let x=M;pg.drawRectangle({x:M,y:y-hh,width:CW,height:hh,color:RED});hd.forEach((h,k)=>{wrap(h,B,z,ws[k]-2*pad).forEach((l,q)=>T(l,x+pad,y-z-4-q*(z+3),{f:B,z,c:WHITE}));x+=ws[k]});y-=hh};
+  drawHead();rows.forEach((row,ri)=>{const cells=row.map((c,k)=>{const o=typeof c==='object'&&c?c:{t:c};return Object.assign(o,{L:wrap(String(o.t??''),o.b?B:F,z,ws[k]-2*pad)})});const rh=Math.max(...cells.map(c=>c.L.length))*(z+3)+9;if(y-rh<BOT){newPage();drawHead()}
+   if(ri%2)pg.drawRectangle({x:M,y:y-rh,width:CW,height:rh,color:ZEBRA});let x=M;cells.forEach((c,k)=>{c.L.forEach((l,q)=>T(l,x+pad,y-z-4-q*(z+3),{f:c.b?B:F,z,c:c.c||DARK}));x+=ws[k]});pg.drawLine({start:{x:M,y:y-rh},end:{x:W-M,y:y-rh},thickness:.4,color:LINE});y-=rh});y-=12};
+ const by=`${r.staffRole||''}${r.staffName?': '+r.staffName:''}`;
+ /* cover */
+ newPage();if(logo){const s=Math.min(240/logo.width,100/logo.height);pg.drawImage(logo,{x:(W-logo.width*s)/2,y:H-230,width:logo.width*s,height:logo.height*s})}
+ const ctr=(s,yy,o={})=>T(s,(W-tw(s,o.f||F,o.z||10))/2,yy,o);
+ pg.drawLine({start:{x:M+30,y:H-275},end:{x:W-M-30,y:H-275},thickness:.8,color:MUT});ctr(`{ ${S[1].toUpperCase()} }`,H-305,{f:B,z:24});ctr('SPORTS SPECIFIC TEST REPORT',H-330,{f:B,z:14,c:RED});pg.drawLine({start:{x:M+30,y:H-345},end:{x:W-M-30,y:H-345},thickness:.8,color:MUT});
+ ctr(`[ Tested by ${by} ]`,H-372,{f:I,z:12});
+ const cb=[['Athlete',r.name||'—'],['Gender / age',[r.gender,r.age?r.age+' years':''].filter(Boolean).join(' / ')||'—'],['Position / event',r.position||'—'],['Level',r.level||'—'],['Venue',r.venue||'—'],['Conditions',r.conditions||'—']];
+ let cy=H-430;pg.drawRectangle({x:M+50,y:cy-cb.length*24+8,width:CW-100,height:cb.length*24+22,color:SOFT,borderColor:LINE,borderWidth:.8});cb.forEach(([k,v])=>{T(k,M+70,cy,{f:B,z:10,c:MUT});T(String(v).slice(0,60),M+200,cy,{f:B,z:11});cy-=24});
+ ctr(fcLongDate(r.date).toUpperCase(),130,{f:B,z:13});ctr(db.org.name||'BIOMOTOR Sport and Fitness',110,{z:11,c:MUT});
+ /* results */
+ newPage();sec('Test Results');const E=r.tests.map(e=>Object.assign({e},stEval(r,e))).filter(o=>o.t);const uu=o=>o.V?stU(o.t,o.V.v):'';
+ para(`Categories use published normative data for ${r.gender?r.gender.toLowerCase()+'s':'athletes'}${r.age?' aged '+r.age:''}. Tests without a universal norm are compared with the athlete's previous result.`,{f:I,z:8.5,c:MUT});
+ table(['#','Test','Quality / energy system','Result','Category','Previous / change'],E.map((o,k)=>{const u=uu(o);const col=o.R&&!o.e.cat?(o.R.best?GREEN:o.R.i===0?RED:DARK):DARK;
+  let ch='—';if(o.V&&o.prev){const d=o.V.v-o.prev.v;const better=stDir(o.t)==='lo'?d<0:d>0;ch=`${stFmt(o.t,o.prev.v)} (${fmtDate(o.prev.date)}) ${d>0?'+':''}${(d/o.prev.v*100).toFixed(1)}% ${better?'improved':d?'declined':''}`}
+  return [{t:String(k+1)},{t:o.t.n,b:1},`${STQ[o.t.q]} · ${FCES[o.t.es]}`,{t:o.V?stFmt(o.t,o.V.v)+u:'Not tested',b:1},{t:o.cat||(o.V&&!o.N?'No norm — see change':'—'),b:1,c:col},ch]}),[CW*.05,CW*.24,CW*.2,CW*.14,CW*.17,CW*.2]);
+ /* interpretation */
+ sec('Interpretation');E.filter(o=>o.V).forEach(o=>{need(70);T(fcTx(o.t.n),M,y,{f:B,z:10.5,c:RED});y-=14;const u=uu(o);
+  para(`Result: ${stFmt(o.t,o.V.v)}${u}${o.V.x?' — '+o.V.x:''}.`,{z:9.5,gap:1});
+  if(o.e.cat)para(`Category (assessor): ${o.e.cat}.`,{z:9.5,f:B,gap:1});else if(o.R&&!o.R.err)para(`Category: ${fcRateText(o.N,o.R,o.V.v)}.`,{z:9.5,f:B,gap:1});
+  para(`What it shows: ${o.t.m}`,{z:9,gap:1});
+  if(o.N){const b=fcBand(o.N,r.gender,fcNum(r.age));if(b)para(`Norms (${o.R&&o.R.grp||''}): ${fcBandText(o.N,b)}`,{z:8.3,c:MUT,gap:1});para('Reference: '+o.N.ref,{f:I,z:8,c:MUT,gap:1})}else if(o.t.p.notes)para(o.t.p.notes,{z:8.5,c:MUT,gap:1});
+  if(o.R&&!o.R.best&&o.R.i<(o.R.n-1)/2&&o.t.es!=='na')para('Training focus: '+FCCOND[o.t.es],{z:8.5,gap:1});if(o.e.note)para('Note: '+o.e.note,{z:8.5,f:I,gap:1});y-=6});
+ if(r.summary||r.recs){sec('Summary & Recommendations');if(r.summary)para(r.summary,{z:10.5,gap:10});if(r.recs){T('Recommendations',M,y,{f:B,z:11,c:RED});y-=16;r.recs.split('\n').filter(Boolean).forEach((l,k)=>{need(16);T((k+1)+'.',M,y,{f:B,z:10,c:RED});const L=wrap(l,F,10,CW-20);L.forEach((x,q)=>{if(q){y-=14;need(14)}T(x,M+18,y,{z:10})});y-=16})}}
+ /* protocols appendix */
+ sec('Test Protocols');E.forEach(o=>{need(60);T(fcTx(o.t.n),M,y,{f:B,z:10,c:RED});y-=13;para('Purpose: '+o.t.p.purpose+'  Equipment: '+o.t.p.equip,{z:8.5,gap:1});o.t.p.proc.forEach((s,k)=>para(`${k+1}. ${s}`,{z:8.5,x:M+10,gap:0}));para('Scoring: '+o.t.p.score,{z:8.5,f:I,gap:8})});
+ need(130);y-=10;const sx=W-M-230;T((r.staffRole||'')+'.',sx,y,{f:B,z:13});T(r.staffName||'',sx,y-18,{z:12});T(fcLongDate(r.date),sx,y-34,{z:10,c:MUT});y-=64;
+ ['Staff sign :-','Athlete name :-','Athlete sign :-'].forEach((l,k)=>{T(l,M,y,{f:B,z:11});pg.drawLine({start:{x:M+120,y:y-2},end:{x:M+330,y:y-2},thickness:.6,color:DARK});if(k===1&&r.name)T(r.name,M+124,y+2,{z:11});y-=28});
+ const foot=`Tested by ${by}  ·  ${fcLongDate(r.date)}`;pages.forEach((p,k)=>{if(!k)return;p.drawLine({start:{x:M,y:44},end:{x:W-M,y:44},thickness:.5,color:LINE});p.drawText(fcTx(foot),{x:M,y:32,size:8,font:F,color:MUT});const pn=`Page ${k+1} of ${pages.length}`;p.drawText(pn,{x:W-M-F.widthOfTextAtSize(pn,8),y:32,size:8,font:F,color:MUT})});
+ return await doc.save()}
+
+/* ============ ACCESS CONTROL (owner-only pages · view-only roles · athlete/parent portal · subscription lock) ============ */
+var OWNER_PAGES=['organization','branding','app-settings','subscription','payments','beta'];
+var RO_ROLES=['Athlete','Parent','Viewer'],PORTAL_ROLES=['Athlete','Parent'];
+function roUser(a){return !!a&&!a.owner&&RO_ROLES.includes(a.role)}
+function portalUser(a){return !!a&&!a.owner&&PORTAL_ROLES.includes(a.role)}
+const PORTAL_NAV=[['MY BIOMOTOR',[['my-portal','My Dashboard'],['my-reports','My Reports'],['my-program','My Program'],['my-team','Team Rankings'],['my-profile','Profile']]]];
+const PORTAL_PAGES=PORTAL_NAV[0][1].map(x=>x[0]);
+Object.assign(TITLES,Object.fromEntries(PORTAL_NAV[0][1]));
+function axNav(me){if(portalUser(me))return PORTAL_NAV;return NAV.map(([g,items])=>[g,items.filter(([k])=>(!OWNER_PAGES.includes(k)||(me&&me.owner))&&(!ADMIN_PAGES.includes(k)||isAdmin(me)))]).filter(([g,i])=>i.length)}
+function axBlocked(me,p){if(!me||me.owner)return '';if(OWNER_PAGES.includes(p))return 'owner';if(ADMIN_PAGES.includes(p)&&!isAdmin(me))return 'admin';return ''}
+/* ---- view-only: nothing an Athlete, Parent or Viewer changes is saved ---- */
+var AX_EVT=0,AX_RENDERING=false,AX_TT=0,AX_RT=null;
+['click','input','change','submit','keydown'].forEach(t=>document.addEventListener(t,()=>{AX_EVT=Date.now()},true));
+function axRevert(){try{const s=localStorage.getItem(KEY);db=s?Object.assign(seed(),Shubham.parse(s)):seed()}catch(e){}
+ if(AX_RENDERING||Date.now()-AX_EVT>1500)return;if(Date.now()-AX_TT>2500){AX_TT=Date.now();toast('👁 View-only account — changes are not allowed')}
+ clearTimeout(AX_RT);AX_RT=setTimeout(()=>{closeModal();render()},60)}
+var AX_MUT=/(^|[^a-z])(add|new|edit|delete|remove|save|approve|archive|restore|import|invite|create|assign|mark|verify|reject|duplicate|upload|send|record|log|start|apply|reset|clear|move|enable|disable|connect|pay|submit|resend|revoke|link|unlink|merge|publish|generate|write|rename|update|schedule|book|refund|charge|request)([^a-z]|$)/i,AX_SYM=/^\s*(＋|\+|✕|🗑|✎|✏|↑|↓|↻|↺|🗄|⇪)/;
+function axLock(root){const me=authUser();if(!roUser(me)||!root)return;
+ root.querySelectorAll('input,textarea,select').forEach(el=>{if(el.closest('[data-ro-ok]')||el.id==='gSearch'||el.type==='search'||/search|filter/i.test(el.placeholder||''))return;const h=(el.getAttribute('onchange')||'')+(el.getAttribute('oninput')||'');if(!el.name&&!el.dataset.p&&!el.closest('form')&&!/db\.|save|In\(|Set\(|Put\(|byId\(/.test(h)&&(h||el.tagName==='SELECT'))return;el.disabled=true});
+ root.querySelectorAll('[contenteditable]').forEach(el=>el.setAttribute('contenteditable','false'));
+ root.querySelectorAll('button,.btn').forEach(b=>{if(b.closest('[data-ro-ok]')||b.dataset.roOk!=null)return;const t=((b.textContent||'')+' '+(b.title||'')).trim();const oc=b.getAttribute('onclick')||'';
+  if(/Pdf|PDF|Download|download|print|closeModal|signOut|accOwnPw|cloudPull/.test(oc+' '+t)&&!/save\(|push\(|splice\(/.test(oc))return;if(AX_SYM.test(t)||AX_MUT.test(t)||/save\(\)|Del\(|Remove\(|New\(|\.push\(|splice\(|openForm\('[a-z]+'\)|import-data/.test(oc))b.style.display='none'})}
+var AX_OBS=new MutationObserver(ms=>{if(!roUser(authUser()))return;const s=new Set();ms.forEach(m=>{const r=m.target.closest&&m.target.closest('#view,#modal');if(r)s.add(r)});s.forEach(axLock)});
+setTimeout(()=>{['view','modal'].forEach(id=>{const el=document.getElementById(id);if(el)AX_OBS.observe(el,{childList:true,subtree:true})})},0);
+/* ---- subscription lock ---- */
+function axSubEnd(s){return s.status==='Trialing'?s.trialEnd:s.nextCharge}
+function axLocked(){const {s,st}=subState();const A=db.meta.access||{};if(A.autoLock===false)return null;const end=axSubEnd(s);if(!end||!['Trial ended','Past due'].includes(st))return null;
+ const g=+A.grace||0;const until=g?addD(end,g):end;return until<today()?{end,until,st}:null}
+function axLockPage(me,L){const {s,pend}=subState();const pl=db.meta.plan;const adm=isAdmin(me);const yr=SPLANS.map(p=>p[0]);
+ return `<div class="card ac-lock"><div style="font-size:46px">🔒</div><div class="eyebrow" style="color:var(--bad);letter-spacing:.15em">Subscription ended</div><h2 style="margin:6px 0">${esc(db.org.name)} — platform locked</h2>
+ <p class="muted" style="font-size:16px;max-width:620px;margin:0 auto">The ${esc(pl)} ${s.status==='Trialing'?'trial':'plan'} ended on <b>${fmtDate(L.end)}</b>. All features stay locked until the subscription is renewed. Your data is safe and nothing is deleted.</p>
+ ${pend.length?`<p class="pill p-warn" style="display:inline-block;margin-top:14px">${pend.length} payment(s) submitted — waiting for ${esc(OWNER_ACC.name)} to verify. The platform opens automatically after verification.</p>`:''}
+ ${adm?`<div class="row" style="justify-content:center;gap:10px;flex-wrap:wrap;margin-top:18px">${yr.map(p=>['Monthly','Yearly'].map(c=>`<button class="btn ${p===pl&&c===s.cycle?'pri':''}" onclick="subPay('${p}','${c}')">${esc(p)} · ${c} — ${inr(subPrice(p,c))}</button>`).join('')).join('')}</div>
+ <div style="margin-top:12px"><button class="btn sm" onclick="subPay('','','manual')">I already paid — add UTR</button></div>`:`<p style="margin-top:16px">Please ask your organisation admin to renew, or contact <b>${esc(OWNER_ACC.name)}</b> · ${esc(OWNER_ACC.phone)}.</p>`}
+ <div class="row" style="justify-content:center;margin-top:18px"><a class="btn" href="tel:${esc(OWNER_ACC.phone)}">📞 Call ${esc(OWNER_ACC.name)}</a><a class="btn" target="_blank" href="https://wa.me/91${esc(OWNER_ACC.phone)}?text=${encodeURIComponent('Subscription renewal for '+db.org.name)}">WhatsApp</a><button class="btn" onclick="signOut()">Sign out</button></div></div>`}
+function axSubCard(){const {s,st}=subState();const A=db.meta.access=db.meta.access||{autoLock:true,grace:0};const L=axLocked();const end=axSubEnd(s);
+ return `<div class="card" style="border:2px solid ${L?'var(--bad)':'var(--accent)'}"><div class="eyebrow" style="letter-spacing:.15em;color:var(--accent)">Owner control</div><h3 style="margin:4px 0 6px;font-weight:500;font-size:24px">Organisation access &amp; automatic lock</h3>
+ <p class="muted" style="margin:0 0 12px">When the plan or trial ends, every account except the owner is locked automatically until a payment is verified. Verifying a payment (below) or extending access here unlocks the platform for everyone straight away.</p>
+ <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:12px"><div class="card" style="margin:0;background:var(--card2)"><div class="eyebrow">Access</div><div style="font-size:26px;font-weight:800;color:var(--${L?'bad':'ok'})">${L?'🔒 Locked':'✅ Open'}</div><div class="muted">${esc(st)}${end?' · ends '+fmtDate(end):''}</div></div>
+ <div class="card" style="margin:0;background:var(--card2)"><div class="eyebrow">Automatic lock</div><label class="row" style="flex-wrap:nowrap;margin-top:8px"><input type="checkbox" style="width:auto" ${A.autoLock!==false?'checked':''} onchange="db.meta.access.autoLock=this.checked;save();render()"> Lock when the plan ends</label></div>
+ <div class="card" style="margin:0;background:var(--card2)"><div class="eyebrow">Grace days after end</div><input type="number" min="0" max="60" value="${+A.grace||0}" onchange="db.meta.access.grace=Math.max(0,Math.min(60,Math.round(+this.value||0)));save();render()"></div></div>
+ <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px"><span class="muted">Extend access without payment:</span><button class="btn sm" onclick="axExtend(30)">+30 days</button><button class="btn sm" onclick="axExtend(365)">+1 year</button><input type="date" id="axUntil" style="width:auto" value="${esc(end||'')}"><button class="btn sm pri" onclick="axSetUntil(document.getElementById('axUntil').value)">Set access until</button><button class="btn sm ghost danger" onclick="axLockNow()">Lock now</button></div></div>`}
+function axSetUntil(d){if(!/^\d{4}-\d{2}-\d{2}$/.test(d||'')){toast('Pick a date');return}const s=subDb();s.status='Active';s.nextCharge=d;save();render();toast('Access open until '+fmtDate(d))}
+function axExtend(n){const s=subDb();const e=axSubEnd(s);axSetUntil(addD(e&&e>today()?e:today(),n))}
+function axLockNow(){confirmBox('Lock the platform for everyone except you now? It opens again when you verify a payment or extend access.',()=>{const s=subDb();s.status='Active';s.nextCharge=addD(today(),-1);db.meta.access=db.meta.access||{};db.meta.access.autoLock=true;db.meta.access.grace=0;save();render();toast('Platform locked')})}
+{const _sub=P.subscription;P.subscription=()=>axSubCard()+_sub()}
+/* ---- which athletes belong to this account ---- */
+function axMine(me){if(!me)return [];const em=normEmail(me.email);const ids=new Set();const uids=db.users.filter(u=>em&&normEmail(u.email)===em&&u.status!=='Archived').map(u=>u.id);if(me.user)uids.push(me.user);
+ (me.role==='Parent'?db.parentLinks:db.athLinks||[]).forEach(l=>{if(l.status==='Active'&&uids.includes(l.user))ids.add(l.athlete)});
+ (db.invites||[]).forEach(i=>{if(em&&normEmail(i.email)===em&&i.role===me.role&&i.athlete&&i.status!=='Revoked')ids.add(i.athlete)});
+ db.athletes.forEach(a=>{const e=[a.email,me.role==='Parent'&&a.parentEmail,me.role==='Parent'&&a.guardianEmail].filter(Boolean).map(normEmail);if(em&&(me.role==='Athlete'?normEmail(a.email)===em:e.slice(1).includes(em)))ids.add(a.id)});
+ return [...ids].map(id=>byId('athletes',id)).filter(Boolean)}
+let AXP={aid:''};
+function axCur(me){const L=axMine(me);if(!L.some(a=>a.id===AXP.aid))AXP.aid=L[0]?L[0].id:'';return {L,a:byId('athletes',AXP.aid)}}
+const axNm=s=>String(s||'').trim().toLowerCase();
+const axFor=(a,r,nameKeys)=>r.athlete===a.id||(!r.athlete&&nameKeys.some(k=>axNm(fcGet(r,k))&&axNm(fcGet(r,k))===axNm(a.name)));
+function axHead(me,title,sub){const {L,a}=axCur(me);const pick=L.length>1?`<select data-ro-ok style="width:auto" onchange="AXP.aid=this.value;render()">${L.map(x=>`<option value="${x.id}" ${x.id===AXP.aid?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`:'';
+ return head(me.role==='Parent'?'Parent portal':'Athlete portal',title,sub,pick)+`<div class="pill p-blue" style="display:inline-block;margin-bottom:12px">👁 View only — your coach updates this information</div>`}
+function axNone(me){return `<div class="card"><h3 style="margin-top:0">Your account is not linked yet</h3><p class="muted">${me.role==='Parent'?'Your account needs to be linked to your child\'s athlete profile.':'Your account needs to be linked to your athlete profile.'} Ask your coach or ${esc(OWNER_ACC.name)} (${esc(OWNER_ACC.phone)}) to link it in <b>Coaches &amp; Users → ${me.role==='Parent'?'Parent':'Athlete'} links</b>. Use the same email you signed in with: <b>${esc(me.email||'')}</b>.</p></div>`}
+const axTeams=a=>db.teams.filter(t=>!t.archived&&tMembers(t).includes(a.id));
+/* latest value per metric for one athlete (Testing results + Sports Specific Test) */
+function axMetrics(aid){const out={};const put=(k,o)=>{const p=out[k];if(!p||String(o.date)>String(p.date)||(o.date===p.date&&(o.dir==='lo'?o.val<p.val:o.val>p.val)))out[k]=o};
+ db.results.filter(r=>r.athlete===aid&&r.value!==''&&r.value!=null&&isFinite(+r.value)).forEach(r=>{const t=byId('testlib',r.test);if(!t)return;put('r:'+t.id,{label:t.name,unit:t.unit||'',cat:t.category||'',dir:/lower/i.test(t.better||'')?'lo':'hi',val:+r.value,date:r.date||''})});
+ (db.sportTests||[]).filter(x=>x.athlete===aid).forEach(x=>(x.tests||[]).forEach(e=>{const t=STT[e.t];if(!t)return;const V=stVal(t,e);if(!V)return;put('s:'+e.t,{label:t.n,unit:t.u,cat:STQ[t.q],dir:stDir(t),val:V.v,date:x.date||'',f:stFmt(t,V.v)})}));
+ return out}
+const axF=m=>m.f||String(+(+m.val).toFixed(2));
+/* ---- pages ---- */
+P['my-portal']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'My Dashboard','')+axNone(me);
+ const M=Object.values(axMetrics(a.id)).sort((x,y)=>String(y.date).localeCompare(String(x.date)));const T=axTeams(a);
+ const fc=(db.fitConsults||[]).filter(r=>axFor(a,r,['demo.name'])).length,stc=(db.sportTests||[]).filter(r=>axFor(a,r,['name'])).length,pd=(db.pdPrograms||[]).filter(r=>axFor(a,r,['client'])).length;
+ const k=(l,v,g)=>`<button class="card ac-k" onclick="go('${g}')"><div class="eyebrow">${l}</div><div style="font-size:30px;font-weight:800">${v}</div></button>`;
+ return axHead(me,me.role==='Parent'?esc(a.name):'Welcome, '+esc(a.name.split(' ')[0]),'Your profile, test results, reports, training program and team rankings.')+
+ `<div class="card"><div class="row" style="gap:16px;flex-wrap:wrap"><div class="av" style="width:64px;height:64px;font-size:24px">${esc(initials(a.name))}</div><div style="flex:1;min-width:200px"><h2 style="margin:0">${esc(a.name)}</h2><div class="muted">${esc([a.sport,a.position].filter(Boolean).join(' · '))}</div><div class="muted">${esc(T.map(t=>t.name).join(', '))}</div></div></div>
+ <div class="tbl" style="margin-top:12px;overflow:auto"><table>${[['Gender',a.gender],['Age',a.dob?ageOf(a.dob)+' years':''],['Date of birth',a.dob?fmtDate(a.dob):''],['Height',a.height?a.height+' cm':''],['Status',a.status]].filter(x=>x[1]).map(([l,v])=>`<tr><th style="width:160px">${l}</th><td>${esc(v)}</td></tr>`).join('')}</table></div></div>
+ <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:12px;margin-bottom:14px">${k('Test results',M.length,'my-reports')}${k('Reports',fc+stc,'my-reports')}${k('Programs',pd+db.assignments.filter(x=>x.athlete===a.id).length,'my-program')}${k('Teams',T.length,'my-team')}</div>
+ <div class="card"><h3 style="margin-top:0">Latest results</h3>${M.length?`<div class="tbl" style="overflow:auto"><table><tr><th>Test</th><th>Result</th><th>Date</th></tr>${M.slice(0,8).map(m=>`<tr><td>${esc(m.label)}</td><td><b>${esc(axF(m))}</b> ${esc(m.unit==='ratio'?'':m.unit)}</td><td>${fmtDate(m.date)}</td></tr>`).join('')}</table></div>`:'<p class="muted">No test results yet.</p>'}</div>`};
+P['my-reports']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'My Reports','')+axNone(me);
+ const res=db.results.filter(r=>r.athlete===a.id&&r.value!==''&&r.value!=null);const byT={};res.forEach(r=>{(byT[r.test]=byT[r.test]||[]).push(r)});
+ const tests=Object.entries(byT).map(([tid,L])=>{const t=byId('testlib',tid);if(!t)return '';L.sort((x,y)=>String(x.date).localeCompare(String(y.date)));const lo=/lower/i.test(t.better||'');const v=L.map(r=>+r.value);const best=lo?Math.min(...v):Math.max(...v);const last=L[L.length-1],prev=L.length>1?L[L.length-2]:null;
+  const d=prev?+last.value-+prev.value:0,good=lo?d<0:d>0;
+  return `<tr><td><b>${esc(t.name)}</b><div class="muted" style="font-size:12px">${esc(t.category||'')}</div></td><td><b>${esc(last.value)}</b> ${esc(t.unit||'')}<div class="muted" style="font-size:12px">${fmtDate(last.date)}</div></td><td>${esc(best)} ${esc(t.unit||'')}</td><td>${prev?`<span style="color:var(--${d?good?'ok':'bad':'muted'})">${d>0?'▲':d<0?'▼':'='} ${Math.abs(d).toFixed(2).replace(/\.?0+$/,'')}</span>`:'—'}</td><td class="muted" style="font-size:12px">${L.length} test${L.length>1?'s':''}</td></tr>`}).join('');
+ const fc=(db.fitConsults||[]).filter(r=>axFor(a,r,['demo.name'])).sort((x,y)=>String(y.date).localeCompare(String(x.date)));
+ const st=(db.sportTests||[]).filter(r=>axFor(a,r,['name'])).sort((x,y)=>String(y.date).localeCompare(String(x.date)));
+ const row=(t,s,b)=>`<div class="item"><div><b>${t}</b><div class="muted" style="font-size:13px">${s}</div></div><span data-ro-ok>${b}</span></div>`;
+ return axHead(me,'My Reports','Testing results, fitness consultation and sports-specific test reports. Download any report as PDF.')+
+ `<div class="card"><h3 style="margin-top:0">Testing results</h3>${tests?`<div class="tbl" style="overflow:auto"><table><tr><th>Test</th><th>Latest</th><th>Best</th><th>Change</th><th></th></tr>${tests}</table></div>`:'<p class="muted">No testing results yet.</p>'}</div>
+ <div class="card"><h3 style="margin-top:0">Sports Specific Test reports</h3>${st.length?st.map(r=>row(`${esc((stSport(r.sport)||['','Sport'])[1])} test`,`${fmtDate(r.date)} · ${(n=>n+' test'+(n===1?'':'s'))((r.tests||[]).filter(e=>stVal(STT[e.t]||{},e)).length)} · ${esc(r.staffName||'')}`,`<button class="btn sm pri" onclick="stPdf('${r.id}')">⬇ PDF</button>`)).join(''):'<p class="muted">No sports-specific test reports yet.</p>'}</div>
+ <div class="card"><h3 style="margin-top:0">Fitness Consultation reports</h3>${fc.length?fc.map(r=>row('Fitness consultation',`${fmtDate(r.date)} · ${esc(r.staffName||'')}`,`<button class="btn sm pri" onclick="fcPdf('${r.id}')">⬇ PDF</button>`)).join(''):'<p class="muted">No consultation reports yet.</p>'}</div>`};
+P['my-program']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'My Program','')+axNone(me);
+ const pd=(db.pdPrograms||[]).filter(r=>axFor(a,r,['client'])).sort((x,y)=>String(y.date).localeCompare(String(x.date)));
+ const as=db.assignments.filter(x=>x.athlete===a.id&&x.status!=='Archived');
+ return axHead(me,'My Program','Your periodisation program and workout plans designed by your coach.')+
+ `<div class="card"><h3 style="margin-top:0">Periodisation programs</h3>${pd.length?pd.map(r=>`<div class="item"><div><b>${esc(r.title||'Periodisation Program')}</b><div class="muted" style="font-size:13px">${fmtDate(r.date)} · ${esc(r.name||'')}${r.role?' ('+esc(r.role)+')':''} · ${(r.pages||[]).length} pages</div></div><span data-ro-ok><button class="btn sm pri" onclick="pdPdfGo('${r.id}',false)">⬇ PDF</button></span></div>`).join(''):'<p class="muted">No periodisation program yet.</p>'}</div>
+ <div class="card"><h3 style="margin-top:0">Workout programs</h3>${as.length?as.map(x=>{const p=byId('programs',x.program)||{};const lines=String(p.plan||'').split('\n').filter(Boolean);return `<div class="card" style="background:var(--card2);margin:8px 0"><b style="font-size:17px">${esc(p.name||'Program')}</b><div class="muted" style="font-size:13px">${esc([p.goal,p.weeks?p.weeks+' weeks':'',p.days?p.days+' days/week':'',x.start?'from '+fmtDate(x.start):''].filter(Boolean).join(' · '))}</div>${lines.length?`<ol style="margin:8px 0 0;padding-left:20px">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ol>`:''}</div>`}).join(''):'<p class="muted">No workout program assigned yet.</p>'}</div>`};
+function axRank(ids,meId){const per={};ids.forEach(id=>per[id]=axMetrics(id));const keys={};ids.forEach(id=>Object.keys(per[id]).forEach(k=>keys[k]=(keys[k]||0)+1));
+ const mets=Object.keys(keys).filter(k=>keys[k]>=2).map(k=>{const L=ids.filter(id=>per[id][k]).map(id=>({id,m:per[id][k]}));const lo=L[0].m.dir==='lo';L.sort((x,y)=>lo?x.m.val-y.m.val:y.m.val-x.m.val);L.forEach((x,i)=>x.rank=i&&x.m.val===L[i-1].m.val?L[i-1].rank:i+1);return {k,m:L[0].m,L}});
+ const sc={};mets.forEach(({L})=>{const n=L.length;L.forEach(x=>{(sc[x.id]=sc[x.id]||[]).push(n>1?(1-(x.rank-1)/(n-1))*100:100)})});
+ const ov=Object.entries(sc).map(([id,a])=>({id,s:a.reduce((t,v)=>t+v,0)/a.length,n:a.length})).sort((x,y)=>y.s-x.s);ov.forEach((x,i)=>x.rank=i+1);return {mets,ov}}
+function axRankCard(title,sub,ids,meId){const {mets,ov}=axRank(ids,meId);const nm=id=>(byId('athletes',id)||{}).name||'—';const me=ov.find(x=>x.id===meId);
+ if(!mets.length)return `<div class="card"><h3 style="margin-top:0">${esc(title)}</h3><p class="muted">${ids.length} members · no shared test results yet to compare.</p></div>`;
+ return `<div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><div><h3 style="margin:0">${esc(title)}</h3><div class="muted">${esc(sub)} · ${ids.length} members · ${mets.length} tests compared</div></div>${me?`<div class="ac-rank">#${me.rank}<span>of ${ov.length}</span></div>`:''}</div>
+ <h4 style="margin:14px 0 6px">Overall fitness ranking</h4><div class="tbl" style="overflow:auto"><table><tr><th>Rank</th><th>Athlete</th><th>Fitness score</th><th>Tests</th></tr>${ov.map(x=>`<tr class="${x.id===meId?'ac-me':''}"><td><b>${x.rank<=3?['🥇','🥈','🥉'][x.rank-1]:'#'+x.rank}</b></td><td>${esc(nm(x.id))}${x.id===meId?' <span class="pill p-blue">You</span>':''}</td><td><div class="ac-bar"><i style="width:${Math.max(3,x.s)}%"></i></div>${Math.round(x.s)}/100</td><td>${x.n}</td></tr>`).join('')}</table></div>
+ <p class="muted" style="font-size:12px">Fitness score = average team position across all shared tests (100 = best in the team on every test). Latest result of each test is used.</p>
+ <h4 style="margin:14px 0 6px">Test by test</h4>${mets.map(({m,L})=>{const mine=L.find(x=>x.id===meId);const avg=L.reduce((t,x)=>t+x.m.val,0)/L.length;const u=m.unit==='ratio'?'':' '+m.unit;
+  return `<details class="ac-met"><summary><b>${esc(m.label)}</b> <span class="muted">${mine?`· your rank <b>#${mine.rank}</b> of ${L.length} · you ${esc(axF(mine.m))}${esc(u)}`:`· ${L.length} athletes`} · team best ${esc(axF(L[0].m))}${esc(u)} · team avg ${esc(String(+avg.toFixed(2)))}${esc(u)}</span></summary>
+  <div class="tbl" style="overflow:auto;margin-top:6px"><table><tr><th>Rank</th><th>Athlete</th><th>Result</th><th>Date</th></tr>${L.map(x=>`<tr class="${x.id===meId?'ac-me':''}"><td>#${x.rank}</td><td>${esc(nm(x.id))}</td><td><b>${esc(axF(x.m))}</b>${esc(u)}</td><td>${fmtDate(x.m.date)}</td></tr>`).join('')}</table></div></details>`}).join('')}</div>`}
+P['my-team']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'Team Rankings','')+axNone(me);const T=axTeams(a);
+ const grp={};T.forEach(t=>{if(t.group)grp[t.group]=1});const G=Object.keys(grp).map(g=>{const ids=new Set();db.teams.filter(t=>!t.archived&&t.group===g).forEach(t=>tMembers(t).forEach(id=>ids.add(id)));return [g,[...ids]]}).filter(([g,ids])=>!T.some(t=>t.group===g&&tMembers(t).length>=ids.length));
+ return axHead(me,'Team Rankings','Fitness ranking and test-by-test comparison with your team-mates.')+(T.length?T.map(t=>axRankCard(t.name,[t.sport,t.level].filter(Boolean).join(' · ')||'Team',tMembers(t),a.id)).join('')+G.map(([g,ids])=>axRankCard(g+' (group)','All teams in this group',ids,a.id)).join(''):`<div class="card"><p class="muted" style="margin:0">${esc(a.name)} is not in a team or group yet. Your coach adds athletes to teams in Athletes → Teams.</p></div>`)};
+{const _r=render;render=function(){AX_RENDERING=true;try{_r()}finally{AX_RENDERING=false}const me=authUser();['gSearch','bellBtn','aiBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=portalUser(me)?'none':''});
+ if(me&&me.owner&&!document.body.classList.contains('tvmode')){const L=axLocked();const v=document.getElementById('view');if(L&&v&&!v.querySelector('.ax-own'))v.insertAdjacentHTML('afterbegin',`<div class="card ax-own" style="border:2px solid var(--bad);color:var(--bad)">🔒 Subscription ended ${fmtDate(L.end)} — the platform is locked for everyone except you. <a href="javascript:void 0" style="color:inherit;font-weight:700" onclick="go('subscription')">Verify a payment or extend access</a></div>`)}
+ if(me&&roUser(me)&&document.body&&!document.body.classList.contains('tvmode')){const v=document.getElementById('view');if(v&&!portalUser(me)&&!v.querySelector('.ac-tour'))v.insertAdjacentHTML('afterbegin',`<div class="card ac-tour">👁 <b>Tour mode — view only.</b> You can look around every section of the platform; nothing can be added, edited or deleted from this account.</div>`);axLock(v)}}}
+
 /* ============ ACCOUNTS & SIGN-IN (owner: Shubham kale) ============ */
 const SITE_URL='https://biomotorsports.com',siteUrl=()=>(db.org&&db.org.website)||SITE_URL,siteName=()=>siteUrl().replace(/^https?:\/\//,'').replace(/\/$/,'');
 const OWNER_ACC={name:'Shubham kale',email:'founder.shubhamkale@gmail.com',phone:'9321766523'};
@@ -4332,7 +5329,9 @@ function render(){
  document.body.classList.remove('tvmode');
  const p=cur();drawNav(p);topUser.textContent=me.name;topRole.textContent=me.role;if(!me.owner)topAv.textContent=me.name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase();document.getElementById('crumbPage').textContent=TITLES[p]||'';
  const g=GATED[p];const v=document.getElementById('view');
- v.innerHTML=ADMIN_PAGES.includes(p)&&!isAdmin(me)?head('Restricted','Owner access only','This section is managed by '+esc(OWNER_ACC.name)+'. Contact '+esc(OWNER_ACC.phone)+' if you need access.',`<button class="btn pri" onclick="go('dashboard')">Back to dashboard</button>`):p==='my-profile'&&!me.owner?accProfile(me):g&&!db.meta.beta[g]?head('Beta','Feature turned off','Enable it in Beta Setup',`<button class="btn pri" onclick="go('beta')">Open Beta Setup</button>`):P[p]();
+ {const LK=!me.owner&&axLocked();if(LK){document.getElementById('nav').innerHTML='';v.innerHTML=axLockPage(me,LK);return}}
+ if(portalUser(me)&&!PORTAL_PAGES.includes(p)){location.hash='my-portal';return}
+ v.innerHTML=axBlocked(me,p)?head('Restricted','Owner access only','This section is managed by '+esc(OWNER_ACC.name)+'. Contact '+esc(OWNER_ACC.phone)+' if you need access.',`<button class="btn pri" onclick="go('dashboard')">Back to dashboard</button>`):p==='my-profile'&&!me.owner?accProfile(me):g&&!db.meta.beta[g]?head('Beta','Feature turned off','Enable it in Beta Setup',`<button class="btn pri" onclick="go('beta')">Open Beta Setup</button>`):P[p]();
  if(db.meta.suspended&&p!=='app-settings')v.insertAdjacentHTML('afterbegin',`<div class="card" style="border:2px solid var(--bad);color:var(--bad)">⚠ Organization suspended since ${fmtDate(db.meta.suspended)} — public pages are offline. <a href="javascript:void 0" style="color:inherit;font-weight:700" onclick="STG.tab='danger';go('app-settings')">Reactivate</a></div>`);
  if(p==='coaches-users'&&isAdmin(me)){const ph=v.querySelector('.pagehead');ph?ph.insertAdjacentHTML('afterend',accPanel()):v.insertAdjacentHTML('afterbegin',accPanel())}
  if(p==='app-settings'&&db.meta)db.meta.annSeen=1;
