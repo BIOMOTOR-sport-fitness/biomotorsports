@@ -5151,6 +5151,17 @@ function axInvRoles(me){if(!me)return [];if(me.owner||isAdmin(me))return UROLES.
  inv=inv.replace(/<select name="role">[\s\S]*?<\/select>/,`<select name="role">${R.map(r=>`<option>${r}</option>`).join('')}</select>`);
  return `<div class="pagehead"><div><h2 style="font-size:40px">Coaches &amp; Users</h2><div class="muted" style="font-size:17px">You can invite ${R.join(' and ').toLowerCase()} accounts and link athlete logins to athlete profiles.</div></div></div>`+inv+cuLinks('ath')}}
 {const _ic=invCreate;invCreate=function(direct){const f=document.getElementById('invF');const r=f&&new FormData(f).get('role');if(r&&!axInvRoles(authUser()).includes(r)){toast('🔒 You cannot invite a '+r);return}return _ic.apply(this,arguments)}}
+/* ---- Plan status card on Profile for staff (read-only: plan, status, end date, days left — no prices, UPI or payments) ---- */
+{const _ap=accProfile;accProfile=function(me){let h=_ap(me);if(!me||me.owner||!STAFF(me.role))return h;
+ try{const {s,st}=subState();const end=axSubEnd(s);const left=end?Math.ceil(dDiff(end,today())):null;const L=axLocked();
+  const col=L||left!=null&&left<0?'bad':left!=null&&left<=7?'warn':'ok';
+  h+=`<div class="card" data-ro-ok><div class="eyebrow" style="letter-spacing:.15em">Organisation plan</div><h3 style="margin:4px 0 12px">Plan status</h3>
+  <div class="tbl"><table><tr><th style="width:160px">Plan</th><td><b>${esc(db.meta.plan||'')}</b></td></tr>
+  <tr><th>Status</th><td><span style="color:var(--${col})">${L?'🔒 Locked':esc(st)}</span></td></tr>
+  ${end?`<tr><th>${s.status==='Trialing'?'Trial ends':'Valid until'}</th><td>${fmtDate(end)}</td></tr>
+  <tr><th>Days left</th><td><b style="color:var(--${col})">${left<0?'Ended '+Math.abs(left)+' day(s) ago':left+' day(s)'}</b></td></tr>`:''}</table></div>
+  <p class="muted" style="margin:12px 0 0">Plan renewal is handled by ${esc(OWNER_ACC.name)} (${esc(OWNER_ACC.phone)}).</p></div>`}catch(e){}
+ return h}}
 var AX_ROLE_OBS=new MutationObserver(()=>{const me=authUser();if(!me||me.owner||isAdmin(me)||!STAFF(me.role))return;const R=axInvRoles(me);
  document.querySelectorAll('#view select,#modal select').forEach(sel=>{const o=[...sel.options];if(!o.some(x=>(x.value||x.text)==='Organization Admin'))return;o.forEach(x=>{if(!R.includes(x.value||x.text))x.remove()})})});
 setTimeout(()=>{['view','modal'].forEach(id=>{const el=document.getElementById(id);if(el)AX_ROLE_OBS.observe(el,{childList:true,subtree:true})})},0);
