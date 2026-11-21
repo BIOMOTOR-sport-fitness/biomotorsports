@@ -177,7 +177,7 @@ const athOpts=(sel)=>`<option value="">— select athlete —</option>`+db.athle
 const NAV=[
  ['TODAY',[['dashboard','Dashboard'],['communication','Communication']]],
  ['ATHLETES',[['athletes','Athletes'],['weighins','Weigh-ins'],['teams','Teams & Groups']]],
- ['TRAIN',[['programs','Programs'],['periodisation','Periodisation Program Design'],['workout-review','Workout Review'],['live-lift','Live Lift'],['speed-log','Speed Log'],['calendar','Calendar']]],
+ ['TRAIN',[['programs','Programs'],['periodisation','Periodisation Program Design'],['workout-review','Workout Review'],['live-lift','Live Lift'],['live-vbt','Live VBT Track'],['speed-log','Speed Log'],['calendar','Calendar']]],
  ['TEST',[['testing','Testing'],['video-jump','Video Jump Test'],['testing-library','Testing Library'],['athlete-goals','Athlete Goals'],['fitness-consultation','Fitness Consultation'],['sports-tests','Sports Specific Test'],['import-data','Import Data']]],
  ['INSIGHTS',[['team-analytics','Team Analytics'],['weekly-summary','Weekly Summary'],['recruiting','Recruiting Showcase'],['events','Events']]],
  ['ADMIN',[['organization','Organization'],['coaches-users','Coaches & Users'],['onboarding','Onboarding Center'],['facility','Facility Setup'],['branding','Branding'],['app-settings','Settings'],['subscription','Subscription'],['payments','Payments'],['beta','Beta Setup'],['my-profile','Profile'],['help','Help & Feedback']]]];
@@ -5080,6 +5080,7 @@ const axTeams=a=>db.teams.filter(t=>!t.archived&&tMembers(t).includes(a.id));
 function axMetrics(aid){const out={};const put=(k,o)=>{const p=out[k];if(!p||String(o.date)>String(p.date)||(o.date===p.date&&(o.dir==='lo'?o.val<p.val:o.val>p.val)))out[k]=o};
  db.results.filter(r=>r.athlete===aid&&r.value!==''&&r.value!=null&&isFinite(+r.value)).forEach(r=>{const t=byId('testlib',r.test);if(!t)return;put('r:'+t.id,{label:t.name,unit:t.unit||'',cat:t.category||'',dir:/lower/i.test(t.better||'')?'lo':'hi',val:+r.value,date:r.date||''})});
  (db.sportTests||[]).filter(x=>x.athlete===aid).forEach(x=>(x.tests||[]).forEach(e=>{const t=STT[e.t];if(!t)return;const V=stVal(t,e);if(!V)return;put('s:'+e.t,{label:t.n,unit:t.u,cat:STQ[t.q],dir:stDir(t),val:V.v,date:x.date||'',f:stFmt(t,V.v)})}));
+ (db.vbtLog||[]).filter(r=>r.aid===aid&&r.e1rm).forEach(r=>put('v:'+r.ex,{label:r.ex+' e1RM (VBT)',unit:'kg',cat:'Strength',dir:'hi',val:+r.e1rm,date:r.date||'',f:String(+(+r.e1rm).toFixed(1))}));
  return out}
 const axF=m=>m.f||String(+(+m.val).toFixed(2));
 /* ---- pages ---- */
@@ -5103,6 +5104,7 @@ P['my-reports']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead
  return axHead(me,'My Reports','Testing results, fitness consultation and sports-specific test reports. Download any report as PDF.')+
  `<div class="card"><h3 style="margin-top:0">Testing results</h3>${tests?`<div class="tbl" style="overflow:auto"><table><tr><th>Test</th><th>Latest</th><th>Best</th><th>Change</th><th></th></tr>${tests}</table></div>`:'<p class="muted">No testing results yet.</p>'}</div>
  <div class="card"><h3 style="margin-top:0">Sports Specific Test reports</h3>${st.length?st.map(r=>row(`${esc((stSport(r.sport)||['','Sport'])[1])} test`,`${fmtDate(r.date)} · ${(n=>n+' test'+(n===1?'':'s'))((r.tests||[]).filter(e=>stVal(STT[e.t]||{},e)).length)} · ${esc(r.staffName||'')}`,`<button class="btn sm pri" onclick="stPdf('${r.id}')">⬇ PDF</button>`)).join(''):'<p class="muted">No sports-specific test reports yet.</p>'}</div>
+ ${(db.vbtLog||[]).some(r=>r.aid===a.id)?`<div class="card"><h3 style="margin-top:0">Live VBT sessions (bar velocity)</h3>${vbTable((db.vbtLog||[]).filter(r=>r.aid===a.id).slice(0,60),false)}</div>`:''}
  <div class="card"><h3 style="margin-top:0">Fitness Consultation reports</h3>${fc.length?fc.map(r=>row('Fitness consultation',`${fmtDate(r.date)} · ${esc(r.staffName||'')}`,`<button class="btn sm pri" onclick="fcPdf('${r.id}')">⬇ PDF</button>`)).join(''):'<p class="muted">No consultation reports yet.</p>'}</div>`};
 P['my-program']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'My Program','')+axNone(me);
  const pd=(db.pdPrograms||[]).filter(r=>axFor(a,r,['client'])).sort((x,y)=>String(y.date).localeCompare(String(x.date)));
@@ -5128,6 +5130,32 @@ P['my-team']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me
 {const _r=render;render=function(){AX_RENDERING=true;try{_r()}finally{AX_RENDERING=false}const me=authUser();['gSearch','bellBtn','aiBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=portalUser(me)?'none':''});
  if(me&&me.owner&&!document.body.classList.contains('tvmode')){const L=axLocked();const v=document.getElementById('view');if(L&&v&&!v.querySelector('.ax-own'))v.insertAdjacentHTML('afterbegin',`<div class="card ax-own" style="border:2px solid var(--bad);color:var(--bad)">🔒 Subscription ended ${fmtDate(L.end)} — the platform is locked for everyone except you. <a href="javascript:void 0" style="color:inherit;font-weight:700" onclick="go('subscription')">Verify a payment or extend access</a></div>`)}
  if(me&&roUser(me)&&document.body&&!document.body.classList.contains('tvmode')){const v=document.getElementById('view');if(v&&!portalUser(me)&&!v.querySelector('.ac-tour'))v.insertAdjacentHTML('afterbegin',`<div class="card ac-tour">👁 <b>Tour mode — view only.</b> You can look around every section of the platform; nothing can be added, edited or deleted from this account.</div>`);axLock(v)}}}
+
+/* ============ LIVE VBT TRACK (camera velocity-based training, embedded tracker + results) ============ */
+window.BMP={get db(){return db},save(){save()},user(){return authUser()}};
+var VB={force:0,tab:'track',url:'',aid:'',ex:''};
+function vbSrc(){return 'vbt/index.html'}
+function vbLoad(){const f=document.getElementById('vbtFrame');if(!f||f.dataset.ld)return;f.dataset.ld=1;if(typeof VBT_SRC==='string')f.srcdoc=VBT_SRC;else f.src=vbSrc()}
+const vbCamOk=()=>!!globalThis.BIOMOTOR_NATIVE||/biomotorsports\.com$|^localhost|^127\./.test(location.hostname)
+function vbFull(){const f=document.getElementById('vbtFrame');if(!f)return;const r=f.requestFullscreen||f.webkitRequestFullscreen;try{const p=r&&r.call(f);if(p&&p.catch)p.catch(()=>toast('Full screen is not available here'))}catch(e){toast('Full screen is not available here')}}
+function vbTab(t){VB.tab=t;VB.force=1;render()}
+function vbLog(){return (db.vbtLog||[]).filter(r=>byId('athletes',r.aid))}
+const vbN=(v,d=2)=>v==null||!isFinite(+v)?'—':String(+(+v).toFixed(d));
+function vbTable(L,showAth){return `<div class="tbl" style="overflow:auto"><table><tr><th>Date</th>${showAth?'<th>Athlete</th>':''}<th>Exercise</th><th>Sets × reps</th><th>Top load</th><th>Best velocity</th><th>Peak power</th><th>e1RM</th></tr>${L.map(r=>`<tr><td>${fmtDate(r.date)}</td>${showAth?`<td><b>${esc(nameOf(byId('athletes',r.aid)))}</b></td>`:''}<td>${esc(r.ex)}${r.fin?'':' <span class="pill p-warn" style="font-size:11px">open</span>'}</td><td>${r.sets} × ${r.reps}</td><td>${vbN(r.maxLoad,1)} kg</td><td><b>${vbN(r.best)}</b> m/s</td><td>${r.power?Math.round(r.power)+' W':'—'}</td><td>${r.e1rm?'<b>'+vbN(r.e1rm,1)+' kg</b>':'—'}</td></tr>`).join('')}</table></div>`}
+function vbResults(){const L=vbLog();const ath=[...new Set(L.map(r=>r.aid))].map(id=>byId('athletes',id)).sort((a,b)=>a.name.localeCompare(b.name));const exs=[...new Set(L.map(r=>r.ex))].sort();
+ const F=L.filter(r=>(!VB.aid||r.aid===VB.aid)&&(!VB.ex||r.ex===VB.ex));
+ const best={};F.forEach(r=>{if(r.e1rm){const k=r.aid+'|'+r.ex;if(!best[k]||r.date>best[k].date)best[k]=r}});const B=Object.values(best).sort((a,b)=>a.ex.localeCompare(b.ex)||b.e1rm-a.e1rm);
+ if(!L.length)return `<div class="card"><h3 style="margin-top:0">No VBT sessions yet</h3><p class="muted">Open the <b>Tracker</b>, pick an athlete (your platform roster appears there automatically), record a set and finish the workout. Results appear here, in each athlete's reports and in Team Rankings.</p></div>`;
+ return `<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap"><select style="width:auto" onchange="VB.aid=this.value;vbTab('res')"><option value="">All athletes</option>${ath.map(a=>`<option value="${a.id}" ${a.id===VB.aid?'selected':''}>${esc(a.name)}</option>`).join('')}</select><select style="width:auto" onchange="VB.ex=this.value;vbTab('res')"><option value="">All exercises</option>${exs.map(x=>`<option ${x===VB.ex?'selected':''}>${esc(x)}</option>`).join('')}</select><span class="muted">${F.length} exercise entries</span></div></div>
+ ${B.length?`<div class="card"><h3 style="margin-top:0">Latest estimated 1RM (load–velocity)</h3><div class="tbl" style="overflow:auto"><table><tr><th>Athlete</th><th>Exercise</th><th>e1RM</th><th>Best velocity</th><th>Date</th></tr>${B.map(r=>`<tr><td><b>${esc(nameOf(byId('athletes',r.aid)))}</b></td><td>${esc(r.ex)}</td><td><b>${vbN(r.e1rm,1)} kg</b></td><td>${vbN(r.best)} m/s</td><td>${fmtDate(r.date)}</td></tr>`).join('')}</table></div></div>`:''}
+ <div class="card"><h3 style="margin-top:0">Session log</h3>${vbTable(F.slice(0,300),!VB.aid)}</div>`}
+P['live-vbt']=()=>{const t=VB.tab;
+ const acts=`<div class="row" style="gap:6px;flex-wrap:wrap" data-ro-ok><button class="btn ${t==='track'?'pri':''}" onclick="vbTab('track')">📹 Tracker</button><button class="btn ${t==='res'?'pri':''}" onclick="vbTab('res')">📊 Results</button>${t==='track'?'<button class="btn" onclick="vbFull()">⛶ Full screen</button>':''}</div>`;
+ const h=head('Train','Live VBT Track','Camera velocity-based training: bar speed, ROM, power, e1RM and load–velocity profiles. Your platform athletes appear in the tracker automatically and finished sessions come back to the platform.',acts);
+ if(t==='res')return h+vbResults();
+ return h+(vbCamOk()?'':`<div class="card" style="border:1px dashed var(--accent);font-size:14px">📷 Live camera works on <b>app.biomotorsports.com</b> and in the installed app. In this preview the browser blocks the camera — use <b>Load video</b> inside the tracker to analyse a recorded lift.</div>`)+`<iframe id="vbtFrame" class="vbt-frame" allow="camera *; microphone *; fullscreen *; autoplay *; screen-wake-lock *" allowfullscreen title="Live VBT Track"></iframe><p class="muted" style="font-size:12px">Tip: put the phone side-on on a tripod with the whole plate in view. Recordings and videos stay on this device; the session summary is saved to the platform.</p>`};
+/* keep the tracker running: other renders (sync from another device, timers) must not reload it */
+{const _r=render;render=function(){document.body.classList.toggle('vbt-on',location.hash==='#live-vbt');if(VB.force){VB.force=0;_r();vbLoad();return}if(location.hash==='#live-vbt'&&document.getElementById('vbtFrame')&&authUser()){try{drawNav('live-vbt')}catch(e){}return}_r();vbLoad()}}
 
 /* ============ ACCOUNTS & SIGN-IN (owner: Shubham kale) ============ */
 const SITE_URL='https://biomotorsports.com',siteUrl=()=>(db.org&&db.org.website)||SITE_URL,siteName=()=>siteUrl().replace(/^https?:\/\//,'').replace(/\/$/,'');

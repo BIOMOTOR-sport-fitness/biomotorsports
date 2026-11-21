@@ -379,3 +379,7 @@ body.light .d3-mini>div{background:rgba(255,255,255,.08)}
 tr.ac-me td{background:color-mix(in srgb,var(--accent) 14%,transparent);font-weight:600}
 .ac-bar{height:8px;background:var(--line);border-radius:99px;margin:4px 0;max-width:180px}.ac-bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
 .ac-met{border-top:1px solid var(--line);padding:8px 0}.ac-met summary{cursor:pointer}
+/* Live VBT Track */
+.vbt-frame{display:block;width:100%;height:calc(100vh - 200px);min-height:620px;border:0;border-radius:14px;background:var(--card);border:1px solid var(--line);margin-bottom:8px}
+@media (max-width:700px){.vbt-frame{height:calc(100vh - 150px);min-height:560px}}
+body.vbt-on #aiBtn{display:none}
