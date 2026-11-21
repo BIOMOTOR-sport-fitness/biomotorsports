@@ -5018,7 +5018,7 @@ async function stBuild(Lb,r){const {PDFDocument,StandardFonts,rgb}=Lb;const S=st
 
 /* ============ ACCESS CONTROL (owner-only pages · view-only roles · athlete/parent portal · subscription lock) ============ */
 var OWNER_PAGES=['organization','branding','app-settings','subscription','payments','beta'];
-var RO_ROLES=['Athlete','Parent','Viewer'],PORTAL_ROLES=['Athlete','Parent','Viewer'];
+var RO_ROLES=['Athlete','Parent','Viewer'],PORTAL_ROLES=['Parent'];
 function roUser(a){return !!a&&!a.owner&&RO_ROLES.includes(a.role)}
 function portalUser(a){return !!a&&!a.owner&&PORTAL_ROLES.includes(a.role)}
 const PORTAL_NAV=[['MY BIOMOTOR',[['my-portal','My Dashboard'],['my-reports','My Reports'],['my-program','My Program'],['my-profile','Profile']]]];
@@ -5037,7 +5037,7 @@ function axLock(root){const me=authUser();if(!roUser(me)||!root)return;
  root.querySelectorAll('input,textarea,select').forEach(el=>{if(el.closest('[data-ro-ok]')||el.id==='gSearch'||el.type==='search'||/search|filter/i.test(el.placeholder||''))return;const h=(el.getAttribute('onchange')||'')+(el.getAttribute('oninput')||'');if(!el.name&&!el.dataset.p&&!el.closest('form')&&!/db\.|save|In\(|Set\(|Put\(|byId\(/.test(h)&&(h||el.tagName==='SELECT'))return;el.disabled=true});
  root.querySelectorAll('[contenteditable]').forEach(el=>el.setAttribute('contenteditable','false'));
  root.querySelectorAll('button,.btn').forEach(b=>{if(b.closest('[data-ro-ok]')||b.dataset.roOk!=null)return;const t=((b.textContent||'')+' '+(b.title||'')).trim();const oc=b.getAttribute('onclick')||'';
-  if(/Pdf|PDF|Download|download|print|closeModal|signOut|accOwnPw|cloudPull/.test(oc+' '+t)&&!/save\(|push\(|splice\(/.test(oc))return;if(AX_SYM.test(t)||AX_MUT.test(t)||/save\(\)|Del\(|Remove\(|New\(|\.push\(|splice\(|openForm\('[a-z]+'\)|import-data/.test(oc))b.style.display='none'})}
+  if(/Pdf|PDF|Download|download|\bprint\b|\bPrint\b|closeModal|signOut|accOwnPw|cloudPull/.test(oc+' '+t)&&!/save\(|push\(|splice\(/.test(oc))return;if(AX_SYM.test(t)||AX_MUT.test(t)||/save\(\)|Del\(|Remove\(|New\(|\.push\(|splice\(|openForm\('[a-z]+'\)|import-data/.test(oc))b.style.display='none'})}
 var AX_OBS=new MutationObserver(ms=>{if(!roUser(authUser()))return;const s=new Set();ms.forEach(m=>{const r=m.target.closest&&m.target.closest('#view,#modal');if(r)s.add(r)});s.forEach(axLock)});
 setTimeout(()=>{['view','modal'].forEach(id=>{const el=document.getElementById(id);if(el)AX_OBS.observe(el,{childList:true,subtree:true})})},0);
 /* ---- subscription lock ---- */
@@ -5128,18 +5128,29 @@ P['my-team']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me
  const grp={};T.forEach(t=>{if(t.group)grp[t.group]=1});const G=Object.keys(grp).map(g=>{const ids=new Set();db.teams.filter(t=>!t.archived&&t.group===g).forEach(t=>tMembers(t).forEach(id=>ids.add(id)));return [g,[...ids]]}).filter(([g,ids])=>!T.some(t=>t.group===g&&tMembers(t).length>=ids.length));
  return axHead(me,'Team Rankings','Fitness ranking and test-by-test comparison with your team-mates.')+(T.length?T.map(t=>axRankCard(t.name,[t.sport,t.level].filter(Boolean).join(' · ')||'Team',tMembers(t),a.id)).join('')+G.map(([g,ids])=>axRankCard(g+' (group)','All teams in this group',ids,a.id)).join(''):`<div class="card"><p class="muted" style="margin:0">${esc(a.name)} is not in a team or group yet. Your coach adds athletes to teams in Athletes → Teams.</p></div>`)};
 /* ---- self-only access: Athlete / Parent / Viewer see and download only their own linked athlete's data ---- */
-function axOwns(r,keys){const me=authUser();if(!portalUser(me))return true;if(!r)return false;return axMine(me).some(a=>axFor(a,r,keys))}
+function axOwns(r,keys){const me=authUser();if(!roUser(me))return true;if(!r)return false;return axMine(me).some(a=>axFor(a,r,keys))}
 function axDeny(){toast('🔒 You can only open your own reports')}
+/* ---- Athlete / Viewer: the whole roster is listed, but only their own athlete opens ---- */
+function axMineIds(){const me=authUser();return roUser(me)?new Set(axMine(me).map(a=>a.id)):null}
+function axLockedAth(id){const M=axMineIds();return !!M&&!!id&&!M.has(id)&&db.athletes.some(a=>a.id===id)}
+function axDenyAth(){toast('🔒 Only your own profile and reports can be opened')}
+{const _ap=athProfile;athProfile=function(id){if(axLockedAth(id))return axDenyAth();return _ap.apply(this,arguments)}}
+document.addEventListener('click',e=>{const M=axMineIds();if(!M)return;const el=e.target.closest&&e.target.closest('[onclick],a[href]');if(!el)return;
+ const s=(el.getAttribute('onclick')||'')+' '+(el.getAttribute('href')||'');if(!s.trim())return;
+ if(db.athletes.some(a=>!M.has(a.id)&&a.id&&(s.includes("'"+a.id+"'")||s.includes('"'+a.id+'"')||s.includes('#'+a.id)))){e.preventDefault();e.stopImmediatePropagation();axDenyAth()}},true);
+{const _al=axLock;axLock=function(root){_al(root);const M=axMineIds();if(!M||!root)return;
+ root.querySelectorAll('option').forEach(o=>{if(o.value&&!M.has(o.value)&&db.athletes.some(a=>a.id===o.value)){o.disabled=true;if(!/🔒/.test(o.textContent))o.textContent='🔒 '+o.textContent}});
+ root.querySelectorAll('select').forEach(sel=>{const o=sel.selectedOptions&&sel.selectedOptions[0];if(o&&o.disabled){const ok=[...sel.options].find(x=>M.has(x.value));if(ok&&sel.value!==ok.value){sel.value=ok.value;sel.dispatchEvent(new Event('change',{bubbles:true}))}}})}}
 /* portal accounts get no live row updates (server hides the organisation row) — refresh their own data every 2 minutes */
-setInterval(()=>{try{if(CLOUD&&CME&&portalUser(CME)&&document.visibilityState==='visible'&&!document.getElementById('modal')?.classList.contains('open'))cloudPull().then(()=>render())}catch(e){}},120000);
+setInterval(()=>{try{if(CLOUD&&CME&&roUser(CME)&&document.visibilityState==='visible'&&!document.getElementById('modal')?.classList.contains('open'))cloudPull().then(()=>render())}catch(e){}},120000);
 {const _fc=fcPdf;fcPdf=function(id){if(!axOwns(byId('fitConsults',id),['demo.name']))return axDeny();return _fc.apply(this,arguments)}}
 {const _st=stPdf;stPdf=function(id){if(!axOwns(byId('sportTests',id),['name']))return axDeny();return _st.apply(this,arguments)}}
 {const _pg=pdPdfGo;pdPdfGo=function(id){if(!axOwns(byId('pdPrograms',id),['client']))return axDeny();return _pg.apply(this,arguments)}}
 {const _pp=pdPdf;pdPdf=function(id){if(!axOwns(byId('pdPrograms',id),['client']))return axDeny();return _pp.apply(this,arguments)}}
-{const _rt=render;render=function(){const me=authUser();if(portalUser(me)&&location.hash.startsWith('#tv-')){location.hash='my-portal';return}return _rt.apply(this,arguments)}}
+{const _rt=render;render=function(){const me=authUser();if(roUser(me)&&location.hash.startsWith('#tv-')){location.hash='my-portal';return}return _rt.apply(this,arguments)}}
 {const _r=render;render=function(){AX_RENDERING=true;try{_r()}finally{AX_RENDERING=false}const me=authUser();['gSearch','bellBtn','aiBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=portalUser(me)?'none':''});
  if(me&&me.owner&&!document.body.classList.contains('tvmode')){const L=axLocked();const v=document.getElementById('view');if(L&&v&&!v.querySelector('.ax-own'))v.insertAdjacentHTML('afterbegin',`<div class="card ax-own" style="border:2px solid var(--bad);color:var(--bad)">🔒 Subscription ended ${fmtDate(L.end)} — the platform is locked for everyone except you. <a href="javascript:void 0" style="color:inherit;font-weight:700" onclick="go('subscription')">Verify a payment or extend access</a></div>`)}
- if(me&&roUser(me)&&document.body&&!document.body.classList.contains('tvmode')){const v=document.getElementById('view');if(v&&!portalUser(me)&&!v.querySelector('.ac-tour'))v.insertAdjacentHTML('afterbegin',`<div class="card ac-tour">👁 <b>Tour mode — view only.</b> You can look around every section of the platform; nothing can be added, edited or deleted from this account.</div>`);axLock(v)}}}
+ if(me&&roUser(me)&&document.body&&!document.body.classList.contains('tvmode')){const v=document.getElementById('view');if(v&&!portalUser(me)&&!v.querySelector('.ac-tour'))v.insertAdjacentHTML('afterbegin',`<div class="card ac-tour">👁 <b>View only.</b> You can open every section of the platform, but you see only your own information and reports. Nothing can be added, edited or deleted from this account.</div>`);axLock(v)}}}
 
 /* ============ LIVE VBT TRACK (camera velocity-based training, embedded tracker + results) ============ */
 window.BMP={get db(){return db},save(){save()},user(){return authUser()}};
@@ -5286,7 +5297,7 @@ async function cloudMe(){const {data:u}=await SB.auth.getUser();if(!u||!u.user){
  if(tok){const inv=(db.invites||[]).find(i=>i.token===tok&&i.status==='Pending'&&normEmail(i.email)===CME.email);if(inv){const pp=CME.name.split(/\s+/);invAccept(inv.id,true,{first:pp[0],last:pp.slice(1).join(' '),phone:CME.phone})}try{localStorage.removeItem('bm_inv')}catch(e){}}
  const ow=CME.owner&&db.users.find(x=>x.role==='Owner');if(ow&&!ow.authId){ow.authId=CME.id;save()}}
 async function cloudPull(rerender){if(!SB||!CME)return;cPulling=true;CSYNC.state='Syncing…';
- try{const PRT=portalUser(CME);let {data,error}=PRT?await SB.rpc('my_portal_data'):await SB.from('org_data').select('data,updated_at').eq('id','main').maybeSingle();if(error)throw error;if(PRT)data=data?{data}:null;
+ try{const PRT=roUser(CME);let {data,error}=PRT?await SB.rpc('my_portal_data'):await SB.from('org_data').select('data,updated_at').eq('id','main').maybeSingle();if(error)throw error;if(PRT){data=data?{data}:null;if(data&&data.data){const sd=seed();Object.keys(sd).forEach(k=>{if(Array.isArray(sd[k])&&!(k in data.data))data.data[k]=[]})}}
   if(data&&typeof data.data==='string')try{data.data=Shubham.parse(data.data)}catch(e){}
   if(data&&data.data){db=Object.assign(seed(),data.data);try{localStorage.setItem(KEY,Shubham.stringify(db))}catch(e){}CSYNC={state:'Synced',at:Date.now(),err:''};authDb()}
   else if(CME.owner){cPulling=false;await cloudPush(true);return}
