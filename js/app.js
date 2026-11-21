@@ -5018,10 +5018,10 @@ async function stBuild(Lb,r){const {PDFDocument,StandardFonts,rgb}=Lb;const S=st
 
 /* ============ ACCESS CONTROL (owner-only pages · view-only roles · athlete/parent portal · subscription lock) ============ */
 var OWNER_PAGES=['organization','branding','app-settings','subscription','payments','beta'];
-var RO_ROLES=['Athlete','Parent','Viewer'],PORTAL_ROLES=['Athlete','Parent'];
+var RO_ROLES=['Athlete','Parent','Viewer'],PORTAL_ROLES=['Athlete','Parent','Viewer'];
 function roUser(a){return !!a&&!a.owner&&RO_ROLES.includes(a.role)}
 function portalUser(a){return !!a&&!a.owner&&PORTAL_ROLES.includes(a.role)}
-const PORTAL_NAV=[['MY BIOMOTOR',[['my-portal','My Dashboard'],['my-reports','My Reports'],['my-program','My Program'],['my-team','Team Rankings'],['my-profile','Profile']]]];
+const PORTAL_NAV=[['MY BIOMOTOR',[['my-portal','My Dashboard'],['my-reports','My Reports'],['my-program','My Program'],['my-profile','Profile']]]];
 const PORTAL_PAGES=PORTAL_NAV[0][1].map(x=>x[0]);
 Object.assign(TITLES,Object.fromEntries(PORTAL_NAV[0][1]));
 function axNav(me){if(portalUser(me))return PORTAL_NAV;return NAV.map(([g,items])=>[g,items.filter(([k])=>(!OWNER_PAGES.includes(k)||(me&&me.owner))&&(!ADMIN_PAGES.includes(k)||isAdmin(me)))]).filter(([g,i])=>i.length)}
@@ -5066,14 +5066,14 @@ function axLockNow(){confirmBox('Lock the platform for everyone except you now? 
 function axMine(me){if(!me)return [];const em=normEmail(me.email);const ids=new Set();const uids=db.users.filter(u=>em&&normEmail(u.email)===em&&u.status!=='Archived').map(u=>u.id);if(me.user)uids.push(me.user);
  (me.role==='Parent'?db.parentLinks:db.athLinks||[]).forEach(l=>{if(l.status==='Active'&&uids.includes(l.user))ids.add(l.athlete)});
  (db.invites||[]).forEach(i=>{if(em&&normEmail(i.email)===em&&i.role===me.role&&i.athlete&&i.status!=='Revoked')ids.add(i.athlete)});
- db.athletes.forEach(a=>{const e=[a.email,me.role==='Parent'&&a.parentEmail,me.role==='Parent'&&a.guardianEmail].filter(Boolean).map(normEmail);if(em&&(me.role==='Athlete'?normEmail(a.email)===em:e.slice(1).includes(em)))ids.add(a.id)});
+ db.athletes.forEach(a=>{const e=[a.email,me.role==='Parent'&&a.parentEmail,me.role==='Parent'&&a.guardianEmail].filter(Boolean).map(normEmail);if(em&&((me.role==='Athlete'||me.role==='Viewer')?normEmail(a.email)===em:e.slice(1).includes(em)))ids.add(a.id)});
  return [...ids].map(id=>byId('athletes',id)).filter(Boolean)}
 let AXP={aid:''};
 function axCur(me){const L=axMine(me);if(!L.some(a=>a.id===AXP.aid))AXP.aid=L[0]?L[0].id:'';return {L,a:byId('athletes',AXP.aid)}}
 const axNm=s=>String(s||'').trim().toLowerCase();
 const axFor=(a,r,nameKeys)=>r.athlete===a.id||(!r.athlete&&nameKeys.some(k=>axNm(fcGet(r,k))&&axNm(fcGet(r,k))===axNm(a.name)));
 function axHead(me,title,sub){const {L,a}=axCur(me);const pick=L.length>1?`<select data-ro-ok style="width:auto" onchange="AXP.aid=this.value;render()">${L.map(x=>`<option value="${x.id}" ${x.id===AXP.aid?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`:'';
- return head(me.role==='Parent'?'Parent portal':'Athlete portal',title,sub,pick)+`<div class="pill p-blue" style="display:inline-block;margin-bottom:12px">👁 View only — your coach updates this information</div>`}
+ return head(me.role==='Parent'?'Parent portal':me.role==='Viewer'?'Viewer portal':'Athlete portal',title,sub,pick)+`<div class="pill p-blue" style="display:inline-block;margin-bottom:12px">👁 View only — your coach updates this information</div>`}
 function axNone(me){return `<div class="card"><h3 style="margin-top:0">Your account is not linked yet</h3><p class="muted">${me.role==='Parent'?'Your account needs to be linked to your child\'s athlete profile.':'Your account needs to be linked to your athlete profile.'} Ask your coach or ${esc(OWNER_ACC.name)} (${esc(OWNER_ACC.phone)}) to link it in <b>Coaches &amp; Users → ${me.role==='Parent'?'Parent':'Athlete'} links</b>. Use the same email you signed in with: <b>${esc(me.email||'')}</b>.</p></div>`}
 const axTeams=a=>db.teams.filter(t=>!t.archived&&tMembers(t).includes(a.id));
 /* latest value per metric for one athlete (Testing results + Sports Specific Test) */
@@ -5088,10 +5088,10 @@ P['my-portal']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(
  const M=Object.values(axMetrics(a.id)).sort((x,y)=>String(y.date).localeCompare(String(x.date)));const T=axTeams(a);
  const fc=(db.fitConsults||[]).filter(r=>axFor(a,r,['demo.name'])).length,stc=(db.sportTests||[]).filter(r=>axFor(a,r,['name'])).length,pd=(db.pdPrograms||[]).filter(r=>axFor(a,r,['client'])).length;
  const k=(l,v,g)=>`<button class="card ac-k" onclick="go('${g}')"><div class="eyebrow">${l}</div><div style="font-size:30px;font-weight:800">${v}</div></button>`;
- return axHead(me,me.role==='Parent'?esc(a.name):'Welcome, '+esc(a.name.split(' ')[0]),'Your profile, test results, reports, training program and team rankings.')+
+ return axHead(me,me.role==='Parent'?esc(a.name):'Welcome, '+esc(a.name.split(' ')[0]),'Your profile, test results, reports and training program.')+
  `<div class="card"><div class="row" style="gap:16px;flex-wrap:wrap"><div class="av" style="width:64px;height:64px;font-size:24px">${esc(initials(a.name))}</div><div style="flex:1;min-width:200px"><h2 style="margin:0">${esc(a.name)}</h2><div class="muted">${esc([a.sport,a.position].filter(Boolean).join(' · '))}</div><div class="muted">${esc(T.map(t=>t.name).join(', '))}</div></div></div>
  <div class="tbl" style="margin-top:12px;overflow:auto"><table>${[['Gender',a.gender],['Age',a.dob?ageOf(a.dob)+' years':''],['Date of birth',a.dob?fmtDate(a.dob):''],['Height',a.height?a.height+' cm':''],['Status',a.status]].filter(x=>x[1]).map(([l,v])=>`<tr><th style="width:160px">${l}</th><td>${esc(v)}</td></tr>`).join('')}</table></div></div>
- <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:12px;margin-bottom:14px">${k('Test results',M.length,'my-reports')}${k('Reports',fc+stc,'my-reports')}${k('Programs',pd+db.assignments.filter(x=>x.athlete===a.id).length,'my-program')}${k('Teams',T.length,'my-team')}</div>
+ <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:12px;margin-bottom:14px">${k('Test results',M.length,'my-reports')}${k('Reports',fc+stc,'my-reports')}${k('Programs',pd+db.assignments.filter(x=>x.athlete===a.id).length,'my-program')}${k('Teams',T.length,'my-portal')}</div>
  <div class="card"><h3 style="margin-top:0">Latest results</h3>${M.length?`<div class="tbl" style="overflow:auto"><table><tr><th>Test</th><th>Result</th><th>Date</th></tr>${M.slice(0,8).map(m=>`<tr><td>${esc(m.label)}</td><td><b>${esc(axF(m))}</b> ${esc(m.unit==='ratio'?'':m.unit)}</td><td>${fmtDate(m.date)}</td></tr>`).join('')}</table></div>`:'<p class="muted">No test results yet.</p>'}</div>`};
 P['my-reports']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'My Reports','')+axNone(me);
  const res=db.results.filter(r=>r.athlete===a.id&&r.value!==''&&r.value!=null);const byT={};res.forEach(r=>{(byT[r.test]=byT[r.test]||[]).push(r)});
@@ -5127,6 +5127,16 @@ function axRankCard(title,sub,ids,meId){const {mets,ov}=axRank(ids,meId);const n
 P['my-team']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'Team Rankings','')+axNone(me);const T=axTeams(a);
  const grp={};T.forEach(t=>{if(t.group)grp[t.group]=1});const G=Object.keys(grp).map(g=>{const ids=new Set();db.teams.filter(t=>!t.archived&&t.group===g).forEach(t=>tMembers(t).forEach(id=>ids.add(id)));return [g,[...ids]]}).filter(([g,ids])=>!T.some(t=>t.group===g&&tMembers(t).length>=ids.length));
  return axHead(me,'Team Rankings','Fitness ranking and test-by-test comparison with your team-mates.')+(T.length?T.map(t=>axRankCard(t.name,[t.sport,t.level].filter(Boolean).join(' · ')||'Team',tMembers(t),a.id)).join('')+G.map(([g,ids])=>axRankCard(g+' (group)','All teams in this group',ids,a.id)).join(''):`<div class="card"><p class="muted" style="margin:0">${esc(a.name)} is not in a team or group yet. Your coach adds athletes to teams in Athletes → Teams.</p></div>`)};
+/* ---- self-only access: Athlete / Parent / Viewer see and download only their own linked athlete's data ---- */
+function axOwns(r,keys){const me=authUser();if(!portalUser(me))return true;if(!r)return false;return axMine(me).some(a=>axFor(a,r,keys))}
+function axDeny(){toast('🔒 You can only open your own reports')}
+/* portal accounts get no live row updates (server hides the organisation row) — refresh their own data every 2 minutes */
+setInterval(()=>{try{if(CLOUD&&CME&&portalUser(CME)&&document.visibilityState==='visible'&&!document.getElementById('modal')?.classList.contains('open'))cloudPull().then(()=>render())}catch(e){}},120000);
+{const _fc=fcPdf;fcPdf=function(id){if(!axOwns(byId('fitConsults',id),['demo.name']))return axDeny();return _fc.apply(this,arguments)}}
+{const _st=stPdf;stPdf=function(id){if(!axOwns(byId('sportTests',id),['name']))return axDeny();return _st.apply(this,arguments)}}
+{const _pg=pdPdfGo;pdPdfGo=function(id){if(!axOwns(byId('pdPrograms',id),['client']))return axDeny();return _pg.apply(this,arguments)}}
+{const _pp=pdPdf;pdPdf=function(id){if(!axOwns(byId('pdPrograms',id),['client']))return axDeny();return _pp.apply(this,arguments)}}
+{const _rt=render;render=function(){const me=authUser();if(portalUser(me)&&location.hash.startsWith('#tv-')){location.hash='my-portal';return}return _rt.apply(this,arguments)}}
 {const _r=render;render=function(){AX_RENDERING=true;try{_r()}finally{AX_RENDERING=false}const me=authUser();['gSearch','bellBtn','aiBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=portalUser(me)?'none':''});
  if(me&&me.owner&&!document.body.classList.contains('tvmode')){const L=axLocked();const v=document.getElementById('view');if(L&&v&&!v.querySelector('.ax-own'))v.insertAdjacentHTML('afterbegin',`<div class="card ax-own" style="border:2px solid var(--bad);color:var(--bad)">🔒 Subscription ended ${fmtDate(L.end)} — the platform is locked for everyone except you. <a href="javascript:void 0" style="color:inherit;font-weight:700" onclick="go('subscription')">Verify a payment or extend access</a></div>`)}
  if(me&&roUser(me)&&document.body&&!document.body.classList.contains('tvmode')){const v=document.getElementById('view');if(v&&!portalUser(me)&&!v.querySelector('.ac-tour'))v.insertAdjacentHTML('afterbegin',`<div class="card ac-tour">👁 <b>Tour mode — view only.</b> You can look around every section of the platform; nothing can be added, edited or deleted from this account.</div>`);axLock(v)}}}
@@ -5276,7 +5286,7 @@ async function cloudMe(){const {data:u}=await SB.auth.getUser();if(!u||!u.user){
  if(tok){const inv=(db.invites||[]).find(i=>i.token===tok&&i.status==='Pending'&&normEmail(i.email)===CME.email);if(inv){const pp=CME.name.split(/\s+/);invAccept(inv.id,true,{first:pp[0],last:pp.slice(1).join(' '),phone:CME.phone})}try{localStorage.removeItem('bm_inv')}catch(e){}}
  const ow=CME.owner&&db.users.find(x=>x.role==='Owner');if(ow&&!ow.authId){ow.authId=CME.id;save()}}
 async function cloudPull(rerender){if(!SB||!CME)return;cPulling=true;CSYNC.state='Syncing…';
- try{const {data,error}=await SB.from('org_data').select('data,updated_at').eq('id','main').maybeSingle();if(error)throw error;
+ try{const PRT=portalUser(CME);let {data,error}=PRT?await SB.rpc('my_portal_data'):await SB.from('org_data').select('data,updated_at').eq('id','main').maybeSingle();if(error)throw error;if(PRT)data=data?{data}:null;
   if(data&&typeof data.data==='string')try{data.data=Shubham.parse(data.data)}catch(e){}
   if(data&&data.data){db=Object.assign(seed(),data.data);try{localStorage.setItem(KEY,Shubham.stringify(db))}catch(e){}CSYNC={state:'Synced',at:Date.now(),err:''};authDb()}
   else if(CME.owner){cPulling=false;await cloudPush(true);return}
