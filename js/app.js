@@ -3116,7 +3116,7 @@ function cuBulk(add){const C=CU.coach;let n=0;CU.sel.forEach(aid=>{const ex=db.c
 function cuSingle(){const aid=document.getElementById('cuSA').value;if(!CU.coach){toast('Select a coach above first');return}if(!aid){toast('Select an athlete');return}CU.sel=[aid];cuBulk(1)}
 function cuAsgSet(id,s){const a=byId('coachAsg',id);if(s==='Active'&&db.coachAsg.some(x=>x!==a&&x.coach===a.coach&&x.athlete===a.athlete&&x.status==='Active')){toast('Already assigned');return}a.status=s;if(s==='Active')a.date=today();save();render();toast(s==='Active'?'Assignment restored':'Assignment archived')}
 /* athlete & parent links */
-function cuLinks(kind){const ath=kind==='ath';const L=ath?db.athLinks:db.parentLinks;const role=ath?'Athlete':'Parent';const users=db.users.filter(u=>u.role===role&&u.status!=='Archived');
+function cuLinks(kind){const ath=kind==='ath';const L=ath?db.athLinks:db.parentLinks;const role=ath?'Athlete':'Parent';const users=db.users.filter(u=>(ath?['Athlete','Viewer'].includes(u.role):u.role===role)&&u.status!=='Archived');
  const list=L.filter(l=>byId('users',l.user)&&byId('athletes',l.athlete)&&(l.status==='Active'||CU.showArch));
  return cuSec(ath?'Athlete portal access':'Parent portal foundation',ath?'Athlete Account Linking':'Parent-Athlete Linking',
  `<div class="form"><div><label class="eyebrow">${role} user</label><select id="lk${kind}U"><option value="">Select ${role.toLowerCase()} login</option>${users.map(u=>`<option value="${u.id}">${esc(uName(u))}${u.email?' · '+esc(u.email):''}</option>`).join('')}</select></div><div><label class="eyebrow">Athlete profile</label><select id="lk${kind}A"><option value="">Select athlete profile</option>${db.athletes.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></div><div><label class="eyebrow">Relationship</label><input id="lk${kind}R" value="${ath?'self':'parent'}"></div></div>
@@ -5134,6 +5134,26 @@ function axDeny(){toast('🔒 You can only open your own reports')}
 function axMineIds(){const me=authUser();return roUser(me)?new Set(axMine(me).map(a=>a.id)):null}
 function axLockedAth(id){const M=axMineIds();return !!M&&!!id&&!M.has(id)&&db.athletes.some(a=>a.id===id)}
 function axDenyAth(){toast('🔒 Only your own profile and reports can be opened')}
+/* ---- Admin menu by role: Owner = everything · Org Admin = all but Subscription/Payments/Beta ·
+        Head Coach & Staff Manager = Coaches & Users, Onboarding, Facility · everyone = Profile, Help ---- */
+OWNER_PAGES=['subscription','payments','beta'];
+var LEAD_PAGES=['coaches-users','onboarding','facility'],LEAD_ROLES=['Head Coach','Staff Manager'];
+function axPageOk(me,k){if(!me||me.owner)return true;if(OWNER_PAGES.includes(k))return false;
+ if(ADMIN_PAGES.includes(k))return isAdmin(me)||(LEAD_PAGES.includes(k)&&LEAD_ROLES.includes(me.role));return true}
+axNav=function(me){if(portalUser(me))return PORTAL_NAV;return NAV.map(([g,items])=>[g,items.filter(([k])=>axPageOk(me,k))]).filter(([g,i])=>i.length)};
+axBlocked=function(me,p){if(!me||me.owner)return '';if(OWNER_PAGES.includes(p))return 'owner';if(!axPageOk(me,p))return 'admin';return ''};
+/* ---- who can invite whom: Owner / Org Admin = every role · Head Coach & Staff Manager = Coach + Athlete · Coach = Athlete ---- */
+LEAD_PAGES=['coaches-users','onboarding','facility'];
+function axInvRoles(me){if(!me)return [];if(me.owner||isAdmin(me))return UROLES.filter(r=>r!=='Owner');if(LEAD_ROLES.includes(me.role))return ['Coach','Athlete'];if(me.role==='Coach')return ['Athlete'];return []}
+{const _ok=axPageOk;axPageOk=function(me,k){if(me&&!me.owner&&me.role==='Coach'&&k==='coaches-users')return true;return _ok(me,k)}}
+{const _cu=P['coaches-users'];P['coaches-users']=function(){const me=authUser();if(!me||me.owner||isAdmin(me))return _cu();
+ cuInit();const R=axInvRoles(me);const all=db.invites;let inv='';db.invites=all.filter(i=>R.includes(i.role));try{inv=cuInvites()}finally{db.invites=all}
+ inv=inv.replace(/<select name="role">[\s\S]*?<\/select>/,`<select name="role">${R.map(r=>`<option>${r}</option>`).join('')}</select>`);
+ return `<div class="pagehead"><div><h2 style="font-size:40px">Coaches &amp; Users</h2><div class="muted" style="font-size:17px">You can invite ${R.join(' and ').toLowerCase()} accounts and link athlete logins to athlete profiles.</div></div></div>`+inv+cuLinks('ath')}}
+{const _ic=invCreate;invCreate=function(direct){const f=document.getElementById('invF');const r=f&&new FormData(f).get('role');if(r&&!axInvRoles(authUser()).includes(r)){toast('🔒 You cannot invite a '+r);return}return _ic.apply(this,arguments)}}
+var AX_ROLE_OBS=new MutationObserver(()=>{const me=authUser();if(!me||me.owner||isAdmin(me)||!STAFF(me.role))return;const R=axInvRoles(me);
+ document.querySelectorAll('#view select,#modal select').forEach(sel=>{const o=[...sel.options];if(!o.some(x=>(x.value||x.text)==='Organization Admin'))return;o.forEach(x=>{if(!R.includes(x.value||x.text))x.remove()})})});
+setTimeout(()=>{['view','modal'].forEach(id=>{const el=document.getElementById(id);if(el)AX_ROLE_OBS.observe(el,{childList:true,subtree:true})})},0);
 {const _ap=athProfile;athProfile=function(id){if(axLockedAth(id))return axDenyAth();return _ap.apply(this,arguments)}}
 document.addEventListener('click',e=>{const M=axMineIds();if(!M)return;const el=e.target.closest&&e.target.closest('[onclick],a[href]');if(!el)return;
  const s=(el.getAttribute('onclick')||'')+' '+(el.getAttribute('href')||'');if(!s.trim())return;
