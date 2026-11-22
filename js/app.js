@@ -5471,6 +5471,65 @@ function skFont(){const b=db&&db.brand||{};const def=!b.fontB||b.fontB==='Inter'
 {const _af=applyFonts;applyFonts=function(){_af.apply(this,arguments);try{skFont()}catch(e){}}}
 try{skFont()}catch(e){}
 
+/* ============ SCREEN PRIVACY (watermark · blur on capture · no print/copy) ============ */
+/* Browsers cannot block screenshots. The Android app uses FLAG_SECURE and the desktop app uses
+   content protection (true blocking). On the website we deter and trace: a personal watermark,
+   blurring when focus leaves the page (e.g. Win+Shift+S snipping), and no print / copy.          */
+var PV={on:false,t:null};
+function pvUser(){try{const a=authUser();return a&&!a.owner?a:null}catch(e){return null}}
+function pvMark(a){const d=new Date(),p=n=>String(n).padStart(2,'0');
+ const txt=`${a.name||'User'} · ${a.phone||a.email||a.role||''} · ${p(d.getDate())}-${p(d.getMonth()+1)}-${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+ const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="420" height="220"><text x="10" y="120" transform="rotate(-24 210 110)" font-family="Arial,sans-serif" font-size="15" fill="rgba(120,120,135,0.16)">${txt.replace(/[<>&"]/g,'')}</text></svg>`;
+ return 'url("data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)+'")'}
+function pvApply(){const a=pvUser();let w=document.getElementById('pvWm');
+ if(!a){document.body.classList.remove('pv');if(w)w.remove();PV.on=false;return}
+ if(!w){w=document.createElement('div');w.id='pvWm';w.setAttribute('aria-hidden','true');document.body.appendChild(w)}
+ w.style.backgroundImage=pvMark(a);document.body.classList.add('pv');PV.on=true}
+function pvBlur(on){if(!PV.on)return;document.body.classList.toggle('pv-blur',!!on)}
+(function(){
+ const start=()=>{pvApply();clearInterval(PV.t);PV.t=setInterval(pvApply,60000)};
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else setTimeout(start,0);
+ if(typeof render==='function'){const _r=render;render=function(){const x=_r.apply(this,arguments);try{pvApply()}catch(e){}return x}}
+ window.addEventListener('blur',()=>setTimeout(()=>{const el=document.activeElement;if(el&&el.tagName==='IFRAME')return;pvBlur(true)},0));
+ window.addEventListener('focus',()=>pvBlur(false));
+ document.addEventListener('visibilitychange',()=>pvBlur(document.hidden));
+ document.addEventListener('keyup',e=>{if(!PV.on)return;if(e.key==='PrintScreen'){try{navigator.clipboard&&navigator.clipboard.writeText('')}catch(er){}pvBlur(true);setTimeout(()=>pvBlur(false),1500);toast&&toast('Screenshots are not allowed on BIOMOTOR')}});
+ document.addEventListener('keydown',e=>{if(!PV.on)return;const k=(e.key||'').toLowerCase();if((e.ctrlKey||e.metaKey)&&(k==='p'||k==='s')){e.preventDefault();toast&&toast('Printing and saving pages is turned off')}});
+ const ok=t=>t&&(t.closest&&t.closest('input,textarea,select,[contenteditable="true"]'));
+ document.addEventListener('contextmenu',e=>{if(PV.on&&!ok(e.target))e.preventDefault()});
+ document.addEventListener('copy',e=>{if(PV.on&&!ok(e.target)){e.preventDefault()}});
+ document.addEventListener('dragstart',e=>{if(PV.on&&e.target&&e.target.tagName==='IMG')e.preventDefault()});
+})();
+
+/* ============ LOGIN LOCK (5 wrong passwords → 15-minute lock with live countdown) ============ */
+var LK={max:5,ms:15*60000,key:'bm_login_lock',t:null,last:''};
+function lkAll(){try{return JSON.parse(localStorage.getItem(LK.key)||'{}')||{}}catch(e){return {}}}
+function lkPut(o){try{localStorage.setItem(LK.key,JSON.stringify(o))}catch(e){}}
+function lkId(){const el=document.getElementById('alI');return String(el&&el.value||'').trim().toLowerCase().replace(/\s+/g,'')}
+function lkRec(id){const o=lkAll();return Object.assign({f:0,u:0},o[id]||{})}
+function lkSave(id,r){const o=lkAll();if(r)o[id]=r;else delete o[id];lkPut(o)}
+function lkLeft(id){const r=lkRec(id);return r.u>Date.now()?r.u-Date.now():0}
+const lkMMSS=ms=>{const s=Math.ceil(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const lkAt=ms=>{const d=new Date(Date.now()+ms);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
+function lkMsg(id){const left=lkLeft(id);return `<div id="lkBox" data-id="${esc(id)}" style="color:var(--bad)"><b>🔒 Login locked for 15 minutes</b><br>5 wrong passwords were entered for this account. You can try again at <b>${lkAt(left)}</b> — <b id="lkT">${lkMMSS(left)}</b> left.<br><span class="muted" style="font-size:12px">Forgot your password? Use "Forgot password" or contact the owner.</span></div>`}
+function lkTick(){clearInterval(LK.t);LK.t=setInterval(()=>{const b=document.getElementById('lkBox');if(!b){clearInterval(LK.t);return}const id=b.dataset.id,left=lkLeft(id);
+ const btn=b.closest('.card,body').querySelector('form button.pri');if(btn)btn.disabled=left>0;
+ if(left>0){const t=document.getElementById('lkT');if(t)t.textContent=lkMMSS(left);return}
+ clearInterval(LK.t);lkSave(id,null);AU.msg='<span style="color:var(--good,#15803d)"><b>🔓 Login unlocked.</b> You can sign in again now.</span>';renderAuth()},1000)}
+function lkShow(id){AU.msg=lkMsg(id);renderAuth();const f=document.getElementById('alI');if(f)f.value=id;lkTick()}
+{const _t=toast;toast=function(m){LK.last=String(m||'');return _t.apply(this,arguments)}}
+function lkWrap(fn){return async function(){const id=lkId();if(!id)return fn.apply(this,arguments);
+ if(lkLeft(id)){lkShow(id);return}
+ LK.last='';await fn.apply(this,arguments);
+ let ok=false;try{ok=!!authUser()}catch(e){}
+ const msg=String(AU&&AU.msg||'')+' '+LK.last;
+ if(ok){lkSave(id,null);return}
+ if(!/wrong (email or )?password|invalid login|too many attempts/i.test(msg))return;
+ const r=lkRec(id);r.f=(r.f||0)+1;
+ if(r.f>=LK.max){r.u=Date.now()+LK.ms;r.f=0;lkSave(id,r);lkShow(id);return}
+ lkSave(id,r);const n=LK.max-r.f;AU.msg=`<span style="color:var(--bad)"><b>Wrong password.</b> ${n} attempt${n>1?'s':''} left — after ${LK.max} wrong passwords, login is locked for 15 minutes.</span>`;renderAuth();const f=document.getElementById('alI');if(f)f.value=id}}
+authLogin=lkWrap(authLogin);cAuthLogin=lkWrap(cAuthLogin);
+
 /* ============ ACCOUNTS & SIGN-IN (owner: Shubham kale) ============ */
 const SITE_URL='https://biomotorsports.com',siteUrl=()=>(db.org&&db.org.website)||SITE_URL,siteName=()=>siteUrl().replace(/^https?:\/\//,'').replace(/\/$/,'');
 const OWNER_ACC={name:'Shubham kale',email:'founder.shubhamkale@gmail.com',phone:'9321766523'};
@@ -5527,7 +5586,7 @@ async function authOwnerReset(){const o=authDb();const c=aval('afC').toUpperCase
  await setPw(o,w);o.ver=(o.ver||0)+1;const code=genCode();o.rsalt=newSalt();o.rhash=await pwHash(code.replace(/-/g,''),o.rsalt);save();signIn(o,true);AU={view:'code',code,msg:'Password reset. A new recovery code was created:',inv:''};renderAuth()}
 async function authLogin(){authDb();const a=accFind(aval('alI'));const w=aval('alW');if(!a||!a.hash){AU.msg='No account found with that email or mobile number. <a href="javascript:void 0" style="color:var(--accent)" onclick="AU.view=\'signup\';AU.msg=\'\';renderAuth()">Create one</a>.';renderAuth();return}
  a.fails=a.fails||0;if(a.lockUntil&&a.lockUntil>Date.now()){toast('Too many attempts — try again in '+Math.ceil((a.lockUntil-Date.now())/60000)+' min');return}
- if(await pwHash(w,a.salt)!==a.hash){a.fails++;if(a.fails>=5){a.lockUntil=Date.now()+5*60000;a.fails=0}save();toast('Wrong password');return}a.fails=0;a.lockUntil=0;
+ if(await pwHash(w,a.salt)!==a.hash){a.fails++;if(a.fails>=5){a.lockUntil=Date.now()+15*60000;a.fails=0}save();toast('Wrong password');return}a.fails=0;a.lockUntil=0;
  if(a.status==='Pending'){AU.msg=`Your account is waiting for approval by ${esc(OWNER_ACC.name)}. Call or WhatsApp ${esc(OWNER_ACC.phone)} to speed it up.`;renderAuth();return}
  if(a.status!=='Active'){AU.msg='This account is disabled. Contact '+esc(OWNER_ACC.name)+'.';renderAuth();return}
  signIn(a,document.getElementById('alR').checked);AU.msg='';location.hash=a.goto||'dashboard';delete a.goto;applyBrand();render();toast('Welcome, '+a.name)}
