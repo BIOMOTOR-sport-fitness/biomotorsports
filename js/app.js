@@ -5509,7 +5509,7 @@ function skFont(){const b=db&&db.brand||{};const def=!b.fontB||b.fontB==='Inter'
 {const _af=applyFonts;applyFonts=function(){_af.apply(this,arguments);try{skFont()}catch(e){}}}
 try{skFont()}catch(e){}
 
-/* ============ SCREEN PRIVACY (watermark · blur on capture · no print/copy) ============ */
+/* ============ SCREEN PRIVACY (blur on capture · no print/copy) ============ */
 /* Browsers cannot block screenshots. The Android app uses FLAG_SECURE and the desktop app uses
    content protection (true blocking). On the website we deter and trace: a personal watermark,
    blurring when focus leaves the page (e.g. Win+Shift+S snipping), and no print / copy.          */
@@ -5519,10 +5519,10 @@ function pvMark(a){const d=new Date(),p=n=>String(n).padStart(2,'0');
  const txt=`${a.name||'User'} · ${a.phone||a.email||a.role||''} · ${p(d.getDate())}-${p(d.getMonth()+1)}-${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="420" height="220"><text x="10" y="120" transform="rotate(-24 210 110)" font-family="Arial,sans-serif" font-size="15" fill="rgba(120,120,135,0.16)">${txt.replace(/[<>&"]/g,'')}</text></svg>`;
  return 'url("data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)+'")'}
-function pvApply(){const a=pvUser();let w=document.getElementById('pvWm');
- if(!a){document.body.classList.remove('pv');if(w)w.remove();PV.on=false;return}
- if(!w){w=document.createElement('div');w.id='pvWm';w.setAttribute('aria-hidden','true');document.body.appendChild(w)}
- w.style.backgroundImage=pvMark(a);document.body.classList.add('pv');PV.on=true}
+/* Watermark turned off for all accounts. Blur, no copy/print and app screenshot blocking stay on. */
+function pvApply(){const a=pvUser();const w=document.getElementById('pvWm');if(w)w.remove();
+ if(!a){document.body.classList.remove('pv');PV.on=false;return}
+ document.body.classList.add('pv');PV.on=true}
 function pvBlur(on){if(!PV.on)return;document.body.classList.toggle('pv-blur',!!on)}
 (function(){
  const start=()=>{pvApply();clearInterval(PV.t);PV.t=setInterval(pvApply,60000)};
