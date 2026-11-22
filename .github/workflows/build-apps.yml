@@ -21,7 +21,6 @@ jobs:
         with: { node-version: 20 }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
-    
       - name: Make the package file from package.shubham
         run: node tools/shubham-build.js apps/mobile/package.shubham
       - name: Install Capacitor
@@ -36,8 +35,34 @@ jobs:
         working-directory: apps/mobile
         run: |
           npx cap add android
-          npx @capacitor/assets generate --android --iconBackgroundColor '#ffffff' --splashBackgroundColor '#ffffff' || echo "icon generation skipped"
           npx cap sync android
+      - name: Block screenshots and screen recording (FLAG_SECURE, like Google Pay)
+        working-directory: apps/mobile
+        run: |
+          F=$(find android/app/src/main/java -name MainActivity.java | head -n 1)
+          echo "Patching $F"
+          cat > "$F" <<'JAVA'
+          package com.biomotor.sportsfitness;
+
+          import android.os.Bundle;
+          import android.view.WindowManager;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+              }
+          }
+          JAVA
+          sed -i 's/^          //' "$F"
+          cat "$F"
+      - name: Put the BIOMOTOR logo on the app icon
+        working-directory: apps/mobile
+        run: |
+          cp -r android-res/. android/app/src/main/res/
+          ls android/app/src/main/res/mipmap-anydpi-v26
       - name: Build APK
         working-directory: apps/mobile/android
         run: |
