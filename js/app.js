@@ -241,12 +241,12 @@ P.dashboard=()=>{
  const greet=h<5?'Good night':h<12?'Good morning':h<17?'Good afternoon':'Good evening';
  const C={a:'#ff7a2f',b:'#5fb3ff',c:'#3ee08f',d:'#b18cff',e:'#ffd23f',f:'#ff6fb1'};
  const wkDelta=rows=>{const w=dsWeekly(rows,2);return w[1]};
- const stats=[['Athletes',db.athletes.filter(a=>a.status!=='Inactive').length,'Active roster records','athletes','athletes',null,C.a],
-  ['Coaches / Users',db.users.length,'Staff and owner memberships','coaches-users','users',null,C.b],
-  ['Testing Sessions',db.sessions.filter(s=>s.status!=='Cancelled').length,'Non-cancelled sessions','testing','sessions',wkDelta(db.sessions.filter(s=>s.status!=='Cancelled')),C.c],
-  ['Test Results',db.results.length,'Recorded results','testing','results',wkDelta(db.results),C.d],
-  ['Active Programs',db.programs.filter(p=>p.status==='Active').length,'Training programs','programs','programs',null,C.e],
-  ['Program Assignments',db.assignments.length,'Athlete training assignments','programs','assignments',wkDelta(db.assignments.filter(a=>a.date||a.start).map(a=>({date:a.date||a.start}))),C.f]];
+ const stats=[['Athletes',db.athletes.filter(a=>a.status!=='Inactive').length,'On the roster','athletes','athletes',null,C.a],
+  ['Coaches / Users',db.users.length,'Coaches & staff','coaches-users','users',null,C.b],
+  ['Testing Sessions',db.sessions.filter(s=>s.status!=='Cancelled').length,'Sessions run','testing','sessions',wkDelta(db.sessions.filter(s=>s.status!=='Cancelled')),C.c],
+  ['Test Results',db.results.length,'Results logged','testing','results',wkDelta(db.results),C.d],
+  ['Active Programs',db.programs.filter(p=>p.status==='Active').length,'Running now','programs','programs',null,C.e],
+  ['Program Assignments',db.assignments.length,'Athletes on a plan','programs','assignments',wkDelta(db.assignments.filter(a=>a.date||a.start).map(a=>({date:a.date||a.start}))),C.f]];
  const recent=[...db.sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
  const clAdd={'Organization Info':"go('organization')",'Branding':"go('branding')",'Staff Invites':"openForm('users')",'Athletes':"openForm('athletes')",'Testing':"openForm('sessions')",'Training':"openForm('programs')"};
  const up=db.events.filter(e=>e.date>=today()).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,4);
@@ -266,8 +266,8 @@ P.dashboard=()=>{
  <section class="d3-hero">
   <div class="d3-hero-main"><div class="d3-kicker"><span class="d3-live"></span>Organization ${esc(me.role||db.profile.role)} · ${new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
    <h1>${greet}${first?', <span>'+esc(first)+'</span>':''}</h1>
-   <p class="d3-org-l">${esc(db.org.name)} · <b>Command Center</b></p>
-   <p class="d3-sub">Live organization view for roster growth, staff access, testing activity, and management foundations.</p>
+   <p class="d3-org-l">${esc(db.org.name)} · <b>Performance Hub</b></p>
+   <p class="d3-sub">Your athletes, coaches, testing and training in one place — what needs you today, and how the week is going.</p>
    <div class="d3-week">${week}</div></div>
   <div class="d3-hero-side"><div class="d3-brand" onclick="go('branding')"><span class="d3-logo"><img src="${bmLogo()}" alt="${esc(db.org.name)}"></span><div><b>${esc(db.org.name)}</b><small>${esc(db.org.tagline||'')}</small></div></div>
    <div class="d3-mini"><div><b>${it.length}</b><small>waiting on you</small></div><div><b>${wkNow}<em class="${wkNow>=wkPrev?'up':'down'}">${wkNow===wkPrev?'':(wkNow>wkPrev?'▲':'▼')+Math.abs(wkNow-wkPrev)}</em></b><small>activities this week</small></div><div><b>${done}/${cl.length}</b><small>launch ready</small></div></div></div>
@@ -3116,7 +3116,7 @@ function cuBulk(add){const C=CU.coach;let n=0;CU.sel.forEach(aid=>{const ex=db.c
 function cuSingle(){const aid=document.getElementById('cuSA').value;if(!CU.coach){toast('Select a coach above first');return}if(!aid){toast('Select an athlete');return}CU.sel=[aid];cuBulk(1)}
 function cuAsgSet(id,s){const a=byId('coachAsg',id);if(s==='Active'&&db.coachAsg.some(x=>x!==a&&x.coach===a.coach&&x.athlete===a.athlete&&x.status==='Active')){toast('Already assigned');return}a.status=s;if(s==='Active')a.date=today();save();render();toast(s==='Active'?'Assignment restored':'Assignment archived')}
 /* athlete & parent links */
-function cuLinks(kind){const ath=kind==='ath';const L=ath?db.athLinks:db.parentLinks;const role=ath?'Athlete':'Parent';const users=db.users.filter(u=>(ath?['Athlete','Viewer'].includes(u.role):u.role===role)&&u.status!=='Archived');
+function cuLinks(kind){const ath=kind==='ath';const L=ath?db.athLinks:db.parentLinks;const role=ath?'Athlete':'Parent';const users=db.users.filter(u=>u.role===role&&u.status!=='Archived');
  const list=L.filter(l=>byId('users',l.user)&&byId('athletes',l.athlete)&&(l.status==='Active'||CU.showArch));
  return cuSec(ath?'Athlete portal access':'Parent portal foundation',ath?'Athlete Account Linking':'Parent-Athlete Linking',
  `<div class="form"><div><label class="eyebrow">${role} user</label><select id="lk${kind}U"><option value="">Select ${role.toLowerCase()} login</option>${users.map(u=>`<option value="${u.id}">${esc(uName(u))}${u.email?' · '+esc(u.email):''}</option>`).join('')}</select></div><div><label class="eyebrow">Athlete profile</label><select id="lk${kind}A"><option value="">Select athlete profile</option>${db.athletes.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></div><div><label class="eyebrow">Relationship</label><input id="lk${kind}R" value="${ath?'self':'parent'}"></div></div>
@@ -4917,7 +4917,7 @@ function stFolder(sid,staff){const S=stSport(sid);if(!S){ST.sport=null;return P[
  return `<div class="pagehead"><div><div class="eyebrow">Sports Specific Test</div><h2>${ic} ${esc(n)}</h2><div class="muted">${ts.length} test protocols with templates, normative data and interpretation</div></div><div class="row"><button class="btn" onclick="ST.sport=null;render()">← All sports</button>${staff?`<button class="btn pri" onclick="stNew('${id}')">＋ New test session</button>`:''}</div></div>
  ${sess.length?`<div class="card"><h3 style="margin-top:0">Test sessions (${sess.length})</h3><div style="overflow:auto"><table><thead><tr><th>Athlete</th><th>Date</th><th>Tests</th><th>Tested by</th><th></th></tr></thead><tbody>${sess.map(x=>`<tr><td><b>${esc(x.name||'—')}</b><div class="muted" style="font-size:12px">${esc([x.gender,x.age?x.age+' y':'',x.level].filter(Boolean).join(' · '))}</div></td><td>${fmtDate(x.date)}</td><td>${(x.tests||[]).filter(e=>stVal(STT[e.t]||{},e)).length}/${(x.tests||[]).length}</td><td>${esc(x.staffName||'—')}<div class="muted" style="font-size:12px">${esc(x.staffRole||'')}</div></td>
   <td style="white-space:nowrap;text-align:right">${staff?`<button class="btn sm" onclick="ST.sid='${x.id}';render();window.scrollTo(0,0)">Open</button> `:''}<button class="btn sm pri" onclick="stPdf('${x.id}')">⬇ PDF</button>${staff?` <button class="btn sm" title="Delete" onclick="stDel('${x.id}')">🗑</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>`:''}
- <h3>Test protocols</h3>${ts.map(t=>stProtoCard(t)).join('')}`}
+ ${typeof roUser==='function'&&roUser(authUser())?`<h3>Tests in this folder</h3><div class="row" style="gap:8px">${ts.map(t=>STT[t]?`<span class="pill p-blue">${esc(STT[t].n)}</span>`:'').join('')}</div><p class="muted">Test protocols are visible to coaches only.</p>`:`<h3>Test protocols</h3>${ts.map(t=>stProtoCard(t)).join('')}`}`}
 function stProtoCard(tid){const t=STT[tid];if(!t)return '';const N=t.nid?stNorm(t.nid):null;const P=t.p;
  return `<details class="card st-proto"><summary><span class="pill p-blue">${esc(STQ[t.q])}</span> <b>${esc(t.n)}</b> <span class="muted">· ${esc(t.u)}${N?' · normative table':' · progress tracking'}</span></summary>
  <div class="fc-g" style="grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));margin-top:10px"><div><div class="fc-sub" style="margin-top:0">Purpose</div>${esc(P.purpose)}<div class="fc-sub">Equipment</div>${esc(P.equip)}<div class="fc-sub">Scoring</div>${esc(P.score)}${P.notes?`<p class="muted">${esc(P.notes)}</p>`:''}<div class="fc-sub">Energy system</div>${esc(FCES[t.es]||'—')}</div>
@@ -4929,11 +4929,12 @@ function stNew(sid){const S=stSport(sid);const me=authUser()||{};const r={id:uid
 function stDel(id){confirmBox('Delete this test session?',()=>{db.sportTests=stDb().filter(x=>x.id!==id);save();if(ST.sid===id)ST.sid=null;render();toast('Session deleted')})}
 const stRec=()=>byId('sportTests',ST.sid);
 let stT=null;function stIn(el){const r=stRec();fcPut(r,el.dataset.p,el.value);clearTimeout(stT);stT=setTimeout(()=>save(),350);stLive()}
-function stLive(){const r=stRec();if(!r)return;r.tests.forEach((e,i)=>{const o=stEval(r,e);const el=document.querySelector(`[data-stres="${i}"]`);if(!el)return;el.innerHTML=stResHtml(r,e,o)})}
+function stLive(){const r=stRec();if(!r)return;try{stFxLive()}catch(er){}r.tests.forEach((e,i)=>{const el=document.querySelector(`[data-stnorm="${i}"]`);if(el){const o=stEval(r,e);el.innerHTML=stNormBoth(o)}});r.tests.forEach((e,i)=>{const o=stEval(r,e);const el=document.querySelector(`[data-stres="${i}"]`);if(!el)return;el.innerHTML=stResHtml(r,e,o)})}
 function stResHtml(r,e,o){const{t,V,N,R,prev}=o;if(!V)return '<span class="muted">Enter the result to see the category.</span>';const u=stU(t,V.v);
  let h=`<div><b style="font-size:20px">${stFmt(t,V.v)}</b>${u}</div>`;if(V.x)h+=`<div class="muted" style="font-size:12px">${esc(V.x)}</div>`;
  if(e.cat)h+=`<div class="fc-rate">${esc(e.cat)} <span class="muted">(assessor)</span></div>`;else if(R&&!R.err)h+=`<div class="fc-rate ${R.best?'ok':R.i===0?'bad':''}">${esc(fcRateText(N,R,V.v))}</div><div class="muted" style="font-size:11px">${esc(N.n)} norms · ${esc(R.grp)}</div>`;else if(R&&R.err)h+=`<div class="muted">${esc(R.err)}</div>`;
  if(prev){const d=V.v-prev.v,pc=prev.v?d/prev.v*100:0;const better=stDir(t)==='lo'?d<0:d>0;h+=`<div style="font-size:12px;margin-top:3px" class="${better?'fc-rate ok':d?'fc-rate bad':'muted'}">vs ${fmtDate(prev.date)}: ${d>0?'+':d<0?'−':''}${stFmt(t,Math.abs(d))}${stU(t,Math.abs(d))} (${pc>0?'+':''}${pc.toFixed(1)}%) ${better?'improved':d?'declined':'no change'}</div>`}
+ {const I=stInterp(r,e,o);if(I)h+=`<div class="st-rec" style="margin-top:6px">💡 ${esc(I.rec)}</div>`}
  return h}
 function stSession(){const r=stRec();const S=stSport(r.sport)||['','Sport','🏅',[]];
  const top=`<div class="pagehead"><div><div class="eyebrow">Sports Specific Test · ${esc(S[1])}</div><h2>${S[2]} ${esc(r.name||'New test session')}</h2></div><div class="row"><button class="btn" onclick="save();ST.sid=null;render()">← ${esc(S[1])}</button><button class="btn pri" onclick="stPdf('${r.id}')">⬇ Download PDF report</button></div></div>`;
@@ -4942,22 +4943,25 @@ function stSession(){const r=stRec();const S=stSport(r.sport)||['','Sport','🏅
  <div><label>Athlete on roster</label><select onchange="stPickAth(this.value)"><option value="">— Type below —</option>${db.athletes.map(a=>`<option value="${a.id}" ${a.id===r.athlete?'selected':''}>${esc(a.name)}</option>`).join('')}</select></div>
  ${f('name','Athlete name')}<div><label>Gender</label><select data-p="gender" onchange="stIn(this);render()"><option value=""></option>${['Male','Female'].map(g=>`<option ${r.gender===g?'selected':''}>${g}</option>`).join('')}</select></div>${f('age','Age (years)','number')}
  ${f('position','Position / event')}${f('level','Level','text','list="stLvl"')}<datalist id="stLvl">${['Club','District','State','National','International','School','University'].map(x=>`<option value="${x}">`).join('')}</datalist>
- ${f('date','Test date','date')}${f('venue','Venue')}${f('conditions','Conditions (surface, temp.)')}
+ ${f('bm','Body mass (kg)','number')}${f('ht','Height (cm)','number')}${f('date','Test date','date')}${f('venue','Venue')}${f('conditions','Conditions (surface, temp.)')}
  <div><label>Tested by (position)</label><input data-p="staffRole" list="pdRoleL2" value="${esc(r.staffRole)}" oninput="stIn(this)"><datalist id="pdRoleL2">${PDROLES.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>${f('staffName','Staff name')}</div>
  ${!r.gender||!r.age?'<p class="pill p-warn" style="margin:10px 0 0;display:inline-block">Enter gender and age so the normative category can be worked out.</p>':''}</div>`;
  const tests=r.tests.map((e,i)=>{const t=STT[e.t];if(!t)return '';const o=stEval(r,e);const nt=t.n2||(t.time?1:3);
   const inputs=t.inp?`<div class="fc-g" style="grid-template-columns:repeat(auto-fill,minmax(min(140px,100%),1fr))">${t.inp.map(([k,l,u])=>`<div><label>${esc(l)} <span class="muted">(${esc(u)})</span></label><input data-p="tests.${i}.inp.${k}" value="${esc((e.inp||{})[k]??'')}" placeholder="${u==='mm:ss'?'e.g. 5:20':''}" oninput="stIn(this)"></div>`).join('')}</div>`
    :`<div class="fc-g" style="grid-template-columns:repeat(auto-fill,minmax(min(120px,100%),1fr))">${Array.from({length:Math.max(nt,(e.tr||[]).length)},(_,k)=>`<div><label>${nt>1?'Trial '+(k+1):'Result'} <span class="muted">(${t.time?'min:sec':esc(t.u)})</span></label><input data-p="tests.${i}.tr.${k}" value="${esc((e.tr||[])[k]??'')}" placeholder="${t.time?'e.g. 8:10':''}" oninput="stIn(this)"></div>`).join('')}</div>`;
   return `<div class="card st-test"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><div><span class="pill p-blue">${esc(STQ[t.q])}</span> <b style="font-size:17px">${i+1}. ${esc(t.n)}</b></div><div class="row" style="gap:4px"><button class="btn sm" ${i?'':'disabled'} onclick="stMove(${i},-1)">↑</button><button class="btn sm" ${i<r.tests.length-1?'':'disabled'} onclick="stMove(${i},1)">↓</button><button class="btn sm" onclick="stRemove(${i})">✕</button></div></div>
-  <details style="margin:6px 0"><summary class="muted" style="cursor:pointer;font-size:13px">Protocol</summary><ol style="margin:6px 0;padding-left:20px;font-size:13px">${t.p.proc.map(s=>`<li>${esc(s)}</li>`).join('')}</ol><div class="muted" style="font-size:13px">Scoring: ${esc(t.p.score)}</div></details>
+  ${typeof roUser==='function'&&roUser(authUser())?'':`<details style="margin:6px 0"><summary class="muted" style="cursor:pointer;font-size:13px">Protocol</summary><ol style="margin:6px 0;padding-left:20px;font-size:13px">${t.p.proc.map(s=>`<li>${esc(s)}</li>`).join('')}</ol><div class="muted" style="font-size:13px">Scoring: ${esc(t.p.score)}</div></details>`}
   <div class="st-row"><div style="flex:2;min-width:240px">${inputs}</div><div class="st-res" data-stres="${i}">${stResHtml(r,e,o)}</div></div>
+  <div data-stfx="${i}">${stFxHtml(r,e,i)}</div>
+  <details class="st-nd" open><summary>Normative data &amp; reference</summary><div data-stnorm="${i}">${stNormBoth(o)}</div></details>
+  ${STPSY[e.t]?`<details class="st-nd"><summary>Validity, reliability &amp; measurement error</summary>${stPsyHtml(e.t)}</details>`:''}
   <div class="fc-g" style="grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));margin-top:8px"><div><label>Category override (optional)</label><input data-p="tests.${i}.cat" value="${esc(e.cat||'')}" placeholder="Leave empty to use the norms" oninput="stIn(this)"></div><div><label>Notes</label><input data-p="tests.${i}.note" value="${esc(e.note||'')}" oninput="stIn(this)"></div></div></div>`}).join('');
  const L=Object.keys(STT).filter(k=>!r.tests.some(e=>e.t===k));
  const add=`<div class="row" style="gap:8px;flex-wrap:wrap;margin:6px 0 16px"><select id="stAdd" style="max-width:360px"><option value="">＋ Add a test from the library…</option>${STQ.map((q,qi)=>`<optgroup label="${esc(q)}">${L.filter(k=>STT[k].q===qi).map(k=>`<option value="${k}">${esc(STT[k].n)}</option>`).join('')}</optgroup>`).join('')}</select><button class="btn sm" onclick="stAdd(document.getElementById('stAdd').value)">Add</button></div>`;
  const fin=`<div class="card"><h3 style="margin-top:0">Interpretation & recommendations</h3><label>Summary</label><textarea id="stSum" data-p="summary" rows="5" oninput="stIn(this)">${esc(r.summary)}</textarea><button class="btn sm" style="margin:6px 0 12px" onclick="stAuto()">↻ Write from the results</button>
  <label>Recommendations</label><textarea id="stRecs" data-p="recs" rows="5" oninput="stIn(this)">${esc(r.recs)}</textarea></div>`;
  return top+info+`<h3>Tests (${r.tests.length})</h3>`+tests+add+fin+`<div class="row" style="justify-content:flex-end"><button class="btn pri" onclick="stPdf('${r.id}')">⬇ Download PDF report</button></div>`}
-function stPickAth(id){const r=stRec();r.athlete=id;const a=byId('athletes',id);if(a){r.name=a.name;r.gender=a.gender||r.gender;r.position=a.position||r.position;if(a.dob){const d=new Date(a.dob),n=new Date(r.date||today());let y=n.getFullYear()-d.getFullYear();if(n<new Date(n.getFullYear(),d.getMonth(),d.getDate()))y--;r.age=String(y)}}save();render()}
+function stPickAth(id){const r=stRec();r.athlete=id;const a=byId('athletes',id);if(a){const w=(db.weighins||[]).filter(x=>x.athlete===id&&+x.weight>0).sort((x,y)=>String(y.date).localeCompare(String(x.date)))[0];if(w)r.bm=String(w.weight);if(a.height&&!r.ht)r.ht=String(a.height);r.name=a.name;r.gender=a.gender||r.gender;r.position=a.position||r.position;if(a.dob){const d=new Date(a.dob),n=new Date(r.date||today());let y=n.getFullYear()-d.getFullYear();if(n<new Date(n.getFullYear(),d.getMonth(),d.getDate()))y--;r.age=String(y)}}save();render()}
 function stMove(i,d){const r=stRec();[r.tests[i],r.tests[i+d]]=[r.tests[i+d],r.tests[i]];save();render()}
 function stRemove(i){const r=stRec();r.tests.splice(i,1);save();render()}
 function stAdd(k){if(!k)return;stRec().tests.push({t:k,tr:[],inp:{},note:'',cat:''});save();render()}
@@ -5006,22 +5010,280 @@ async function stBuild(Lb,r){const {PDFDocument,StandardFonts,rgb}=Lb;const S=st
   para(`Result: ${stFmt(o.t,o.V.v)}${u}${o.V.x?' — '+o.V.x:''}.`,{z:9.5,gap:1});
   if(o.e.cat)para(`Category (assessor): ${o.e.cat}.`,{z:9.5,f:B,gap:1});else if(o.R&&!o.R.err)para(`Category: ${fcRateText(o.N,o.R,o.V.v)}.`,{z:9.5,f:B,gap:1});
   para(`What it shows: ${o.t.m}`,{z:9,gap:1});
-  if(o.N){const b=fcBand(o.N,r.gender,fcNum(r.age));if(b)para(`Norms (${o.R&&o.R.grp||''}): ${fcBandText(o.N,b)}`,{z:8.3,c:MUT,gap:1});para('Reference: '+o.N.ref,{f:I,z:8,c:MUT,gap:1})}else if(o.t.p.notes)para(o.t.p.notes,{z:8.5,c:MUT,gap:1});
-  if(o.R&&!o.R.best&&o.R.i<(o.R.n-1)/2&&o.t.es!=='na')para('Training focus: '+FCCOND[o.t.es],{z:8.5,gap:1});if(o.e.note)para('Note: '+o.e.note,{z:8.5,f:I,gap:1});y-=6});
+  {const pt=(N,isY)=>{const act=o.youth===isY;y-=2;if(!N){T(isY?'Normative data — Under 18 years':'Normative data — 18 years and above',M,y,{f:B,z:8.8});y-=11;para(isY?'No validated, published under-18 normative table for this test — compared with the athlete\'s previous results (adult values are not applied to under-18s).':'No validated, published adult normative table for this test — compared with the athlete\'s previous results.',{z:8.3,c:MUT,gap:2});return}
+   const b=(act&&o.R&&!o.R.err&&o.R.band)||fcBand(N,r.gender,isY?Math.min(17,fcNum(r.age)||17):Math.max(18,fcNum(r.age)||25))||N.B[0];
+   T(`Normative data — ${isY?'Under 18 years':'18 years and above'} · ${stGrp2(b,isY)}${N.u?' ('+N.u+')':''}${act?'  [athlete\'s group]':''}`,M,y,{f:B,z:8.8});y-=6;
+   table(['Category','Range'],stNormRows(N,b).map(([l,rg])=>{const h=act&&o.R&&!o.R.err&&l===o.R.lab&&!o.e.cat;return [{t:l+(h?'  ← athlete':''),b:h?1:0,c:h?RED:DARK},{t:rg,b:h?1:0}]}),[CW*.55,CW*.45],8);y+=6;para('Reference: '+N.ref,{f:I,z:7.8,c:MUT,gap:2})};
+   pt(o.NY,true);pt(o.NA,false);{const P=STPSY[o.e.t];if(P&&!(typeof roUser==='function'&&roUser(authUser()))){if(P.pop==='—')para('Measurement properties: '+P.refs[0],{z:7.8,c:MUT,gap:2});else{para('Measurement properties — '+PK.filter(([k])=>P[k]&&k!=='pop').map(([k,l])=>l+': '+P[k]).join('  |  '),{z:7.8,c:MUT,gap:1});para('Sources: '+P.refs.join('; '),{f:I,z:7.4,c:MUT,gap:2})}}}}
+  stFxList(r,o.e).filter(f=>f.val!=null).forEach(f=>para(`• ${f.n}: ${f.t} = ${stFxVal(f)}`,{z:8.5,x:M+8,gap:0}));{const I=stInterp(r,o.e,o);if(I)para('Recommendation: '+I.rec,{z:8.8,f:B,gap:1})}if(o.e.note)para('Note: '+o.e.note,{z:8.5,f:I,gap:1});y-=6});
+ {const A=r.summary||r.recs?{summary:r.summary,recs:r.recs}:stAutoText(r);r={...r,summary:A.summary,recs:A.recs}}
  if(r.summary||r.recs){sec('Summary & Recommendations');if(r.summary)para(r.summary,{z:10.5,gap:10});if(r.recs){T('Recommendations',M,y,{f:B,z:11,c:RED});y-=16;r.recs.split('\n').filter(Boolean).forEach((l,k)=>{need(16);T((k+1)+'.',M,y,{f:B,z:10,c:RED});const L=wrap(l,F,10,CW-20);L.forEach((x,q)=>{if(q){y-=14;need(14)}T(x,M+18,y,{z:10})});y-=16})}}
  /* protocols appendix */
- sec('Test Protocols');E.forEach(o=>{need(60);T(fcTx(o.t.n),M,y,{f:B,z:10,c:RED});y-=13;para('Purpose: '+o.t.p.purpose+'  Equipment: '+o.t.p.equip,{z:8.5,gap:1});o.t.p.proc.forEach((s,k)=>para(`${k+1}. ${s}`,{z:8.5,x:M+10,gap:0}));para('Scoring: '+o.t.p.score,{z:8.5,f:I,gap:8})});
+ if(!(typeof roUser==='function'&&roUser(authUser())))sec('Test Protocols');if(!(typeof roUser==='function'&&roUser(authUser())))E.forEach(o=>{need(60);T(fcTx(o.t.n),M,y,{f:B,z:10,c:RED});y-=13;para('Purpose: '+o.t.p.purpose+'  Equipment: '+o.t.p.equip,{z:8.5,gap:1});o.t.p.proc.forEach((s,k)=>para(`${k+1}. ${s}`,{z:8.5,x:M+10,gap:0}));para('Scoring: '+o.t.p.score,{z:8.5,f:I,gap:8})});
  need(130);y-=10;const sx=W-M-230;T((r.staffRole||'')+'.',sx,y,{f:B,z:13});T(r.staffName||'',sx,y-18,{z:12});T(fcLongDate(r.date),sx,y-34,{z:10,c:MUT});y-=64;
  ['Staff sign :-','Athlete name :-','Athlete sign :-'].forEach((l,k)=>{T(l,M,y,{f:B,z:11});pg.drawLine({start:{x:M+120,y:y-2},end:{x:M+330,y:y-2},thickness:.6,color:DARK});if(k===1&&r.name)T(r.name,M+124,y+2,{z:11});y-=28});
  const foot=`Tested by ${by}  ·  ${fcLongDate(r.date)}`;pages.forEach((p,k)=>{if(!k)return;p.drawLine({start:{x:M,y:44},end:{x:W-M,y:44},thickness:.5,color:LINE});p.drawText(fcTx(foot),{x:M,y:32,size:8,font:F,color:MUT});const pn=`Page ${k+1} of ${pages.length}`;p.drawText(pn,{x:W-M-F.widthOfTextAtSize(pn,8),y:32,size:8,font:F,color:MUT})});
  return await doc.save()}
+/* ---------- formulas, automatic interpretation and recommendations ---------- */
+const STREC=['Build the aerobic base: 2–3 sessions a week of continuous or tempo running (20–40 min at 70–80% HRmax) plus long intervals (3–5 min at 85–90% HRmax).',
+ 'Intermittent running: 15 s on / 15 s off at 90–100% of VIFT, 2–3 sets of 6–8 min, plus small-sided games.',
+ 'Repeated-sprint work: 6–10 × 20–30 m with 20–25 s recovery, 2–3 sets, twice a week.',
+ 'Speed work: 10–40 m acceleration and max-velocity sprints with full recovery, resisted sprints and sprint technique drills.',
+ 'Change-of-direction training: 505 and T-pattern drills, deceleration technique and reactive agility, twice a week.',
+ 'Power training: jumps, bounds, medicine-ball throws and Olympic-lift variations, 3–5 sets of 3–5 explosive reps.',
+ 'Strength training: main lifts at 75–90% 1RM, 3–5 sets of 3–6 reps, progressed every week.',
+ 'Muscular endurance: 15–25-rep circuits, timed holds and bodyweight conditioning 2–3 times a week.',
+ 'Mobility: dynamic warm-up every session and 2–3 × 30 s stretches for the limited area after training.',
+ 'Body composition: nutrition review with energy and protein targets, combined with strength training and conditioning.',
+ 'Movement quality: single-leg balance, hip and trunk control and landing mechanics; re-screen in 6 weeks.',
+ 'Sport-specific conditioning and technique at match intensity; re-test in 6–8 weeks.'];
+const stTrials=(t,e)=>(e.tr||[]).map(x=>t.time?stSec(x):parseFloat(x)).filter(v=>v!=null&&isFinite(v));
+const stBM=(r,x)=>{const v=parseFloat((x||{}).bm)||parseFloat(r.bm);return v>0?v:null};
+const stSpd=d=>[{n:'Average speed',t:`Speed = ${d} m ÷ time`,u:'m/s',d:2,calc:V=>V>0?d/V:null},{n:'Average speed (km/h)',t:'km/h = m/s × 3.6',u:'km/h',d:1,calc:V=>V>0?d/V*3.6:null}];
+const ST1RM={n:'Estimated 1RM (Epley)',t:'1RM = load × (1 + reps ÷ 30)',inp:[['w','Sub-max load','kg'],['reps','Reps done','reps']],u:'kg',d:1,calc:(V,x)=>+x.w>0&&+x.reps>0?x.w*(1+x.reps/30):null};
+const STFX={
+ yyir1:[{n:'Estimated VO2max',t:'VO2max = distance × 0.0084 + 36.4 (Bangsbo 2008)',u:'ml/kg/min',d:1,calc:V=>V>0?V*0.0084+36.4:null}],
+ cooper:[{n:'Estimated VO2max',t:'VO2max = (distance − 504.9) ÷ 44.73 (Cooper 1968)',u:'ml/kg/min',d:1,calc:V=>V>0?(V-504.9)/44.73:null}],
+ tt2k:[{n:'Average speed',t:'Speed = 2000 m ÷ time × 3.6',u:'km/h',d:1,calc:V=>V>0?2000/V*3.6:null},{n:'Pace per km',t:'Pace = time ÷ 2',f:'time',u:'/km',calc:V=>V>0?V/2:null}],
+ vift:[{n:'Interval speed 90%',t:'0.90 × VIFT',u:'km/h',d:1,calc:V=>V>0?V*0.9:null},{n:'Interval speed 95%',t:'0.95 × VIFT',u:'km/h',d:1,calc:V=>V>0?V*0.95:null},{n:'Distance for a 15 s run at 95%',t:'VIFT ÷ 3.6 × 0.95 × 15 s',u:'m',d:0,calc:V=>V>0?V/3.6*0.95*15:null}],
+ rast:[{n:'Power per sprint',t:'Power = body mass × 35² ÷ time³; fatigue index = (peak − min) ÷ total time',u:'W/kg',d:2,calc:V=>V}],
+ rsa:[{n:'Sprint decrement',t:'Sdec % = (total time ÷ (best × 6) − 1) × 100',u:'%',d:1,calc:V=>V}],
+ s10:stSpd(10),s20:stSpd(20),s30:stSpd(30),s40:stSpd(40),
+ cmj:[{n:'Peak power (Sayers)',t:'Power = 60.7 × height (cm) + 45.3 × body mass (kg) − 2055',inp:[['bm','Body mass','kg']],u:'W',d:0,calc:(V,x,r)=>{const m=stBM(r,x);return V>0&&m?60.7*V+45.3*m-2055:null}},{n:'Relative peak power',t:'Peak power ÷ body mass',u:'W/kg',d:1,calc:(V,x,r)=>{const m=stBM(r,x);return V>0&&m?(60.7*V+45.3*m-2055)/m:null}}],
+ sbj:[{n:'Jump ÷ height',t:'Distance ÷ standing height',u:'× height',d:2,calc:(V,x,r)=>{const h=parseFloat(r.ht);return V>0&&h>0?V/h:null}}],
+ a505:[{n:'Best time and asymmetry',t:'Best = faster turn; asymmetry % = |left − right| ÷ faster × 100',u:'s',d:2,calc:V=>V}],
+ grip:[{n:'Relative grip strength',t:'(right + left) ÷ body mass',inp:[['bm','Body mass','kg']],u:'kg/kg',d:2,calc:(V,x,r)=>{const m=stBM(r,x);return V>0&&m?V/m:null}}],
+ bench:[{n:'Relative strength',t:'1RM ÷ body weight',u:'× BW',d:2,calc:V=>V},ST1RM],legpress:[{n:'Relative strength',t:'1RM ÷ body weight',u:'× BW',d:2,calc:V=>V},ST1RM],squat:[{n:'Relative strength',t:'1RM ÷ body weight',u:'× BW',d:2,calc:V=>V},ST1RM],
+ bf:[{n:'Fat mass',t:'Body mass × body fat % ÷ 100',inp:[['bm','Body mass','kg']],u:'kg',d:1,calc:(V,x,r)=>{const m=stBM(r,x);return V>0&&m?m*V/100:null}},{n:'Fat-free mass',t:'Body mass − fat mass',u:'kg',d:1,calc:(V,x,r)=>{const m=stBM(r,x);return V>0&&m?m-m*V/100:null}}],
+ bmi:[{n:'BMI',t:'BMI = weight (kg) ÷ height (m)²',u:'kg/m²',d:1,calc:V=>V}],
+ ybt:[{n:'Composite reach',t:'(Anterior + posteromedial + posterolateral) ÷ (3 × limb length) × 100',u:'%',d:1,calc:V=>V}],
+ css:[{n:'Critical swim speed',t:'CSS = (T400 − T200) ÷ 2 per 100 m',f:'time',u:'/100 m',calc:V=>V},{n:'Threshold set pace',t:'CSS ± 2 s per 100 m',f:'time',u:'/100 m',calc:V=>V},{n:'Aerobic endurance pace',t:'CSS + 5–10 s per 100 m',f:'time',u:'/100 m',calc:V=>V?V+7:null}],
+ swim400:[{n:'Pace per 100 m',t:'Time ÷ 4',f:'time',u:'/100 m',calc:V=>V>0?V/4:null},{n:'Average speed',t:'400 m ÷ time',u:'m/s',d:2,calc:V=>V>0?400/V:null}],
+ swim50:[{n:'Average speed',t:'50 m ÷ time',u:'m/s',d:2,calc:V=>V>0?50/V:null}],
+ t30:[{n:'Threshold pace per 100 m',t:'1800 s ÷ (distance ÷ 100)',f:'time',u:'/100 m',calc:V=>V>0?1800/(V/100):null},{n:'Average speed',t:'Distance ÷ 1800 s',u:'m/s',d:2,calc:V=>V>0?V/1800:null}],
+ runa3:[{n:'Average running speed',t:'3 × 17.68 m ÷ time',u:'m/s',d:2,calc:V=>V>0?53.04/V:null}],
+ bowlspd:[{n:'Speed in m/s',t:'km/h ÷ 3.6',u:'m/s',d:1,calc:V=>V>0?V/3.6:null}],
+ erg2k:[{n:'Split per 500 m',t:'Time ÷ 4',f:'time',u:'/500 m',calc:V=>V>0?V/4:null},{n:'Average power (Concept2)',t:'Watts = 2.80 ÷ (time ÷ 2000)³',u:'W',d:0,calc:V=>V>0?2.8/Math.pow(V/2000,3):null}],
+ ftp:[{n:'FTP',t:'FTP = 0.95 × 20-min average power; W/kg = FTP ÷ body mass',u:'W/kg',d:2,calc:V=>V}],
+ sjft:[{n:'SJFT index',t:'(HR after + HR 1 min after) ÷ total throws',u:'',d:2,calc:V=>V}],
+ rhr:[{n:'Estimated HRmax (Tanaka)',t:'HRmax = 208 − 0.7 × age',u:'bpm',d:0,calc:(V,x,r)=>+r.age>0?208-0.7*r.age:null},{n:'Heart-rate reserve',t:'HRR = HRmax − resting HR',u:'bpm',d:0,calc:(V,x,r)=>V>0&&+r.age>0?208-0.7*r.age-V:null},{n:'Training HR at 70% (Karvonen)',t:'Target = resting HR + 0.70 × HRR',u:'bpm',d:0,calc:(V,x,r)=>V>0&&+r.age>0?V+0.7*(208-0.7*r.age-V):null}],
+ vo2:[{n:'METs',t:'METs = VO2max ÷ 3.5',u:'METs',d:1,calc:V=>V>0?V/3.5:null}],
+ shoulder:[{n:'Total rotation arc',t:'Internal + external rotation',u:'°',d:0,calc:V=>V}]};
+function stFxList(r,e){const t=STT[e.t];if(!t)return [];const V=stVal(t,e),v=V?V.v:null,x=e.fx||{},out=[];
+ if(!t.inp&&(t.n2||(t.time?1:3))>1){const tr=stTrials(t,e),n=tr.length,mean=n?tr.reduce((a,b)=>a+b,0)/n:null,sd=n>1?Math.sqrt(tr.reduce((a,b)=>a+(b-mean)**2,0)/(n-1)):null;
+  out.push({n:'Best trial',t:t.best==='min'?'Best = fastest (lowest) trial':'Best = highest trial',val:v,u:t.u,f:t.time?'time':'',d:2},{n:'Mean of trials',t:'Mean = sum of trials ÷ number of trials',val:n>1?mean:null,u:t.u,f:t.time?'time':'',d:2},{n:'Trial variation (CV)',t:'CV% = SD ÷ mean × 100 (under 5% = consistent)',val:n>1&&mean?sd/mean*100:null,u:'%',d:1})}
+ (STFX[e.t]||[]).forEach(f=>{let val=null;try{val=f.calc(v,x,r,e)}catch(er){}if(val!=null&&!isFinite(val))val=null;out.push(Object.assign({},f,{val}))});
+ return out}
+const stFxVal=f=>f.val==null?'—':(f.f==='time'?stMMSS(f.val):String(+(+f.val).toFixed(f.d??1)))+(f.u?' '+f.u:'');
+function stInterp(r,e,o){o=o||stEval(r,e);const{t,V,N,R,prev}=o;if(!t||!V)return null;const q=t.q;let text='',rec='';
+ if(e.cat)text='Category (assessor): '+e.cat;else if(R&&!R.err)text=fcRateText(N,R,V.v);
+ if(prev){const d=V.v-prev.v,better=stDir(t)==='lo'?d<0:d>0,pc=prev.v?Math.abs(d/prev.v*100).toFixed(1):'0';text+=(text?' · ':'')+(d?`${better?'Improved':'Declined'} ${pc}% since ${fmtDate(prev.date)}`:'No change since '+fmtDate(prev.date))}
+ if(!text)text='First test — this is the baseline.';
+ if(R&&!R.err&&!e.cat){if(R.best)rec='Excellent level — maintain with 1–2 focused sessions a week and re-test in 6–8 weeks.';else if(R.i<(R.n-1)/2)rec='Priority: '+STREC[q];else rec='Keep developing: '+STREC[q]}
+ else if(prev){const d=V.v-prev.v,better=stDir(t)==='lo'?d<0:d>0;rec=better?'Improving — keep the current plan and re-test in 6–8 weeks under the same conditions.':'Declined since the last test — '+STREC[q]}
+ else rec='Baseline recorded. '+STREC[q];
+ return {text,rec}}
+function stAutoText(r){const S=stSport(r.sport);const ok=[],low=[],mid=[],pro=[];const focus=new Set();
+ r.tests.forEach(e=>{const o=stEval(r,e);if(!o.V)return;const nm=o.t.n;if(o.cat){const R=o.R;const i=R&&!e.cat?R.i:null;
+   if(i!=null&&i<(R.n-1)/2&&!R.best){low.push(`${nm}: ${o.cat}`);focus.add(o.t.q)}else if(R&&R.best)ok.push(`${nm}: ${o.cat}`);else mid.push(`${nm}: ${o.cat}`)}
+  else if(o.prev){const d=o.V.v-o.prev.v;const better=stDir(o.t)==='lo'?d<0:d>0;pro.push(`${nm} ${better?'improved':'declined'} by ${Math.abs(d/o.prev.v*100).toFixed(1)}%`);if(!better)focus.add(o.t.q)}});
+ const nm=r.name||'The athlete';
+ const summary=[`${nm}${r.age?' ('+r.age+' y'+(r.gender?', '+r.gender.toLowerCase():'')+')':''} completed ${r.tests.filter(e=>stVal(STT[e.t],e)).length} ${S?S[1].toLowerCase():''}-specific tests on ${fmtDate(r.date)}.`,ok.length?`Strengths: ${ok.join('; ')}.`:'',mid.length?`Around the reference level: ${mid.join('; ')}.`:'',low.length?`Priority areas: ${low.join('; ')}.`:'',pro.length?`Progress since the last test: ${pro.join('; ')}.`:''].filter(Boolean).join(' ');
+ const recs=[...focus].map(q=>STREC[q]).concat(focus.size?[]:['Maintain current qualities; progress training load gradually.']).concat(['Re-test under the same conditions (time of day, surface, warm-up) in 6–8 weeks.']).join('\n');
+ return {summary,recs}}
+stAuto=function(){const r=stRec();Object.assign(r,stAutoText(r));save();render()};
+function stFxHtml(r,e,i){const L=stFxList(r,e);if(!L.length)return '';const ro=typeof roUser==='function'&&roUser(authUser());
+ return `<div class="st-fx"><div class="fc-sub" style="margin:0 0 6px">Formulas</div>${L.map((f,j)=>`<div class="st-fxr"><div><b>${esc(f.n)}</b><code>${esc(f.t)}</code>${f.inp&&!ro?`<div class="row" style="gap:6px;margin-top:4px">${f.inp.map(([k,l,u])=>`<label style="font-size:12px;display:flex;gap:4px;align-items:center">${esc(l)}<input style="width:90px;padding:5px 8px" data-p="tests.${i}.fx.${k}" value="${esc((e.fx||{})[k]??(k==='bm'?(r.bm||''):''))}" placeholder="${esc(u)}" oninput="stIn(this)"></label>`).join('')}</div>`:''}</div><span class="st-fxv" data-stfxv="${i}:${j}">${esc(stFxVal(f))}</span></div>`).join('')}</div>`}
+function stFxLive(){const r=stRec();if(!r)return;r.tests.forEach((e,i)=>stFxList(r,e).forEach((f,j)=>{const el=document.querySelector(`[data-stfxv="${i}:${j}"]`);if(el)el.textContent=stFxVal(f)}))}
+/* athlete / parent view: values, formulas, interpretation, recommendations — no protocols */
+function stPortalHtml(r){const S=stSport(r.sport)||['','Sport','🏅'];const A=r.summary||r.recs?{summary:r.summary,recs:r.recs}:stAutoText(r);
+ const rows=r.tests.map(e=>{const o=stEval(r,e);if(!o.t||!o.V)return '';const I=stInterp(r,e,o);const fx=stFxList(r,e).filter(f=>f.val!=null);
+  return `<div class="st-pt"><div class="row" style="justify-content:space-between;gap:8px"><b>${esc(o.t.n)}</b><span class="pill p-blue">${esc(STQ[o.t.q])}</span></div>
+  <div class="st-pv"><span style="font-size:22px;font-weight:800">${esc(stFmt(o.t,o.V.v))}</span> ${esc(stU(o.t,o.V.v).trim())}${o.V.x?`<div class="muted" style="font-size:12px">${esc(o.V.x)}</div>`:''}</div>
+  ${fx.length?`<div class="st-fx">${fx.map(f=>`<div class="st-fxr"><div><b>${esc(f.n)}</b><code>${esc(f.t)}</code></div><span class="st-fxv">${esc(stFxVal(f))}</span></div>`).join('')}</div>`:''}
+  <div class="st-int ${o.R&&!o.R.err?(o.R.best?'ok':o.R.i<(o.R.n-1)/2?'bad':''):''}">📊 ${esc(I.text)}</div><div class="st-rec">💡 ${esc(I.rec)}</div>
+  <details class="st-nd"><summary>Normative data &amp; reference</summary>${stNormBoth(o)}</details></div>`}).join('');
+ return `<div class="card"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><div><h3 style="margin:0">${S[2]} ${esc(S[1])} test · ${fmtDate(r.date)}</h3><div class="muted">Tested by ${esc([r.staffRole,r.staffName].filter(Boolean).join(': ')||'—')}</div></div><span data-ro-ok><button class="btn sm pri" onclick="stPdf('${r.id}')">⬇ PDF report</button></span></div>
+ <div class="st-pgrid">${rows||'<p class="muted">No results entered yet.</p>'}</div>
+ ${A.summary?`<div class="st-sum"><b>Summary</b><p>${esc(A.summary)}</p>${A.recs?`<b>Recommendations</b><ol>${A.recs.split('\n').filter(Boolean).map(l=>`<li>${esc(l)}</li>`).join('')}</ol>`:''}</div>`:''}</div>`}
+/* ---------- additional published normative tables ---------- */
+STN.push(
+ {id:'sbj',n:'Standing broad jump',q:5,es:'atp',u:'cm',dir:'hi',L:['Very poor','Poor','Below average','Average','Above average','Very good','Excellent'],ref:'Topend Sports — Standing Long Jump Test, adult rating scale (Wood R.). topendsports.com/testing/tests/longjump.htm',B:[{s:'M',a:[0,120],c:[191,211,221,231,241,251]},{s:'F',a:[0,120],c:[141,161,171,181,191,201]}]},
+ {id:'hex',n:'Hexagon agility test',q:4,es:'atp',u:'s',dir:'lo',L:['Poor','Below average','Average','Above average','Excellent'],ref:'Arnot & Gaines (1984) national norms for 16–19-year-olds, as published by BrianMac Sports Coach and Topend Sports (hexagon test).',B:[{s:'M',a:[0,120],c:[11.19,13.3,15.5,17.8]},{s:'F',a:[0,120],c:[12.19,14.3,16.5,18.8]}]},
+ {id:'pullup',n:'Pull-ups',q:7,es:'gly',u:'reps',dir:'hi',L:['Very poor','Poor','Fair','Average','Good','Excellent','Elite'],ref:'Topend Sports — Pull-Up Test Norms (general guide table by R. Wood, based on coaching experience). topendsports.com/testing/norms/pull-up.htm',B:[{s:'M',a:[0,120],c:[1,2,5,8,14,21]},{s:'F',a:[0,120],c:[1,1,2,5,10,15]}]},
+ {id:'plank',n:'Prone plank hold',q:7,es:'gly',u:'s',dir:'hi',L:['Very poor','Poor','Below average','Average','Above average','Very good','Excellent'],ref:'Topend Sports — Plank (prone bridge) test rating scale. topendsports.com/testing/tests/plank.htm',B:[{s:'A',a:[0,120],c:[15,30,60,120,240,361]}]},
+ {id:'ftp',n:'Functional threshold power',q:11,es:'aer',u:'W/kg',dir:'hi',L:['Untrained','Fair','Good','Excellent','Superior'],ref:'Allen H. & Coggan A. (2010) Training and Racing with a Power Meter (VeloPress) — FTP W/kg classification, as used by Garmin.',B:[{s:'M',a:[0,120],c:[2.23,2.79,3.93,5.05]},{s:'F',a:[0,120],c:[1.90,2.36,3.33,4.30]}]},
+ {id:'sjft',n:'Special Judo Fitness Test index',q:11,es:'gly',u:'',dir:'lo',L:['Very poor','Poor','Regular','Good','Excellent'],ref:'Sterkowicz-Przybycień K., Fukuda D.H. & Franchini E. (2019) Meta-analysis to determine normative values for the SJFT in male athletes. Sports 7(8):194. (Male norms; no female table here.)',B:[{s:'M',a:[0,21],c:[11.04,12.23,14.73,15.92]},{s:'M',a:[22,120],c:[10.47,11.68,14.22,15.43]}]},
+ {id:'s10',n:'10 m sprint (male club-level team sport)',q:3,es:'atp',u:'s',dir:'lo',L:['Below average','Average','Good','Advanced','Elite'],ref:'OVR Performance — 10-yard/10 m sprint benchmarks, men\'s high-school / club soccer (electronic timing). Male team-sport reference only; timing method strongly affects short-sprint times.',B:[{s:'M',a:[0,120],c:[1.59,1.66,1.74,1.90]}]},
+ {id:'sqr',n:'Back squat 1RM ÷ body weight',q:6,es:'mix',u:'× BW',dir:'hi',L:['Below beginner','Beginner','Novice','Intermediate','Advanced','Elite'],ref:'BarBend squat strength standards (1RM as a multiple of body weight).',B:[{s:'M',a:[0,120],c:[0.80,1.15,1.45,1.80,2.45]},{s:'F',a:[0,120],c:[0.40,0.85,1.00,1.35,1.80]}]},
+ {id:'erg2k',n:'2000 m ergometer',q:11,es:'aer',u:'s',fmt:'time',dir:'lo',L:['Below novice','Novice','Intermediate','Advanced','Elite'],ref:'Concept2 logbook-based 2000 m standards by age group (BOXROX summary of Concept2 rankings).',B:[
+  {s:'M',a:[0,29],c:[355,385,425,480]},{s:'M',a:[30,39],c:[365,395,435,495]},{s:'M',a:[40,49],c:[375,405,450,510]},{s:'M',a:[50,59],c:[390,420,468,530]},{s:'M',a:[60,120],c:[410,440,490,555]},
+  {s:'F',a:[0,29],c:[410,450,495,550]},{s:'F',a:[30,39],c:[420,460,505,565]},{s:'F',a:[40,49],c:[432,472,520,580]},{s:'F',a:[50,59],c:[450,490,540,600]},{s:'F',a:[60,120],c:[470,515,565,630]}]},
+ {id:'bowlcr',n:'Cricket pace-bowling speed',q:11,es:'atp',u:'km/h',dir:'hi',L:['Slow','Medium','Medium-fast','Fast-medium','Fast'],ref:'Pace-bowler speed classification (Sport Singapore / ActiveSG cricket guide): fast > 142, fast-medium 130–141, medium-fast 120–129, medium 96–119, slow < 96 km/h.',B:[{s:'A',a:[0,120],c:[96,120,130,142]}]},
+ {id:'lane',n:'Lane agility drill',q:4,es:'atp',u:'s',dir:'lo',L:['Below combine range','Centre range','Forward range','Guard range','Elite prospect'],ref:'NBA Draft Combine reference values (Topend Sports lane agility drill): guards 10.2–10.9 s, forwards 11.0–11.4 s, centres 11.5–12.3 s; elite prospects under 10.5 s. Male players.',B:[{s:'M',a:[0,120],c:[10.49,10.99,11.49,12.3]}]},
+ {id:'trm',n:'Shoulder total rotation deficit',q:10,es:'na',u:'°',dir:'lo',L:['Increased injury risk (deficit > 5°)','Acceptable (≤ 5°)'],ref:'Wilk K.E. et al. (2011) Am J Sports Med 39(2):329-35 — total rotational motion deficit > 5° vs the other shoulder linked with higher injury rates in pitchers.',B:[{s:'A',a:[0,120],c:[5]}]},
+ {id:'css',n:'Critical swim speed',q:11,es:'aer',u:'s/100 m',fmt:'time',dir:'lo',L:['Below average','Average','Good','Excellent','Elite'],ref:'Topend Sports — Critical Swim Speed categories: elite < 1:02, excellent 1:02–1:11, good 1:11–1:23, average 1:23–1:40, below average > 1:40 per 100 m.',B:[{s:'A',a:[0,120],c:[62,71,83,100]}]},
+ {id:'t30',n:'T-30 swim distance',q:11,es:'aer',u:'m',dir:'hi',L:['Below average','Average','Good','Excellent','Elite'],ref:'Derived from the Topend Sports critical-swim-speed categories (T-30 and CSS both estimate threshold pace): distance = 1800 s ÷ pace × 100.',B:[{s:'A',a:[0,120],c:[1800,2169,2536,2904]}]},
+ {id:'rsa',n:'Repeated-sprint decrement',q:2,es:'gly',u:'%',dir:'lo',L:['Substantial fatigue (> 10%)','Below substantial-fatigue level (≤ 10%)'],ref:'Girard O., Mendez-Villanueva A. & Bishop D. (2011) Sports Med 41(8):673-94; sprint decrement > 10% indicates substantial fatigue (Billaut et al.).',B:[{s:'A',a:[0,120],c:[10]}]});
+Object.assign(STT.sbj,{nid:'sbj'});Object.assign(STT.hexagon,{nid:'hex'});Object.assign(STT.pullup,{nid:'pullup'});Object.assign(STT.plank,{nid:'plank'});Object.assign(STT.ftp,{nid:'ftp'});Object.assign(STT.sjft,{nid:'sjft'});
+Object.assign(STT.s10,{nid:'s10'});Object.assign(STT.squat,{nid:'sqr'});Object.assign(STT.erg2k,{nid:'erg2k'});Object.assign(STT.lane,{nid:'lane'});Object.assign(STT.css,{nid:'css'});Object.assign(STT.t30,{nid:'t30'});Object.assign(STT.rsa,{nid:'rsa'});
+STT.bowlspd.nidBy={cricket:'bowlcr'};
+/* shoulder: both sides so the total-rotation deficit can be rated */
+Object.assign(STT.shoulder,{n:'Shoulder rotation ROM (total-arc deficit)',u:'°',nid:'trm',inp:[['ir','Dominant / throwing IR','°'],['er','Dominant / throwing ER','°'],['ir2','Other side IR','°'],['er2','Other side ER','°']],
+ calc:v=>{const a=(+v.ir||0)+(+v.er||0),b=(+v.ir2||0)+(+v.er2||0);if(!a||!b)return null;return {v:b-a,x:`Total arc ${a}° (dominant) vs ${b}° (other side) · IR difference ${(+v.ir2||0)-(+v.ir||0)}° (GIRD if ≥ 20°)`}},
+ p:stP('Shoulder rotation range and side-to-side deficit.','Goniometer or inclinometer, plinth.',['Supine, shoulder at 90° abduction, elbow 90°.','Measure passive internal (IR) and external (ER) rotation on both shoulders.','Total arc = IR + ER for each side.'],'Deficit = other-side total arc − dominant total arc (positive = dominant shoulder has lost motion).')});
+STFX.shoulder=[{n:'Total-arc deficit',t:'(other IR + other ER) − (dominant IR + dominant ER)',u:'°',d:0,calc:V=>V},{n:'IR deficit (GIRD)',t:'Other-side IR − dominant IR (≥ 20° = GIRD)',u:'°',d:0,calc:(V,x,r,e)=>{const i=e.inp||{};return +i.ir2&&+i.ir?i.ir2-i.ir:null}}];
+const stNid=(t,r)=>(t.nidBy&&r&&t.nidBy[r.sport])||t.nid;
+{const _ev=stEval;stEval=function(r,e){const t=STT[e.t];if(!t||!t.nidBy)return _ev(r,e);const n0=t.nid;t.nid=stNid(t,r);try{return _ev(r,e)}finally{t.nid=n0}}}
+/* normative data table (all groups) + reference */
+const stNF=(N,x)=>N.fmt==='time'?stMMSS(x):String(+(+x).toFixed(2));
+function stNormRows(N,b){const c=b.c,L=N.L,f=x=>stNF(N,x),out=[];
+ if(N.dir==='lo'){for(let k=0;k<L.length;k++){const l=L[L.length-1-k];out.push([l,k===0?`≤ ${f(c[0])}`:k===L.length-1?`> ${f(c[k-1])}`:`${f(c[k-1])} – ${f(c[k])}`])}}
+ else{for(let i=L.length-1;i>=0;i--){if(i>0&&i<L.length-1&&c[i-1]>=c[i])continue;out.push([L[i],i===0?`< ${f(c[0])}`:i===L.length-1?`≥ ${f(c[i-1])}`:`${f(c[i-1])} – < ${f(c[i])}`])}}
+ return out}
+const stGrp=b=>(b.s==='A'?'All':b.s==='M'?'Men':'Women')+(b.a[0]<=0&&b.a[1]>=120?'':b.a[0]<=0?` ≤ ${b.a[1]} y`:b.a[1]>=120?` ${b.a[0]}+ y`:` ${b.a[0]}–${b.a[1]} y`);
+function stNormHtml(N,R,ctx){if(!N)return `<div class="st-norm"><div class="fc-sub" style="margin:0 0 4px">Normative data</div><p class="muted" style="margin:0;font-size:13px">No published universal normative table for this test — results are interpreted against the athlete's previous tests (change and % change).</p></div>`;
+ const hb=R&&!R.err?R.band:null,lab=R&&!R.err?R.lab:null;const rows=N.L.map(l=>l);const cols=N.B;
+ const cell={};cols.forEach((b,j)=>stNormRows(N,b).forEach(([l,rg])=>{(cell[l]=cell[l]||[])[j]=rg}));
+ const order=stNormRows(N,cols[0]).map(x=>x[0]).concat(N.L.slice().reverse().filter(l=>!stNormRows(N,cols[0]).some(x=>x[0]===l)));
+ return `<div class="st-norm"><div class="fc-sub" style="margin:0 0 6px">Normative data${N.u?` (${esc(N.u)})`:''}</div><div style="overflow:auto"><table class="st-nt"><thead><tr><th>Category</th>${cols.map(b=>`<th class="${b===hb?'hl':''}">${esc(stGrp(b))}</th>`).join('')}</tr></thead>
+ <tbody>${order.filter(l=>cell[l]).map(l=>`<tr class="${l===lab?'hl':''}"><td><b>${esc(l)}</b></td>${cols.map((b,j)=>`<td class="${b===hb?'hl':''}">${esc((cell[l]||[])[j]||'—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+ <p class="st-ref">Reference: ${esc(N.ref)}</p></div>`}
+stNormTable=function(N){return stNormHtml(N,null)};
+/* ---------- Under-18 vs 18+ normative data ---------- */
+const STREF={
+ chms:'Hoffmann M.D., Colley R.C., Doyon C.Y., Wong S.L., Tomkinson G.R. & Lang J.J. (2019) Normative-referenced percentile values for physical fitness among Canadians. Health Reports 30(10):14–22, Statistics Canada (Canadian Health Measures Survey, nationally representative). doi:10.25318/82-003-x201901000002-eng.',
+ fitback:'Ortega F.B., Leskošek B., Blagus R., … Tomkinson G.R., … Jurak G. (2023) European fitness landscape for children and adolescents: updated reference values, fitness maps and country rankings based on nearly 8 million test results from 34 countries gathered by the FitBack network. Br J Sports Med 57:299–310, Table 3. doi:10.1136/bjsports-2022-106176.',
+ nowak:'Nowak M., Szymanek-Pilarczyk M., Stolarczyk A., Oleksy Ł., Muracki J. & Wąsik J. (2025) Normative and limit values of speed, endurance and power tests results of young football players. Front Physiol 15:1502694 (495 male academy players aged 12–16, photocell timing). doi:10.3389/fphys.2024.1502694.',
+ iotf:'Cole T.J., Bellizzi M.C., Flegal K.M. & Dietz W.H. (2000) Establishing a standard definition for child overweight and obesity worldwide. BMJ 320:1240; Cole T.J. et al. (2007) BMI cut-offs to define thinness in children and adolescents. BMJ 335:194 (IOTF cut-offs, equivalent to adult BMI 18.5 / 25 / 30).',
+ fg:'The Cooper Institute — FITNESSGRAM Healthy Fitness Zone standards for percent body fat (Laurson K.R., Eisenmann J.C. & Welk G.J. (2011) Am J Prev Med 41(4 Suppl 2):S93–S99).'};
+const Q5=['Needs improvement','Fair','Good','Very good','Excellent'],Q5b=['Very poor','Poor','Average','Good','Excellent'],P6=['Very poor (< P10)','Poor (P10–25)','Below median (P25–50)','Above median (P50–75)','Good (P75–90)','Excellent (≥ P90)'];
+const stQ=(s,a,c)=>({s,a,c});
+const STY={
+ grip:{L:Q5,ref:STREF.chms+' Table 1 — total grip (best right + best left). Categories = quintiles: P20 / P40 / P60 / P80.',B:[stQ('M',[0,13],[42.8,49.5,55.2,62.1]),stQ('M',[14,15],[54.2,62.2,68.8,77.1]),stQ('M',[16,17],[63.4,72.3,79.6,88.8]),stQ('F',[0,13],[34.3,39.0,43.0,48.0]),stQ('F',[14,15],[39.1,44.2,48.6,54.1]),stQ('F',[16,17],[42.4,47.8,52.5,58.3])]},
+ vo2:{L:['Poor','Fair','Good','Excellent','Superior'],ref:STREF.chms+' Table 2 — VO2max (mCAFT). Categories = quintiles: P20 / P40 / P60 / P80.',B:[stQ('M',[0,13],[46.0,48.8,51.4,54.3]),stQ('M',[14,15],[45.0,48.1,51.0,54.1]),stQ('M',[16,17],[44.0,47.3,50.4,53.8]),stQ('F',[0,13],[42.5,44.8,47.0,49.7]),stQ('F',[14,15],[40.9,43.1,45.2,47.9]),stQ('F',[16,17],[39.6,41.8,43.8,46.4])]},
+ sitreach:{L:Q5,ref:STREF.chms+' Table 3 — sit-and-reach, toe line = 26 cm. Categories = quintiles: P20 / P40 / P60 / P80.',B:[stQ('M',[0,13],[15.7,21.6,27.0,32.7]),stQ('M',[14,15],[15.6,21.6,27.1,33.0]),stQ('M',[16,17],[15.6,21.6,27.3,33.2]),stQ('F',[0,13],[23.5,28.9,33.1,38.1]),stQ('F',[14,15],[23.4,28.9,33.1,38.2]),stQ('F',[16,17],[23.3,28.8,33.2,38.4])]},
+ vj:{L:Q5b,ref:STREF.chms+' Table 4 — countermovement jump height on a force plate, arm swing allowed. Categories = quintiles: P20 / P40 / P60 / P80.',B:[stQ('M',[0,13],[33.6,38.0,41.8,46.3]),stQ('M',[14,15],[37.0,41.9,46.1,51.0]),stQ('M',[16,17],[39.3,44.7,49.2,54.3]),stQ('F',[0,13],[30.0,33.4,36.3,39.7]),stQ('F',[14,15],[29.9,33.3,36.2,39.7]),stQ('F',[16,17],[28.9,32.3,35.2,38.7])],adultRef:'Ages 18–19: Davis B. et al. (2000) Physical Education and the Study of Sport — national norms for 16–19-year-olds. Ages 20+: Topend Sports vertical jump rating scale (R. Wood, practitioner guide).'},
+ sbj:{L:Q5b,ref:STREF.fitback+' Categories = quintiles: P20 / P40 / P60 / P80.',B:[
+  stQ('M',[0,12],[138.1,153.4,166.2,181.1]),stQ('M',[13,13],[150.0,166.5,180.1,196.0]),stQ('M',[14,14],[162.1,179.6,194.0,210.7]),stQ('M',[15,15],[171.5,189.6,204.4,221.4]),stQ('M',[16,16],[177.7,195.9,210.8,227.8]),stQ('M',[17,17],[182.2,200.4,215.1,231.8]),
+  stQ('F',[0,12],[126.9,141.6,154.1,169.1]),stQ('F',[13,13],[131.9,147.2,160.3,175.8]),stQ('F',[14,14],[134.4,150.1,163.5,179.4]),stQ('F',[15,15],[134.8,150.5,163.9,179.7]),stQ('F',[16,16],[134.2,149.8,163.1,178.6]),stQ('F',[17,17],[134.7,150.3,163.3,178.6])]},
+ s10:{L:P6,dir:'lo',ref:STREF.nowak+' 10 m sprint percentiles P10–P90 (ages 16–17 use the 16-year table). Male football players only.',B:[stQ('M',[0,12],[1.873,1.928,1.984,2.059,2.102]),stQ('M',[13,13],[1.812,1.869,1.935,2.009,2.115]),stQ('M',[14,14],[1.746,1.788,1.842,1.900,1.967]),stQ('M',[15,15],[1.719,1.764,1.803,1.864,1.937]),stQ('M',[16,17],[1.690,1.729,1.788,1.844,1.904])]},
+ s30:{L:P6,dir:'lo',ref:STREF.nowak+' 30 m sprint percentiles P10–P90 (ages 16–17 use the 16-year table). Male football players only.',B:[stQ('M',[0,12],[4.554,4.683,4.862,4.974,5.063]),stQ('M',[13,13],[4.352,4.484,4.650,4.809,4.963]),stQ('M',[14,14],[4.170,4.282,4.372,4.500,4.663]),stQ('M',[15,15],[4.122,4.172,4.268,4.348,4.461]),stQ('M',[16,17],[4.046,4.123,4.220,4.315,4.462])]},
+ vift:{L:P6,dir:'hi',ref:STREF.nowak+' 30-15 IFT percentiles P10–P90. The paper reports MAS = 0.8 × VIFT in m/s; converted here to VIFT in km/h (MAS × 4.5). Male football players only.',B:[stQ('M',[0,12],[18.5,18.9,19.4,20.7,21.2]),stQ('M',[13,13],[18.9,19.4,19.8,21.2,21.6]),stQ('M',[14,14],[18.9,19.8,21.2,22.1,22.5]),stQ('M',[15,15],[18.9,20.7,21.6,22.1,23.0]),stQ('M',[16,17],[19.8,21.2,22.1,22.5,23.0])]},
+ bmi:{L:['Thinness','Normal weight','Overweight','Obese'],dir:'cat',best:1,u:'kg/m²',ref:STREF.iotf,B:[
+  stQ('M',[0,12],[15.35,21.22,26.02]),stQ('M',[13,13],[15.84,21.91,26.84]),stQ('M',[14,14],[16.41,22.62,27.63]),stQ('M',[15,15],[16.98,23.29,28.30]),stQ('M',[16,16],[17.54,23.90,28.88]),stQ('M',[17,17],[18.05,24.46,29.41]),
+  stQ('F',[0,12],[15.62,21.68,26.67]),stQ('F',[13,13],[16.26,22.58,27.76]),stQ('F',[14,14],[16.88,23.34,28.57]),stQ('F',[15,15],[17.45,23.94,29.11]),stQ('F',[16,16],[17.91,24.37,29.43]),stQ('F',[17,17],[18.25,24.70,29.69])]},
+ bf:{L:['Very lean','Healthy Fitness Zone','Needs improvement','Needs improvement – health risk'],dir:'cat',best:1,ref:STREF.fg,B:[
+  stQ('M',[0,12],[8.4,23.7,35.9]),stQ('M',[13,13],[7.8,22.9,35.0]),stQ('M',[14,14],[7.1,21.4,33.2]),stQ('M',[15,15],[6.6,20.2,31.5]),stQ('M',[16,16],[6.5,20.2,31.6]),stQ('M',[17,17],[6.7,21.0,33.0]),
+  stQ('F',[0,12],[12.7,26.8,35.5]),stQ('F',[13,13],[13.4,27.8,36.3]),stQ('F',[14,14],[14.0,28.6,36.8]),stQ('F',[15,15],[14.6,29.2,37.1]),stQ('F',[16,16],[15.3,29.8,37.4]),stQ('F',[17,17],[15.9,30.5,37.9])]},
+ pushup:{ref:'Canadian Society for Exercise Physiology — CSEP-PATH push-up norms, 15–19-year column (boys: standard push-ups; girls: modified knee push-ups), reprinted in ACSM\'s Guidelines for Exercise Testing and Prescription.',from:19},
+ bench:{ref:'The Cooper Institute / ACSM\'s Guidelines for Exercise Testing and Prescription — 1RM bench press ÷ body weight, age < 20 column.',from:19},
+ cooper:{ref:'Cooper K.H. (1968/1982) 12-minute run fitness categories, 13–19-year table (as reproduced by Topend Sports / BrianMac).',from:19},
+ illinois:{same:1,ref:'Davis B. et al. (2000) Physical Education and the Study of Sport — Illinois agility national norms for 16–19-year-olds. The same table is the most widely cited adult reference; no separate adult study exists.'},
+ hex:{same:1,ref:'Arnot R. & Gaines C. (1984) Sports Talent — hexagon test norms for 16–19-year-olds. No separate adult table has been published; the same values are used for 18+.'},
+ ybt:{same:1,ref:'Plisky P.J., Rauh M.J., Kaminski T.W. & Underwood F.B. (2006) Star Excursion Balance Test as a predictor of lower extremity injury in high school basketball players. J Orthop Sports Phys Ther 36(12):911–919 — composite < 94% of limb length linked with higher injury risk (validated in high-school athletes).'},
+ rhr:{same:1,ref:'MedlinePlus (U.S. National Library of Medicine) — normal resting heart rate for children aged 10 years and older and adults: 60–100 beats per minute.'},
+ rsa:{same:1,ref:'Girard O., Mendez-Villanueva A. & Bishop D. (2011) Sports Med 41(8):673–694 — the > 10% sprint-decrement fatigue threshold is a test-derived criterion, not an age-specific norm, and is applied to both age groups.'},
+ sjft:{L:['Very poor','Poor','Regular','Good','Excellent'],ref:'Sterkowicz-Przybycień K., Fukuda D.H. & Franchini E. (2019) Sports 7(8):194 — JUNIOR male judoka table (judo junior category, under 21 years). No separate cadet (under-18) table has been published. Male only.',B:[stQ('M',[0,17],[11.04,12.23,14.73,15.92])],adultB:[stQ('M',[18,120],[10.47,11.68,14.22,15.43])],adultRef:'Sterkowicz-Przybycień K., Fukuda D.H. & Franchini E. (2019) Sports 7(8):194 — SENIOR male judoka table. Male only.'},
+ yyir1:{L:['Well below (< −1 SD)','Below average','Average','Above average','Well above (> +1 SD)'],ref:'Deprez D., Fransen J., Lenoir M., Philippaerts R.M. & Vaeyens R. (2015) The Yo-Yo intermittent recovery test level 1 is reliable in young high-level soccer players. Biol Sport 32(1):65–70 — U15 2024 ± 470 m, U17 2404 ± 347 m, U19 2547 ± 337 m. Bands = mean ± 0.5 SD and ± 1 SD of high-level male youth players (not a population percentile table).',B:[stQ('M',[0,14],[1554,1789,2259,2494]),stQ('M',[15,16],[2057,2231,2578,2751]),stQ('M',[17,17],[2210,2379,2716,2884])]}
+};
+const stYouth=r=>{const a=fcNum(r&&r.age);return a!=null&&a<18};
+function stView(N,youth){if(!N)return null;const Y=STY[N.id];
+ if(youth){if(!Y)return null;
+  if(Y.same)return Object.assign({},N,{ref:Y.ref,youth:1,B:N.B.map(b=>Object.assign({},b,{a:[0,17]}))});
+  if(Y.from)return Object.assign({},N,{ref:Y.ref,youth:1,B:N.B.filter(b=>b.a[1]<=Y.from).map(b=>Object.assign({},b,{a:[0,17]}))});
+  return Object.assign({},N,{L:Y.L||N.L,dir:Y.dir||N.dir,best:Y.best!=null?Y.best:N.best,u:Y.u||N.u,ref:Y.ref,B:Y.B,youth:1})}
+ let B=Y&&Y.adultB?Y.adultB:N.B.filter(b=>!(Y&&Y.from&&b.a[1]<=Y.from)&&!(b.a[1]<18));
+ B=B.map(b=>b.a[0]<=20&&b.a[1]>=20?Object.assign({},b,{a:[18,b.a[1]]}):b.a[0]<18?Object.assign({},b,{a:[18,b.a[1]]}):b);if(!B.length)return null;
+ let ref=(Y&&Y.adultRef)||N.ref;if(Y&&Y.same)ref=Y.ref;
+ return Object.assign({},N,{B,ref,adult:1})}
+{const _ev0=stEval;stEval=function(r,e){const o=_ev0(r,e);const t=o.t;if(!t)return o;const N0=(t.nidBy||t.nid)?stNorm(stNid(t,r)):null;
+ const NY=stView(N0,1),NA=stView(N0,0),y=stYouth(r),N=y?NY:NA;let R=null;
+ if(o.V&&N){R=fcRate(N,o.V.v,r.gender,fcNum(r.age));if(R&&!R.err&&y)R.grp=R.grp.replace('women','girls').replace(/\bmen\b/,'boys').replace('all adults','all under-18s')}
+ return Object.assign(o,{N,R,NY,NA,youth:y,cat:e.cat||(R&&!R.err?R.lab:'')})}}
+const stGrp2=(b,y)=>(b.s==='A'?'All':b.s==='M'?(y?'Boys':'Men'):(y?'Girls':'Women'))+(y?(b.a[0]<=0&&b.a[1]>=17?' (under 18)':b.a[0]<=0?` ≤ ${b.a[1]} y`:b.a[0]===b.a[1]?` ${b.a[0]} y`:` ${b.a[0]}–${b.a[1]} y`):(b.a[1]>=120?(b.a[0]<=18?' (18+)':` ${b.a[0]}+ y`):` ${b.a[0]}–${b.a[1]} y`));
+function stNormTbl(N,R,y,active){const hb=active&&R&&!R.err?R.band:null,lab=active&&R&&!R.err?R.lab:null,cols=N.B;
+ const order=N.L.slice().reverse();const cell={};cols.forEach((b,j)=>stNormRows(N,b).forEach(([l,rg])=>{(cell[l]=cell[l]||[])[j]=rg}));const ls=order.filter(l=>cell[l]);
+ if(cols.length<=3)return `<div style="overflow:auto"><table class="st-nt"><thead><tr><th>Category</th>${cols.map(b=>`<th class="${b===hb?'hl':''}">${esc(stGrp2(b,y))}</th>`).join('')}</tr></thead><tbody>${ls.map(l=>`<tr class="${l===lab?'hl':''}"><td><b>${esc(l)}</b></td>${cols.map((b,j)=>`<td class="${b===hb?'hl':''}">${esc(cell[l][j]||'—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+ return `<div style="overflow:auto"><table class="st-nt"><thead><tr><th>Group</th>${ls.map(l=>`<th class="${l===lab?'hl':''}">${esc(l)}</th>`).join('')}</tr></thead><tbody>${cols.map((b,j)=>`<tr class="${b===hb?'hl':''}"><td><b>${esc(stGrp2(b,y))}</b></td>${ls.map(l=>`<td class="${b===hb&&l===lab?'hx':''}">${esc(cell[l][j]||'—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
+function stNormBoth(o){const R=o.R,y=o.youth;const sec=(N,isY,title)=>{const act=R&&y===isY;
+ const body=N?`${stNormTbl(N,R,isY,act)}<p class="st-ref">Reference: ${esc(N.ref)}</p>`:`<p class="muted" style="margin:0;font-size:13px">${isY?'No validated, published under-18 normative table exists for this test. Under-18 results are therefore interpreted against the athlete\'s own previous tests (change and % change) — adult values are not applied to under-18s.':'No validated, published adult normative table exists for this test — results are interpreted against the athlete\'s own previous tests (change and % change).'}</p>`;
+ return `<div class="st-norm${act?' on':''}"><div class="fc-sub" style="margin:0 0 6px">${title}${N&&N.u?` <span class="muted">(${esc(N.u)})</span>`:''}${act?' <span class="pill p-blue">athlete\'s group</span>':''}</div>${body}</div>`};
+ return sec(o.NY,true,'Normative data — Under 18 years')+sec(o.NA,false,'Normative data — 18 years and above')}
+stNormHtml=function(N,R){return stNormBoth({R,NY:N&&N.youth?N:null,NA:N&&!N.youth?N:null,youth:!!(N&&N.youth)})};
+stProtoCard=(function(f){return function(tid){let h=f(tid);const t=STT[tid];if(!t)return h;const N0=t.nid?stNorm(t.nid):null;
+ const i=h.lastIndexOf('<div class="fc-sub">Normative data</div>');const j=h.lastIndexOf('<p class="muted" style="font-size:13px">No universal');const k=i>=0?i:j;if(k<0)return h;
+ return h.slice(0,k)+`<div class="fc-sub">Normative data</div>${stNormBoth({NY:stView(N0,1),NA:stView(N0,0)})}${t.nidBy?`<p class="muted" style="font-size:12px">${esc(Object.keys(t.nidBy).map(s=>(stSport(s)||[0,s])[1]+': '+stNorm(t.nidBy[s]).n).join(' · '))} table is used for that sport.</p>`:''}</details>`}})(stProtoCard);
+/* ---------- additional norms (plank adult, medicine-ball youth) ---------- */
+STN.push({id:'mbt',n:'Seated medicine-ball throw (2 kg)',q:5,es:'atp',u:'m',dir:'hi',L:['Below average (< P25)','Low-average (P25–50)','High-average (P50–75)','Above average (≥ P75)'],ref:'',B:[stQ('M',[0,13],[3.9,4.2,5.0]),stQ('M',[14,17],[4.3,5.0,5.8]),stQ('F',[0,13],[3.0,3.3,3.3]),stQ('F',[14,17],[3.3,3.6,4.0])]});
+STT.mbthrow.nid='mbt';
+STY.mbt={L:['Below average (< P25)','Low-average (P25–50)','High-average (P50–75)','Above average (≥ P75)'],ref:'Biggar C., Larson A. & DeBeliso M. (2022) Establishing normative reference values for the Utah seated medicine ball throw protocol in adolescents. The Sport Journal — 2 kg ball, seated with back against a wall, MEAN of 3 chest-pass throws; percentiles P25/P50/P75 for 12–13 and 14–15 y (14–15 table applied to 16–17 y). LOW evidence level: small sample (n ≈ 110) from one school; valid only when the same protocol is used.',B:STN.find(x=>x.id==='mbt').B};
+STY.plank={noY:1,adultL:['Very poor (< P20)','Poor (P20–40)','Average (P40–60)','Good (P60–80)','Excellent (≥ P80)'],adultB:[stQ('M',[18,120],[79,97,122,157]),stQ('F',[18,120],[48,63,84,108])],adultRef:'Strand S.L., Hjelm J., Shoepe T.C. & Fajardo M.A. (2014) Norms for an isometric muscle endurance test. J Hum Kinet 40:93–102 (forearm plank, 471 US college students, mean age ≈ 20 y). Categories = quintiles P20/P40/P60/P80. The authors note the percentiles need confirmation before generalisation to other populations.'};
+{const _sv=stView;stView=function(N,youth){if(N&&STY[N.id]&&STY[N.id].noY){const Y=STY[N.id];if(youth)return null;return Object.assign({},N,{L:Y.adultL||N.L,B:Y.adultB,ref:Y.adultRef,adult:1})}return _sv(N,youth)}}
+/* World Aquatics points for swim tests */
+const STSWB={M:{50:20.91,400:219.96},F:{50:23.61,400:234.18}};
+const stWAP=(t,d,r)=>{const s=/^f/i.test(r&&r.gender||'')?'F':'M';const B=STSWB[s][d];return t>0?Math.round(1000*Math.pow(B/t,3)):null};
+STFX.swim50=(STFX.swim50||[]).concat([{n:'World Aquatics points (50 m freestyle, LCM)',t:'1000 × (base time ÷ swim time)³ — base 2026 LCM: men 20.91 s, women 23.61 s',u:'pts',d:0,calc:(V,x,r)=>stWAP(V,50,r)}]);
+STFX.swim400=(STFX.swim400||[]).concat([{n:'World Aquatics points (400 m freestyle, LCM)',t:'1000 × (base time ÷ swim time)³ — base 2026 LCM: men 219.96 s, women 234.18 s',u:'pts',d:0,calc:(V,x,r)=>stWAP(V,400,r)}]);
+/* ---------- measurement properties (validity, reliability, error, agreement) ---------- */
+const PK=[['pop','Population studied'],['rel','Test–retest reliability'],['intra','Intra-rater reliability'],['inter','Inter-rater reliability / objectivity'],['err','Measurement error (SEM · MDC · CV · TE)'],['ba','Agreement (Bland–Altman / limits of agreement)'],['val','Validity'],['ss','Sensitivity & specificity'],['resp','Responsiveness / usefulness (SWC)']];
+const YOYO={pop:'Adult male soccer players (Krustrup 2003); high-level male youth soccer U15–U19, n = 36 (Deprez 2015).',rel:'Adults: test–retest CV 4.9%. Youth: ICC 0.87–0.95, CV 3.0–7.5%.',err:'Youth: typical error 74–172 m.',ba:'Youth: limits of agreement with Bland–Altman plots reported (Deprez 2015).',val:'Yo-Yo distance correlated with high-intensity running in matches (r = 0.71); not with VO2max or treadmill performance.',resp:'Pre-season: Yo-Yo performance improved 25 ± 6% vs VO2max 7 ± 1% — highly sensitive to training.',refs:['Krustrup P. et al. (2003) Med Sci Sports Exerc 35(4):697–705. doi:10.1249/01.MSS.0000058441.94520.32','Deprez D. et al. (2015) Biol Sport 32(1):65–70. doi:10.5604/20831862.1127284']};
+const SPR={pop:'Adolescent rugby players (Darrall-Jones 2016); elite soccer players (Haugen 2014); highly trained male team-sport athletes (Holmberg 2025).',rel:'CV: 10 m 3.1%, 20 m 1.8%, 30 m 2.0%, 40 m 1.3% (adolescents, single-beam gates). Highly trained adults, 20 m: ICC 0.89–0.95, CV 0.52–1.36%.',err:'Typical variation for repeated 20 m sprints ≈ 0.025 s (CV 0.8–1.0%) with dual-beam timing.',val:'Timing method decides validity: manual timing and single-beam photocells should be avoided over 10–20 m (large absolute errors); dual-beam photocells, laser or high-speed video are the accurate methods.',resp:'Adolescents: typical error larger than the smallest worthwhile change (0.2 × SD) — usefulness rated "marginal"; look for changes larger than the TE.',refs:['Haugen T. & Buchheit M. (2016) Sprint running performance monitoring: methodological and practical considerations. Sports Med 46(5):641–656. doi:10.1007/s40279-015-0446-0','Darrall-Jones J., Jones B., Roe G. & Till K. (2016) Reliability and usefulness of linear sprint testing in adolescent rugby union and league players. J Strength Cond Res','Holmberg P.M., Olivier M.H. & Kelly V.G. (2025) Sensors 25(7):2077. doi:10.3390/s25072077']};
+const RM1={pop:'Systematic review: 32 studies, pooled n = 1595 (trained and untrained, both sexes, different ages).',rel:'ICC 0.64–0.99, median 0.97; 92% of ICCs ≥ 0.90 — good to excellent regardless of training experience, exercise, body part, sex or age.',err:'CV < 5% is generally deemed acceptable; most studies met it.',val:'1RM is the field reference standard for dynamic maximal strength.',refs:['Grgic J., Lazinica B., Schoenfeld B.J. & Pedisic Z. (2020) Test–retest reliability of the one-repetition maximum (1RM) strength assessment: a systematic review. Sports Med Open 6:31. doi:10.1186/s40798-020-00260-z']};
+const SWIM={pop:'National-level junior and open swimmers (Stewart & Hopkins 2000); top-50 world-ranked swimmers (Trewin 2004).',rel:'Typical variation of the same event between competitions 1.4% (faster swimmers 1.1%); elite within-athlete CV 0.8%.',val:'Performance test itself is the criterion; World Aquatics points (1000 × (B/T)³, base = world record) give an official, comparable performance score.',refs:['Stewart A.M. & Hopkins W.G. (2000) Consistency of swimming performance within and between competitions. Med Sci Sports Exerc 32(5):997–1001. doi:10.1097/00005768-200005000-00018','Trewin C.B., Hopkins W.G. & Pyne D.B. (2004) Relationship between world-ranking and Olympic performance of swimmers. J Sports Sci 22:339–345','World Aquatics — Swimming Points and 2026 base times (worldaquatics.com/swimming/points)']};
+const STPSY={
+ vo2:{pop:'Adults, laboratory cardiopulmonary exercise test (cycle).',rel:'ICC 0.984, CoV 1.98%.',err:'SEM 0.77 ml/kg/min; minimal difference 2.14 ml/kg/min.',val:'Laboratory VO2max with gas analysis is the criterion (gold-standard) measure of aerobic capacity.',refs:['Test–retest reliability of VO2max during CPET and verification phase (2023), PMC10532016']},
+ cooper:{pop:'115 US Air Force men (Cooper 1968); young healthy adults (2011 validity/reliability study).',val:'r = 0.897 between 12-min distance and treadmill VO2max (Cooper 1968); r = 0.87 in active young men (1998 validation).',rel:'High overall reliability in young healthy adults.',ba:'Bland–Altman analysis vs treadmill VO2max: individual predictions need caution (2011 study).',refs:['Cooper K.H. (1968) A means of assessing maximal oxygen intake. JAMA 203(3):201–204. doi:10.1001/jama.1968.03140030033008','Validity and reliability analysis of Cooper\'s 12-minute run and the multistage shuttle run in healthy adults (2011) J Strength Cond Res 25(3):597–605. doi:10.1519/JSC.0b013e3181cc2423']},
+ yyir1:YOYO,yylvl:YOYO,yybcci:YOYO,
+ tt2k:{pop:'—',refs:['No peer-reviewed reliability or validity study of the 2 km time trial was located; it is a BCCI selection standard. Interpret against the athlete\'s previous trials (same track, weather, pacing).']},
+ vift:{pop:'Elite female soccer (Čović 2016); semi-professional male soccer (Thomas et al.); professional rugby league (Scott et al. 2015).',rel:'ICC 0.91, CV 1.8% (female soccer); ICC 0.80, CV 2.5% (semi-pro soccer); CV 1.9% (rugby league).',err:'Typical error 0.36 km/h (rugby league).',val:'Valid intermittent aerobic test vs laboratory continuous test in elite female soccer players.',resp:'A change of ≥ 1.0 km/h (2 stages) can be considered real; in rugby league TE (0.36) > SWC (0.21 km/h) — usefulness "marginal".',refs:['Čović N. et al. (2016) Reliability, validity and usefulness of 30–15 IFT in female soccer players. Front Physiol 7:510. doi:10.3389/fphys.2016.00510','Thomas C., Dos\'Santos T., Jones P.A. & Comfort P. Reliability of the 30-15 IFT in semiprofessional soccer players. Int J Sports Physiol Perform','Scott T.J. et al. (2015) Reliability and usefulness of the 30-15 IFT in rugby league. J Strength Cond Res']},
+ rast:{pop:'Amateur male soccer players, n = 23 (Burgess 2016); armed-forces men, n = 40 (Zagatto 2009).',rel:'Average power ICC 0.88 (very good); peak power ICC 0.72 (good).',val:'Criterion validity vs Wingate: peak power r = 0.70, average power r = 0.60; RAST significantly UNDER-estimates peak power.',refs:['Burgess K., Holt T., Munro S. & Swinton P. (2016) Reliability and validity of the RAST in soccer players. J Trainology 5(2):24–29. doi:10.17338/trainology.5.2_24','Zagatto A.M., Beck W.R. & Gobatto C.A. (2009) J Strength Cond Res 23(6):1820–1827. doi:10.1519/JSC.0b013e3181b3df32']},
+ rsa:{pop:'Physically active men (Glaister 2008); men and women (Glaister 2009).',rel:'Fastest and mean sprint time: CV 1.1–1.3%, ICC 0.91–0.92 (very good). Fatigue / decrement scores: CV 38.7%, ICC 0.59 (poor).',err:'Across 8 fatigue formulas CV 0.8–145.7%, ICC 0.09–0.75.',val:'Percentage decrement is the most valid and reliable fatigue formula — but still far less reliable than mean sprint time; prioritise mean time.',refs:['Glaister M. et al. (2008) The reliability and validity of fatigue measures during multiple-sprint work: an issue revisited. J Strength Cond Res','Glaister M. et al. (2009) Familiarization, reliability, and comparability of a 40-m maximal shuttle run test. J Sports Sci Med 8:77–82']},
+ s10:SPR,s20:SPR,s30:SPR,s40:SPR,
+ ttest:{pop:'304 college-aged men and women of varying sport levels.',rel:'ICC 0.98 across 3 trials.',val:'Correlations with 40-yd dash r = 0.53 (men) / 0.73 (women), vertical jump r = −0.49 / −0.55, hexagon r = 0.42 / 0.48; discriminates low vs high sport participation.',refs:['Pauole K., Madole K., Garhammer J., Lacourse M. & Rozenek R. (2000) Reliability and validity of the T-test as a measure of agility, leg power, and leg speed in college-aged men and women. J Strength Cond Res 14(4):443–450']},
+ illinois:{pop:'105 male team-sport athletes (89 retested).',rel:'ICC 0.96 (95% CI 0.85–0.98).',err:'SEM 0.19 s; MDC95 reported (≈ 0.64 s in U14 soccer, Hachana 2014).',val:'Related to speed (r = 0.42) more than leg power (r = 0.39).',refs:['Hachana Y. et al. (2013) Test-retest reliability, criterion-related validity, and minimal detectable change of the Illinois agility test in male team sport athletes. J Strength Cond Res 27(10):2752–2759','Hachana Y. et al. (2014) PLoS ONE 9(4):e95773. doi:10.1371/journal.pone.0095773']},
+ a505:{pop:'Amateur rugby league (2015); youth soccer players aged 13.6 ± 2.0 y, n = 86 (Dugdale 2020).',rel:'Within-test CV 2.8%, between-test CV 1.3% (adults); youth modified 505: ICC 0.81–0.91, CV 1.2–2.0%.',val:'Strongly related to 5 m (r = 0.89), 10 m (r = 0.91) and 20 m (r = 0.93) sprint times — partly a sprint measure.',refs:['Influence of test distance on change of direction speed test results (2015) J Strength Cond Res 29(9):2412–2416. doi:10.1519/JSC.0000000000001045','Dugdale J.H., Sanders D. & Hunter A.M. (2020) Reliability of change of direction and agility assessments in youth soccer players. Sports 8:51']},
+ spider:{pop:'Nationally ranked youth tennis players, n = 10, 15.1 ± 2.6 y (small sample).',rel:'Between-session ICC 0.95; CV 1.8–4.1%.',val:'Concurrent validity with a tennis-specific agility test r = 0.70.',refs:['Huggins J., Jarvis P., Brazier J., Kyriacou Y. & Bishop C. (2017) Within- and between-session reliability of the spider drill test in youth tennis athletes. Int J Sports Exerc Med 3(5):074','Tennis-specific Agility Test validation (2021), PMC8607759']},
+ hexagon:{pop:'35 under-16 tennis players (2021); college men and women (Pauole 2000).',rel:'ICC 0.88.',err:'SEM 0.17 s.',val:'Moderately related to sprint, jump and COD tests — should not replace CMJ, 20 m sprint or 5-0-5.',refs:['Relationship between sprint, change of direction, jump, and hexagon test performance in young tennis players (2021) J Sports Sci Med 20:197–203']},
+ badm:{pop:'—',refs:['No peer-reviewed reliability, validity or normative study of a standardised badminton 4-corner footwork test was located. Use the same court layout and order each time and compare with previous tests.']},
+ lane:{pop:'—',refs:['No peer-reviewed reliability study of the NBA lane agility drill was located; NBA Draft Combine reference values are descriptive only (Topend Sports).']},
+ cmj:{pop:'93 physical-education students (Markovic 2004).',rel:'Cronbach α 0.98 (CMJ) — highest of 7 jump tests.',err:'Within-subject CV 2.4–4.6% across jump tests, lowest for CMJ and horizontal jumps.',val:'Factorial validity: CMJ loads r = 0.87 on the explosive-power factor (highest of all jumps).',refs:['Markovic G., Dizdar D., Jukic I. & Cardinale M. (2004) Reliability and factorial validity of squat and countermovement jump tests. J Strength Cond Res 18(3):551–555','Hoffmann M.D. et al. (2019) Health Reports 30(10):14–22 (force-plate method used for the norms)']},
+ sbj:{pop:'93 physical-education students (Markovic 2004); European youth (FitBack 2023).',rel:'Reliability α 0.93–0.96 for jumps other than SJ/CMJ.',err:'CV lowest for the horizontal jumps (≈ 2.4%).',val:'Loads on the same explosive-power factor as vertical jumps (r = 0.76–0.87 for all jumps).',refs:['Markovic G. et al. (2004) J Strength Cond Res 18(3):551–555','Ortega F.B. et al. (2023) Br J Sports Med 57:299–310']},
+ mbthrow:{pop:'Children and adolescents — meta-analysis (González-Devesa 2025); 12–15 y PE students (Biggar 2022).',rel:'Seated chest throw ICC 0.84 (95% CI 0.48–0.96); standing chest throw ICC 0.72 (0.58–0.83). Between-trial r = 0.85–0.97 (Biggar).',val:'Criterion validity has been examined in only 3 youth studies — evidence limited.',refs:['González-Devesa D. et al. (2025) Reliability and validity of the medicine ball throw test in children and adolescents: a systematic review and meta-analysis. Kinesiology 57(1):122–135. doi:10.26582/k.57.1.11','Biggar C., Larson A. & DeBeliso M. (2022) The Sport Journal']},
+ grip:{pop:'Canadian population 6–79 y (CHMS); children and preadolescents 7–13 y (2020).',err:'Children: SEM 3.44–5.48% of the mean (Jamar digital dynamometer).',val:'Elbow position affects handgrip in adolescents — use one standard protocol (España-Romero 2010).',refs:['Hoffmann M.D. et al. (2019) Health Reports 30(10):14–22','España-Romero V. et al. (2010) Elbow position affects handgrip strength in adolescents: validity and reliability of Jamar, DynEx and TKK dynamometers. J Strength Cond Res 24(1):272–277. doi:10.1519/JSC.0b013e3181b296a5','Test–retest reliability of handgrip strength measurement in children and preadolescents (2020) Int J Environ Res Public Health 17(21):8026']},
+ bench:RM1,legpress:RM1,squat:RM1,
+ pushup:{pop:'Healthy adults — upper-extremity functional test battery (2023).',rel:'Push-up ICC 0.83.',err:'MDC 4.68 repetitions.',ba:'Bland–Altman plots used to check agreement between sessions.',refs:['Reliability of CKCUES, seated medicine ball throw, push-up and USSP tests (2023) J Orthop Surg Res, doi:10.1186/s13018-023-03974-4']},
+ pullup:{pop:'—',refs:['No high-quality reliability study with SEM/MDC for maximal pull-up repetitions in athletes was located.']},
+ plank:{pop:'471 US college students (normative study).',rel:'Not reported in the normative study (each person tested once).',val:'Abdominal endurance construct; scores agreed with curl-up categories in a follow-up abstract.',refs:['Strand S.L. et al. (2014) J Hum Kinet 40:93–102. doi:10.2478/hukin-2014-0011']},
+ hang:{pop:'—',refs:['No peer-reviewed reliability or normative study of the straight-arm dead hang was located (the Eurofit bent-arm hang is a different test).']},
+ sitreach:{pop:'Meta-analysis of 34 studies (Mayorga-Vega 2014).',val:'Classic sit-and-reach: criterion validity for hamstring extensibility rp = 0.67 (95% CI 0.55–0.80), n = 3481; LOW validity for lumbar extensibility (rp = 0.16–0.35).',refs:['Mayorga-Vega D., Merino-Marban R. & Viciana J. (2014) Criterion-related validity of sit-and-reach tests for estimating hamstring and lumbar extensibility: a meta-analysis. J Sports Sci Med 13(1):1–14']},
+ shoulder:{pop:'Healthy adults (Cools 2014); NCAA athletes (Kevern 2014); professional baseball pitchers (Wilk 2011).',rel:'IR and ER ROM: ICC 0.85–0.99, good to excellent across positions and devices (Cools 2014).',inter:'Rotation ROM shows excellent intra-rater but poorer inter-rater reliability — keep the same tester (Kevern 2014).',val:'Total rotation deficit > 5° associated with higher injury rates in pitchers (Wilk 2011).',refs:['Cools A.M. et al. (2014) Measuring shoulder external and internal rotation strength and range of motion: comprehensive intra-rater and inter-rater reliability study. Knee Surg Sports Traumatol Arthrosc (PMID 24726484)','Kevern M.A., Beecher M. & Rao S. (2014) J Athl Train, PMC4208868','Wilk K.E. et al. (2011) Am J Sports Med 39(2):329–335']},
+ bf:{pop:'Young White, Hispanic and African-American adults vs DXA (Jackson 2009); NCAA athletes (2016).',inter:'Skinfold inter-rater ICC 0.966 (wide 95% CI 0.328–0.991).',rel:'Skinfold test–retest ICC ≥ 0.996.',err:'Jackson–Pollock equations vs DXA: SEE ≈ 2.6–3.0% body fat.',refs:['Jackson A.S. et al. (2009) Cross-validation of generalised body composition equations with diverse young men and women. Br J Nutr 101(6):871–878. doi:10.1017/S0007114508047764','Validity and reliability of A-mode ultrasound for body composition in NCAA Division I athletes (2016) PLoS ONE 11(4):e0153146']},
+ bmi:{pop:'Adults — 25 studies meta-analysis (Okorodudu 2010); children 4–18 y — 37 studies, n = 53 521 (Javed 2015).',ss:'Adults (BMI ≥ 30 for high body fat): sensitivity 0.50, specificity 0.90. Children (obesity cut-offs): sensitivity 0.73, specificity 0.93 — BMI misses about a quarter of children with excess fat.',val:'High specificity but low sensitivity for excess adiposity; not a body-fat measure in muscular athletes.',refs:['Okorodudu D.O. et al. (2010) Int J Obes 34(5):791–799. doi:10.1038/ijo.2010.5','Javed A. et al. (2015) Pediatr Obes 10(3):234–244. doi:10.1111/ijpo.242']},
+ ybt:{pop:'15 male collegiate soccer players (Plisky 2009); early-adolescent female athletes (Greenberg 2019).',intra:'ICC 0.85–0.91 (composite 0.91).',inter:'ICC 0.99–1.00 (composite 0.99).',err:'Intra-rater SEM anterior 2.01 cm; MDC anterior 1.94 cm. Adolescent girls: MDC 2.02–3.63% of reach.',rel:'Adolescent girls (novice raters): test–retest ICC 0.68–0.91.',ss:'Composite < 94% of limb length linked with higher lower-limb injury risk in high-school basketball (Plisky 2006).',refs:['Plisky P.J. et al. (2009) The reliability of an instrumented device for measuring components of the SEBT. N Am J Sports Phys Ther 4(2):92–99','Greenberg E.T. et al. (2019) Int J Sports Phys Ther 14:204–213','Plisky P.J. et al. (2006) J Orthop Sports Phys Ther 36(12):911–919']},
+ fms:{pop:'Systematic review and meta-analysis (Bonazza 2017); prospective injury studies (Moran 2017).',intra:'ICC 0.81 (95% CI 0.69–0.92).',inter:'ICC 0.81 (95% CI 0.70–0.92).',ss:'Score ≤ 14: odds of injury 2.74 × (Bonazza 2017) — but a later meta-analysis found moderate evidence AGAINST using the composite score to predict injury (Moran 2017).',refs:['Bonazza N.A. et al. (2017) Am J Sports Med 45(3):725–732','Moran R.W. et al. (2017) Br J Sports Med 51(23):1661–1669']},
+ css:{pop:'Competitive swimmers (Wakayoshi 1992/1993; Dekerle 2002).',val:'Critical swim speed from 200 m + 400 m corresponds to the maximal lactate steady state (≈ 3.2 mmol/l) and correlates r = 0.977 with mean 400 m velocity (Wakayoshi).',refs:['Wakayoshi K. et al. (1993) Does critical swimming velocity represent exercise intensity at maximal lactate steady state? Eur J Appl Physiol 66:90–95','Dekerle J. et al. (2002) Validity and reliability of critical speed, critical stroke rate, and anaerobic capacity in relation to front crawl swimming performances. Int J Sports Med 23:93–98. doi:10.1055/s-2002-20125']},
+ t30:{pop:'Well-trained swimmers (Dekerle 2002).',val:'30-min test velocity not different from critical swim speed (200 + 400 m), but overestimated by 3.2%.',refs:['Dekerle J. et al. (2002) Int J Sports Med 23:93–98. doi:10.1055/s-2002-20125']},
+ swim400:SWIM,swim50:SWIM,
+ runa3:{pop:'—',refs:['No peer-reviewed reliability, validity or normative study of the cricket run-a-three test was located. Compare with squad data and the athlete\'s previous tests.']},
+ bowlspd:{pop:'13 male amateur club fast bowlers (Feros 2018); radar vs motion capture (Smith & Burke 2024).',rel:'Peak bowling speed ICC 0.948–0.975, CV 1.3–1.9% (radar gun).',ba:'Radar vs motion capture at 0°: r = 0.99, ICC 0.984, radar overestimates by 1.7 ± 0.8 m/s; accuracy falls with angle offset (> ≈ 20°).',val:'Radar gun in line with the ball path is the accepted field criterion.',refs:['Feros S.A., Young W.B. & O\'Brien B.J. (2018) The reliability and sensitivity of performance measures in a novel pace bowling test. Int J Sports Physiol Perform','Smith N.D.W. & Burke D.J. (2024) Influence of angular position on radar gun peak cricket ball speed measurements. Sports Biomech 23(6):695–708']},
+ erg2k:{pop:'Well-trained rowers, Concept II ergometer.',rel:'Retest correlation 0.96 (0.87–0.99).',err:'CV for mean power 2.0% (1.3–3.1%); CV for time ≈ one-third of that (≈ 0.7%).',val:'Highly suitable for monitoring rowing performance.',refs:['Schabort E.J., Hawley J.A., Hopkins W.G. & Blum H. (1999) High reliability of performance of well-trained rowers on a rowing ergometer. J Sports Sci 17(8):627–632. doi:10.1080/026404199365650']},
+ ftp:{pop:'Competitive cyclists (Borszcz 2020); trained / well-trained cyclists (Borszcz 2019).',rel:'20-min time trial ICC 0.97, CV 2.9%.',ba:'FTP vs maximal lactate steady state assessed with bias ± 95% limits of agreement (Borszcz 2019) — check the paper before treating FTP as equal to MLSS.',refs:['Borszcz F.K. et al. (2020) Reliability of the functional threshold power in competitive cyclists. Int J Sports Med 41(3):175–181. doi:10.1055/a-1018-1965','Borszcz F.K., Tramontin A.F. & Costa V.P. (2019) Is the functional threshold power interchangeable with the maximal lactate steady state in trained cyclists? Int J Sports Physiol Perform 14(8):1029–1035. doi:10.1123/ijspp.2018-0572']},
+ sjft:{pop:'Junior judo athletes 17.1 ± 2.0 y, n = 15 (2021); judo athletes (Kons 2021).',rel:'SJFT index α = 0.807 (error 4.5%); standard SJFT ICC 0.91–0.95 for throws and index (Kons 2021).',val:'Discriminates elite from non-elite judoka; normative tables from meta-analysis (Sterkowicz-Przybycień 2019).',refs:['Test and re-test reliability of the Special Judo Fitness Test (2021) Acta Fac Educ Phys Univ Comenianae 61:97–106. doi:10.2478/afepuc-2021-0009','Kons R.L. et al. (2021) Psychometric suitability of adaptations to the SJFT for athletes with visual impairment (PMID 34210230)','Sterkowicz-Przybycień K. et al. (2019) Sports 7(8):194']},
+ rhr:{pop:'—',refs:['Measure seated or supine after ≥ 5 min rest, same time of day. No single athlete reliability study is applied here; the classification uses the MedlinePlus / AHA normal range.']}
+};
+function stPsyHtml(tid){const P=STPSY[tid];if(!P)return '';const have=PK.filter(([k])=>P[k]);const miss=PK.filter(([k])=>!P[k]&&k!=='pop').map(x=>x[1]);
+ if(P.pop==='—')return `<div class="st-psy"><div class="fc-sub" style="margin:0 0 4px">Measurement properties</div><p class="muted" style="margin:0;font-size:13px">${esc(P.refs[0])}</p></div>`;
+ return `<div class="st-psy"><div class="fc-sub" style="margin:0 0 6px">Measurement properties (validity · reliability · error)</div><table class="st-nt st-pt2"><tbody>${have.map(([k,l])=>`<tr><td><b>${esc(l)}</b></td><td style="white-space:normal">${esc(P[k])}</td></tr>`).join('')}</tbody></table>
+ ${miss.length?`<p class="muted" style="font-size:12px;margin:6px 0 0">Not reported in the located literature: ${esc(miss.join(' · '))}.</p>`:''}<div class="st-ref">References:<ol style="margin:4px 0 0;padding-left:18px">${P.refs.map(r=>`<li>${esc(r)}</li>`).join('')}</ol></div></div>`}
+stProtoCard=(function(f){return function(tid){const h=f(tid);const i=h.lastIndexOf('</details>');return i<0?h:h.slice(0,i)+stPsyHtml(tid)+'</details>'}})(stProtoCard);
 
 /* ============ ACCESS CONTROL (owner-only pages · view-only roles · athlete/parent portal · subscription lock) ============ */
 var OWNER_PAGES=['organization','branding','app-settings','subscription','payments','beta'];
-var RO_ROLES=['Athlete','Parent','Viewer'],PORTAL_ROLES=['Parent'];
+var RO_ROLES=['Athlete','Parent','Viewer'],PORTAL_ROLES=['Athlete','Parent'];
 function roUser(a){return !!a&&!a.owner&&RO_ROLES.includes(a.role)}
 function portalUser(a){return !!a&&!a.owner&&PORTAL_ROLES.includes(a.role)}
-const PORTAL_NAV=[['MY BIOMOTOR',[['my-portal','My Dashboard'],['my-reports','My Reports'],['my-program','My Program'],['my-profile','Profile']]]];
+const PORTAL_NAV=[['MY BIOMOTOR',[['my-portal','My Dashboard'],['my-reports','My Reports'],['my-program','My Program'],['my-team','Team Rankings'],['my-profile','Profile']]]];
 const PORTAL_PAGES=PORTAL_NAV[0][1].map(x=>x[0]);
 Object.assign(TITLES,Object.fromEntries(PORTAL_NAV[0][1]));
 function axNav(me){if(portalUser(me))return PORTAL_NAV;return NAV.map(([g,items])=>[g,items.filter(([k])=>(!OWNER_PAGES.includes(k)||(me&&me.owner))&&(!ADMIN_PAGES.includes(k)||isAdmin(me)))]).filter(([g,i])=>i.length)}
@@ -5037,7 +5299,7 @@ function axLock(root){const me=authUser();if(!roUser(me)||!root)return;
  root.querySelectorAll('input,textarea,select').forEach(el=>{if(el.closest('[data-ro-ok]')||el.id==='gSearch'||el.type==='search'||/search|filter/i.test(el.placeholder||''))return;const h=(el.getAttribute('onchange')||'')+(el.getAttribute('oninput')||'');if(!el.name&&!el.dataset.p&&!el.closest('form')&&!/db\.|save|In\(|Set\(|Put\(|byId\(/.test(h)&&(h||el.tagName==='SELECT'))return;el.disabled=true});
  root.querySelectorAll('[contenteditable]').forEach(el=>el.setAttribute('contenteditable','false'));
  root.querySelectorAll('button,.btn').forEach(b=>{if(b.closest('[data-ro-ok]')||b.dataset.roOk!=null)return;const t=((b.textContent||'')+' '+(b.title||'')).trim();const oc=b.getAttribute('onclick')||'';
-  if(/Pdf|PDF|Download|download|\bprint\b|\bPrint\b|closeModal|signOut|accOwnPw|cloudPull/.test(oc+' '+t)&&!/save\(|push\(|splice\(/.test(oc))return;if(AX_SYM.test(t)||AX_MUT.test(t)||/save\(\)|Del\(|Remove\(|New\(|\.push\(|splice\(|openForm\('[a-z]+'\)|import-data/.test(oc))b.style.display='none'})}
+  if(/Pdf|PDF|Download|download|print|closeModal|signOut|accOwnPw|cloudPull/.test(oc+' '+t)&&!/save\(|push\(|splice\(/.test(oc))return;if(AX_SYM.test(t)||AX_MUT.test(t)||/save\(\)|Del\(|Remove\(|New\(|\.push\(|splice\(|openForm\('[a-z]+'\)|import-data/.test(oc))b.style.display='none'})}
 var AX_OBS=new MutationObserver(ms=>{if(!roUser(authUser()))return;const s=new Set();ms.forEach(m=>{const r=m.target.closest&&m.target.closest('#view,#modal');if(r)s.add(r)});s.forEach(axLock)});
 setTimeout(()=>{['view','modal'].forEach(id=>{const el=document.getElementById(id);if(el)AX_OBS.observe(el,{childList:true,subtree:true})})},0);
 /* ---- subscription lock ---- */
@@ -5066,14 +5328,14 @@ function axLockNow(){confirmBox('Lock the platform for everyone except you now? 
 function axMine(me){if(!me)return [];const em=normEmail(me.email);const ids=new Set();const uids=db.users.filter(u=>em&&normEmail(u.email)===em&&u.status!=='Archived').map(u=>u.id);if(me.user)uids.push(me.user);
  (me.role==='Parent'?db.parentLinks:db.athLinks||[]).forEach(l=>{if(l.status==='Active'&&uids.includes(l.user))ids.add(l.athlete)});
  (db.invites||[]).forEach(i=>{if(em&&normEmail(i.email)===em&&i.role===me.role&&i.athlete&&i.status!=='Revoked')ids.add(i.athlete)});
- db.athletes.forEach(a=>{const e=[a.email,me.role==='Parent'&&a.parentEmail,me.role==='Parent'&&a.guardianEmail].filter(Boolean).map(normEmail);if(em&&((me.role==='Athlete'||me.role==='Viewer')?normEmail(a.email)===em:e.slice(1).includes(em)))ids.add(a.id)});
+ db.athletes.forEach(a=>{const e=[a.email,me.role==='Parent'&&a.parentEmail,me.role==='Parent'&&a.guardianEmail].filter(Boolean).map(normEmail);if(em&&(me.role==='Athlete'?normEmail(a.email)===em:e.slice(1).includes(em)))ids.add(a.id)});
  return [...ids].map(id=>byId('athletes',id)).filter(Boolean)}
 let AXP={aid:''};
 function axCur(me){const L=axMine(me);if(!L.some(a=>a.id===AXP.aid))AXP.aid=L[0]?L[0].id:'';return {L,a:byId('athletes',AXP.aid)}}
 const axNm=s=>String(s||'').trim().toLowerCase();
 const axFor=(a,r,nameKeys)=>r.athlete===a.id||(!r.athlete&&nameKeys.some(k=>axNm(fcGet(r,k))&&axNm(fcGet(r,k))===axNm(a.name)));
 function axHead(me,title,sub){const {L,a}=axCur(me);const pick=L.length>1?`<select data-ro-ok style="width:auto" onchange="AXP.aid=this.value;render()">${L.map(x=>`<option value="${x.id}" ${x.id===AXP.aid?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`:'';
- return head(me.role==='Parent'?'Parent portal':me.role==='Viewer'?'Viewer portal':'Athlete portal',title,sub,pick)+`<div class="pill p-blue" style="display:inline-block;margin-bottom:12px">👁 View only — your coach updates this information</div>`}
+ return head(me.role==='Parent'?'Parent portal':'Athlete portal',title,sub,pick)+`<div class="pill p-blue" style="display:inline-block;margin-bottom:12px">👁 View only — your coach updates this information</div>`}
 function axNone(me){return `<div class="card"><h3 style="margin-top:0">Your account is not linked yet</h3><p class="muted">${me.role==='Parent'?'Your account needs to be linked to your child\'s athlete profile.':'Your account needs to be linked to your athlete profile.'} Ask your coach or ${esc(OWNER_ACC.name)} (${esc(OWNER_ACC.phone)}) to link it in <b>Coaches &amp; Users → ${me.role==='Parent'?'Parent':'Athlete'} links</b>. Use the same email you signed in with: <b>${esc(me.email||'')}</b>.</p></div>`}
 const axTeams=a=>db.teams.filter(t=>!t.archived&&tMembers(t).includes(a.id));
 /* latest value per metric for one athlete (Testing results + Sports Specific Test) */
@@ -5088,10 +5350,10 @@ P['my-portal']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(
  const M=Object.values(axMetrics(a.id)).sort((x,y)=>String(y.date).localeCompare(String(x.date)));const T=axTeams(a);
  const fc=(db.fitConsults||[]).filter(r=>axFor(a,r,['demo.name'])).length,stc=(db.sportTests||[]).filter(r=>axFor(a,r,['name'])).length,pd=(db.pdPrograms||[]).filter(r=>axFor(a,r,['client'])).length;
  const k=(l,v,g)=>`<button class="card ac-k" onclick="go('${g}')"><div class="eyebrow">${l}</div><div style="font-size:30px;font-weight:800">${v}</div></button>`;
- return axHead(me,me.role==='Parent'?esc(a.name):'Welcome, '+esc(a.name.split(' ')[0]),'Your profile, test results, reports and training program.')+
+ return axHead(me,me.role==='Parent'?esc(a.name):'Welcome, '+esc(a.name.split(' ')[0]),'Your profile, test results, reports, training program and team rankings.')+
  `<div class="card"><div class="row" style="gap:16px;flex-wrap:wrap"><div class="av" style="width:64px;height:64px;font-size:24px">${esc(initials(a.name))}</div><div style="flex:1;min-width:200px"><h2 style="margin:0">${esc(a.name)}</h2><div class="muted">${esc([a.sport,a.position].filter(Boolean).join(' · '))}</div><div class="muted">${esc(T.map(t=>t.name).join(', '))}</div></div></div>
  <div class="tbl" style="margin-top:12px;overflow:auto"><table>${[['Gender',a.gender],['Age',a.dob?ageOf(a.dob)+' years':''],['Date of birth',a.dob?fmtDate(a.dob):''],['Height',a.height?a.height+' cm':''],['Status',a.status]].filter(x=>x[1]).map(([l,v])=>`<tr><th style="width:160px">${l}</th><td>${esc(v)}</td></tr>`).join('')}</table></div></div>
- <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:12px;margin-bottom:14px">${k('Test results',M.length,'my-reports')}${k('Reports',fc+stc,'my-reports')}${k('Programs',pd+db.assignments.filter(x=>x.athlete===a.id).length,'my-program')}${k('Teams',T.length,'my-portal')}</div>
+ <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:12px;margin-bottom:14px">${k('Test results',M.length,'my-reports')}${k('Reports',fc+stc,'my-reports')}${k('Programs',pd+db.assignments.filter(x=>x.athlete===a.id).length,'my-program')}${k('Teams',T.length,'my-team')}</div>
  <div class="card"><h3 style="margin-top:0">Latest results</h3>${M.length?`<div class="tbl" style="overflow:auto"><table><tr><th>Test</th><th>Result</th><th>Date</th></tr>${M.slice(0,8).map(m=>`<tr><td>${esc(m.label)}</td><td><b>${esc(axF(m))}</b> ${esc(m.unit==='ratio'?'':m.unit)}</td><td>${fmtDate(m.date)}</td></tr>`).join('')}</table></div>`:'<p class="muted">No test results yet.</p>'}</div>`};
 P['my-reports']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'My Reports','')+axNone(me);
  const res=db.results.filter(r=>r.athlete===a.id&&r.value!==''&&r.value!=null);const byT={};res.forEach(r=>{(byT[r.test]=byT[r.test]||[]).push(r)});
@@ -5103,7 +5365,7 @@ P['my-reports']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead
  const row=(t,s,b)=>`<div class="item"><div><b>${t}</b><div class="muted" style="font-size:13px">${s}</div></div><span data-ro-ok>${b}</span></div>`;
  return axHead(me,'My Reports','Testing results, fitness consultation and sports-specific test reports. Download any report as PDF.')+
  `<div class="card"><h3 style="margin-top:0">Testing results</h3>${tests?`<div class="tbl" style="overflow:auto"><table><tr><th>Test</th><th>Latest</th><th>Best</th><th>Change</th><th></th></tr>${tests}</table></div>`:'<p class="muted">No testing results yet.</p>'}</div>
- <div class="card"><h3 style="margin-top:0">Sports Specific Test reports</h3>${st.length?st.map(r=>row(`${esc((stSport(r.sport)||['','Sport'])[1])} test`,`${fmtDate(r.date)} · ${(n=>n+' test'+(n===1?'':'s'))((r.tests||[]).filter(e=>stVal(STT[e.t]||{},e)).length)} · ${esc(r.staffName||'')}`,`<button class="btn sm pri" onclick="stPdf('${r.id}')">⬇ PDF</button>`)).join(''):'<p class="muted">No sports-specific test reports yet.</p>'}</div>
+ <h3 style="margin:18px 0 8px">Sports Specific Test results</h3>${st.length?st.map(r=>stPortalHtml(r)).join(''):'<div class="card"><p class="muted" style="margin:0">No sports-specific test reports yet.</p></div>'}
  ${(db.vbtLog||[]).some(r=>r.aid===a.id)?`<div class="card"><h3 style="margin-top:0">Live VBT sessions (bar velocity)</h3>${vbTable((db.vbtLog||[]).filter(r=>r.aid===a.id).slice(0,60),false)}</div>`:''}
  <div class="card"><h3 style="margin-top:0">Fitness Consultation reports</h3>${fc.length?fc.map(r=>row('Fitness consultation',`${fmtDate(r.date)} · ${esc(r.staffName||'')}`,`<button class="btn sm pri" onclick="fcPdf('${r.id}')">⬇ PDF</button>`)).join(''):'<p class="muted">No consultation reports yet.</p>'}</div>`};
 P['my-program']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'My Program','')+axNone(me);
@@ -5127,61 +5389,9 @@ function axRankCard(title,sub,ids,meId){const {mets,ov}=axRank(ids,meId);const n
 P['my-team']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'Team Rankings','')+axNone(me);const T=axTeams(a);
  const grp={};T.forEach(t=>{if(t.group)grp[t.group]=1});const G=Object.keys(grp).map(g=>{const ids=new Set();db.teams.filter(t=>!t.archived&&t.group===g).forEach(t=>tMembers(t).forEach(id=>ids.add(id)));return [g,[...ids]]}).filter(([g,ids])=>!T.some(t=>t.group===g&&tMembers(t).length>=ids.length));
  return axHead(me,'Team Rankings','Fitness ranking and test-by-test comparison with your team-mates.')+(T.length?T.map(t=>axRankCard(t.name,[t.sport,t.level].filter(Boolean).join(' · ')||'Team',tMembers(t),a.id)).join('')+G.map(([g,ids])=>axRankCard(g+' (group)','All teams in this group',ids,a.id)).join(''):`<div class="card"><p class="muted" style="margin:0">${esc(a.name)} is not in a team or group yet. Your coach adds athletes to teams in Athletes → Teams.</p></div>`)};
-/* ---- self-only access: Athlete / Parent / Viewer see and download only their own linked athlete's data ---- */
-function axOwns(r,keys){const me=authUser();if(!roUser(me))return true;if(!r)return false;return axMine(me).some(a=>axFor(a,r,keys))}
-function axDeny(){toast('🔒 You can only open your own reports')}
-/* ---- Athlete / Viewer: the whole roster is listed, but only their own athlete opens ---- */
-function axMineIds(){const me=authUser();return roUser(me)?new Set(axMine(me).map(a=>a.id)):null}
-function axLockedAth(id){const M=axMineIds();return !!M&&!!id&&!M.has(id)&&db.athletes.some(a=>a.id===id)}
-function axDenyAth(){toast('🔒 Only your own profile and reports can be opened')}
-/* ---- Admin menu by role: Owner = everything · Org Admin = all but Subscription/Payments/Beta ·
-        Head Coach & Staff Manager = Coaches & Users, Onboarding, Facility · everyone = Profile, Help ---- */
-OWNER_PAGES=['subscription','payments','beta'];
-var LEAD_PAGES=['coaches-users','onboarding','facility'],LEAD_ROLES=['Head Coach','Staff Manager'];
-function axPageOk(me,k){if(!me||me.owner)return true;if(OWNER_PAGES.includes(k))return false;
- if(ADMIN_PAGES.includes(k))return isAdmin(me)||(LEAD_PAGES.includes(k)&&LEAD_ROLES.includes(me.role));return true}
-axNav=function(me){if(portalUser(me))return PORTAL_NAV;return NAV.map(([g,items])=>[g,items.filter(([k])=>axPageOk(me,k))]).filter(([g,i])=>i.length)};
-axBlocked=function(me,p){if(!me||me.owner)return '';if(OWNER_PAGES.includes(p))return 'owner';if(!axPageOk(me,p))return 'admin';return ''};
-/* ---- who can invite whom: Owner / Org Admin = every role · Head Coach & Staff Manager = Coach + Athlete · Coach = Athlete ---- */
-LEAD_PAGES=['coaches-users','onboarding','facility'];
-function axInvRoles(me){if(!me)return [];if(me.owner||isAdmin(me))return UROLES.filter(r=>r!=='Owner');if(LEAD_ROLES.includes(me.role))return ['Coach','Athlete'];if(me.role==='Coach')return ['Athlete'];return []}
-{const _ok=axPageOk;axPageOk=function(me,k){if(me&&!me.owner&&me.role==='Coach'&&k==='coaches-users')return true;return _ok(me,k)}}
-{const _cu=P['coaches-users'];P['coaches-users']=function(){const me=authUser();if(!me||me.owner||isAdmin(me))return _cu();
- cuInit();const R=axInvRoles(me);const all=db.invites;let inv='';db.invites=all.filter(i=>R.includes(i.role));try{inv=cuInvites()}finally{db.invites=all}
- inv=inv.replace(/<select name="role">[\s\S]*?<\/select>/,`<select name="role">${R.map(r=>`<option>${r}</option>`).join('')}</select>`);
- return `<div class="pagehead"><div><h2 style="font-size:40px">Coaches &amp; Users</h2><div class="muted" style="font-size:17px">You can invite ${R.join(' and ').toLowerCase()} accounts and link athlete logins to athlete profiles.</div></div></div>`+inv+cuLinks('ath')}}
-{const _ic=invCreate;invCreate=function(direct){const f=document.getElementById('invF');const r=f&&new FormData(f).get('role');if(r&&!axInvRoles(authUser()).includes(r)){toast('🔒 You cannot invite a '+r);return}return _ic.apply(this,arguments)}}
-/* ---- Plan status card on Profile for staff (read-only: plan, status, end date, days left — no prices, UPI or payments) ---- */
-{const _ap=accProfile;accProfile=function(me){let h=_ap(me);if(!me||me.owner||!STAFF(me.role))return h;
- try{const {s,st}=subState();const end=axSubEnd(s);const left=end?Math.ceil(dDiff(end,today())):null;const L=axLocked();
-  const col=L||left!=null&&left<0?'bad':left!=null&&left<=7?'warn':'ok';
-  h+=`<div class="card" data-ro-ok><div class="eyebrow" style="letter-spacing:.15em">Organisation plan</div><h3 style="margin:4px 0 12px">Plan status</h3>
-  <div class="tbl"><table><tr><th style="width:160px">Plan</th><td><b>${esc(db.meta.plan||'')}</b></td></tr>
-  <tr><th>Status</th><td><span style="color:var(--${col})">${L?'🔒 Locked':esc(st)}</span></td></tr>
-  ${end?`<tr><th>${s.status==='Trialing'?'Trial ends':'Valid until'}</th><td>${fmtDate(end)}</td></tr>
-  <tr><th>Days left</th><td><b style="color:var(--${col})">${left<0?'Ended '+Math.abs(left)+' day(s) ago':left+' day(s)'}</b></td></tr>`:''}</table></div>
-  <p class="muted" style="margin:12px 0 0">Plan renewal is handled by ${esc(OWNER_ACC.name)} (${esc(OWNER_ACC.phone)}).</p></div>`}catch(e){}
- return h}}
-var AX_ROLE_OBS=new MutationObserver(()=>{const me=authUser();if(!me||me.owner||isAdmin(me)||!STAFF(me.role))return;const R=axInvRoles(me);
- document.querySelectorAll('#view select,#modal select').forEach(sel=>{const o=[...sel.options];if(!o.some(x=>(x.value||x.text)==='Organization Admin'))return;o.forEach(x=>{if(!R.includes(x.value||x.text))x.remove()})})});
-setTimeout(()=>{['view','modal'].forEach(id=>{const el=document.getElementById(id);if(el)AX_ROLE_OBS.observe(el,{childList:true,subtree:true})})},0);
-{const _ap=athProfile;athProfile=function(id){if(axLockedAth(id))return axDenyAth();return _ap.apply(this,arguments)}}
-document.addEventListener('click',e=>{const M=axMineIds();if(!M)return;const el=e.target.closest&&e.target.closest('[onclick],a[href]');if(!el)return;
- const s=(el.getAttribute('onclick')||'')+' '+(el.getAttribute('href')||'');if(!s.trim())return;
- if(db.athletes.some(a=>!M.has(a.id)&&a.id&&(s.includes("'"+a.id+"'")||s.includes('"'+a.id+'"')||s.includes('#'+a.id)))){e.preventDefault();e.stopImmediatePropagation();axDenyAth()}},true);
-{const _al=axLock;axLock=function(root){_al(root);const M=axMineIds();if(!M||!root)return;
- root.querySelectorAll('option').forEach(o=>{if(o.value&&!M.has(o.value)&&db.athletes.some(a=>a.id===o.value)){o.disabled=true;if(!/🔒/.test(o.textContent))o.textContent='🔒 '+o.textContent}});
- root.querySelectorAll('select').forEach(sel=>{const o=sel.selectedOptions&&sel.selectedOptions[0];if(o&&o.disabled){const ok=[...sel.options].find(x=>M.has(x.value));if(ok&&sel.value!==ok.value){sel.value=ok.value;sel.dispatchEvent(new Event('change',{bubbles:true}))}}})}}
-/* portal accounts get no live row updates (server hides the organisation row) — refresh their own data every 2 minutes */
-setInterval(()=>{try{if(CLOUD&&CME&&roUser(CME)&&document.visibilityState==='visible'&&!document.getElementById('modal')?.classList.contains('open'))cloudPull().then(()=>render())}catch(e){}},120000);
-{const _fc=fcPdf;fcPdf=function(id){if(!axOwns(byId('fitConsults',id),['demo.name']))return axDeny();return _fc.apply(this,arguments)}}
-{const _st=stPdf;stPdf=function(id){if(!axOwns(byId('sportTests',id),['name']))return axDeny();return _st.apply(this,arguments)}}
-{const _pg=pdPdfGo;pdPdfGo=function(id){if(!axOwns(byId('pdPrograms',id),['client']))return axDeny();return _pg.apply(this,arguments)}}
-{const _pp=pdPdf;pdPdf=function(id){if(!axOwns(byId('pdPrograms',id),['client']))return axDeny();return _pp.apply(this,arguments)}}
-{const _rt=render;render=function(){const me=authUser();if(roUser(me)&&location.hash.startsWith('#tv-')){location.hash='my-portal';return}return _rt.apply(this,arguments)}}
 {const _r=render;render=function(){AX_RENDERING=true;try{_r()}finally{AX_RENDERING=false}const me=authUser();['gSearch','bellBtn','aiBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=portalUser(me)?'none':''});
  if(me&&me.owner&&!document.body.classList.contains('tvmode')){const L=axLocked();const v=document.getElementById('view');if(L&&v&&!v.querySelector('.ax-own'))v.insertAdjacentHTML('afterbegin',`<div class="card ax-own" style="border:2px solid var(--bad);color:var(--bad)">🔒 Subscription ended ${fmtDate(L.end)} — the platform is locked for everyone except you. <a href="javascript:void 0" style="color:inherit;font-weight:700" onclick="go('subscription')">Verify a payment or extend access</a></div>`)}
- if(me&&roUser(me)&&document.body&&!document.body.classList.contains('tvmode')){const v=document.getElementById('view');if(v&&!portalUser(me)&&!v.querySelector('.ac-tour'))v.insertAdjacentHTML('afterbegin',`<div class="card ac-tour">👁 <b>View only.</b> You can open every section of the platform, but you see only your own information and reports. Nothing can be added, edited or deleted from this account.</div>`);axLock(v)}}}
+ if(me&&roUser(me)&&document.body&&!document.body.classList.contains('tvmode')){const v=document.getElementById('view');if(v&&!portalUser(me)&&!v.querySelector('.ac-tour'))v.insertAdjacentHTML('afterbegin',`<div class="card ac-tour">👁 <b>Tour mode — view only.</b> You can look around every section of the platform; nothing can be added, edited or deleted from this account.</div>`);axLock(v)}}}
 
 /* ============ LIVE VBT TRACK (camera velocity-based training, embedded tracker + results) ============ */
 window.BMP={get db(){return db},save(){save()},user(){return authUser()}};
@@ -5208,6 +5418,58 @@ P['live-vbt']=()=>{const t=VB.tab;
  return h+(vbCamOk()?'':`<div class="card" style="border:1px dashed var(--accent);font-size:14px">📷 Live camera works on <b>app.biomotorsports.com</b> and in the installed app. In this preview the browser blocks the camera — use <b>Load video</b> inside the tracker to analyse a recorded lift.</div>`)+`<iframe id="vbtFrame" class="vbt-frame" allow="camera *; microphone *; fullscreen *; autoplay *; screen-wake-lock *" allowfullscreen title="Live VBT Track"></iframe><p class="muted" style="font-size:12px">Tip: put the phone side-on on a tripod with the whole plate in view. Recordings and videos stay on this device; the session summary is saved to the platform.</p>`};
 /* keep the tracker running: other renders (sync from another device, timers) must not reload it */
 {const _r=render;render=function(){document.body.classList.toggle('vbt-on',location.hash==='#live-vbt');if(VB.force){VB.force=0;_r();vbLoad();return}if(location.hash==='#live-vbt'&&document.getElementById('vbtFrame')&&authUser()){try{drawNav('live-vbt')}catch(e){}return}_r();vbLoad()}}
+
+/* ============ BIOMOTOR PULSE DESIGN (own icon set, sidebar, labels) ============ */
+var SKI={
+ home:'<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
+ chat:'<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
+ users:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.6 2.7-6 6-6s6 2.4 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14c2.8 0 5 2 5 5"/>',
+ scale:'<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 10a4 4 0 0 1 8 0"/><path d="M12 10l2-2"/>',
+ team:'<circle cx="12" cy="7" r="2.6"/><circle cx="5.5" cy="10" r="2"/><circle cx="18.5" cy="10" r="2"/><path d="M7 20c0-3 2.2-5 5-5s5 2 5 5M2 18c0-2 1.5-3.5 3.5-3.5M22 18c0-2-1.5-3.5-3.5-3.5"/>',
+ clip:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 10h7M8.5 14h7M8.5 18h4"/>',
+ wave:'<path d="M3 17l4-5 3 3 4-7 3 4 4-5"/><path d="M3 21h18"/>',
+ check:'<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
+ bar:'<path d="M2 12h20"/><rect x="4" y="7" width="3" height="10" rx="1"/><rect x="17" y="7" width="3" height="10" rx="1"/>',
+ gauge:'<path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/><circle cx="12" cy="17" r="1.4"/>',
+ bolt:'<path d="M13 2L5 13h6l-1 9 8-11h-6z"/>',
+ cal:'<rect x="4" y="5" width="16" height="16" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+ flask:'<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/>',
+ video:'<rect x="3" y="6" width="13" height="12" rx="3"/><path d="M16 10l5-3v10l-5-3"/>',
+ book:'<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M8 7h7"/>',
+ target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/>',
+ steth:'<path d="M6 3v6a5 5 0 0 0 10 0V3"/><path d="M11 14v2a4 4 0 0 0 8 0v-2"/><circle cx="19" cy="12" r="2"/>',
+ medal:'<circle cx="12" cy="15" r="5"/><path d="M8.5 11L6 3h4l2 5 2-5h4l-2.5 8"/>',
+ upload:'<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
+ chart:'<path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="5" width="3" height="12"/>',
+ doc:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>',
+ star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+ ticket:'<path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 6v12" stroke-dasharray="2 2"/>',
+ build:'<path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6M9 10h.01M15 10h.01"/>',
+ ucog:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.6 2.7-6 6-6 1.3 0 2.5.4 3.5 1"/><circle cx="18" cy="17" r="2.2"/><path d="M18 13v1.2M18 19.8V21M14 17h1.2M20.8 17H22"/>',
+ rocket:'<path d="M12 15c4-2 7-6 7-12-6 0-10 3-12 7l5 5z"/><path d="M7 10l-3 1 2 2M14 17l-1 3-2-2"/><circle cx="14.5" cy="7.5" r="1.4"/>',
+ pin:'<path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+ brush:'<path d="M14 4l6 6-8 8H6v-6z"/><path d="M4 20l2-2"/>',
+ gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+ card:'<rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M7 15h4"/>',
+ rupee:'<path d="M7 4h10M7 8h10M7 4c5 0 7 2 7 4s-2 4-7 4h-1l8 8"/>',
+ beta:'<path d="M9 3h6M10 3v5L5 18a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-10V3"/><circle cx="10" cy="16" r="1"/><circle cx="14" cy="14" r="1"/>',
+ user:'<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5"/>',
+ help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/>',
+ phone:'<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
+ globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.3 3 14.7 0 18M12 3c-3 3.3-3 14.7 0 18"/>',
+ reports:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9 17v-3M12 17v-6M15 17v-4"/>',
+ program:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/>'};
+var SKMAP={dashboard:'home',communication:'chat',athletes:'users',weighins:'scale',teams:'team',programs:'clip',periodisation:'wave','workout-review':'check','live-lift':'bar','live-vbt':'gauge','speed-log':'bolt',calendar:'cal',testing:'flask','video-jump':'video','testing-library':'book','athlete-goals':'target','fitness-consultation':'steth','sports-tests':'medal','import-data':'upload','team-analytics':'chart','weekly-summary':'doc',recruiting:'star',events:'ticket',organization:'build','coaches-users':'ucog',onboarding:'rocket',facility:'pin',branding:'brush','app-settings':'gear',subscription:'card',payments:'rupee',beta:'beta','my-profile':'user',help:'help','my-portal':'home','my-reports':'reports','my-program':'program','my-team':'medal'};
+var SKGRP={TODAY:'Home',ATHLETES:'Roster',TRAIN:'Training',TEST:'Testing & assessment',INSIGHTS:'Analytics',ADMIN:'Organisation','MY BIOMOTOR':'My BIOMOTOR'};
+const skIco=k=>`<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">${SKI[SKMAP[k]||k]||SKI.doc}</svg></span>`;
+drawNav=function(cur){const me=authUser();const el=document.getElementById('nav');
+ el.innerHTML=axNav(me).map(([g,items])=>`<div class="grp">${esc(SKGRP[g]||g)}</div>`+items.map(([k,l])=>`<a href="#${k}" class="${k===cur?'on':''}" title="${esc(l)}">${skIco(k)}<span>${esc(l)}</span></a>`).join('')).join('');
+ if(dlAppOk())el.insertAdjacentHTML('beforeend',`<a href="download.html" class="dl-app">${skIco('phone')}<span>Download app</span></a>`);
+ el.insertAdjacentHTML('beforeend',`<a href="${esc(siteUrl())}" target="_blank" rel="noopener" class="site-link">${skIco('globe')}<span>${esc(siteName())}</span></a>`)};
+document.body.classList.add('pulse');
+function skFont(){const b=db&&db.brand||{};const def=!b.fontB||b.fontB==='Inter';document.body.classList.toggle('pulse-font',def)}
+{const _af=applyFonts;applyFonts=function(){_af.apply(this,arguments);try{skFont()}catch(e){}}}
+try{skFont()}catch(e){}
 
 /* ============ ACCOUNTS & SIGN-IN (owner: Shubham kale) ============ */
 const SITE_URL='https://biomotorsports.com',siteUrl=()=>(db.org&&db.org.website)||SITE_URL,siteName=()=>siteUrl().replace(/^https?:\/\//,'').replace(/\/$/,'');
@@ -5328,7 +5590,7 @@ async function cloudMe(){const {data:u}=await SB.auth.getUser();if(!u||!u.user){
  if(tok){const inv=(db.invites||[]).find(i=>i.token===tok&&i.status==='Pending'&&normEmail(i.email)===CME.email);if(inv){const pp=CME.name.split(/\s+/);invAccept(inv.id,true,{first:pp[0],last:pp.slice(1).join(' '),phone:CME.phone})}try{localStorage.removeItem('bm_inv')}catch(e){}}
  const ow=CME.owner&&db.users.find(x=>x.role==='Owner');if(ow&&!ow.authId){ow.authId=CME.id;save()}}
 async function cloudPull(rerender){if(!SB||!CME)return;cPulling=true;CSYNC.state='Syncing…';
- try{const PRT=roUser(CME);let {data,error}=PRT?await SB.rpc('my_portal_data'):await SB.from('org_data').select('data,updated_at').eq('id','main').maybeSingle();if(error)throw error;if(PRT){data=data?{data}:null;if(data&&data.data){const sd=seed();Object.keys(sd).forEach(k=>{if(Array.isArray(sd[k])&&!(k in data.data))data.data[k]=[]})}}
+ try{const {data,error}=await SB.from('org_data').select('data,updated_at').eq('id','main').maybeSingle();if(error)throw error;
   if(data&&typeof data.data==='string')try{data.data=Shubham.parse(data.data)}catch(e){}
   if(data&&data.data){db=Object.assign(seed(),data.data);try{localStorage.setItem(KEY,Shubham.stringify(db))}catch(e){}CSYNC={state:'Synced',at:Date.now(),err:''};authDb()}
   else if(CME.owner){cPulling=false;await cloudPush(true);return}
@@ -5460,31 +5722,3 @@ gSearch.oninput=()=>{const q=gSearch.value.trim().toLowerCase();if(q.length<2)re
  modal(`<h3 style="margin-top:0">Search: “${esc(q)}”</h3>${hits.length?hits.slice(0,20).map(h=>`<div class="item"><span>${esc(h.t)} <span class="muted" style="font-size:12px">· ${esc(h.c)}</span></span><span class="r" onclick="closeModal();go('${h.pg}')${h.c2?`;setTimeout(()=>openForm('${h.c2}','${h.id}'),50)`:''}">Open</span></div>`).join(''):'<p class="muted">No matches.</p>'}`)},400)};
 window.addEventListener('hashchange',()=>{render();scrollTo(0,0)});
 skBoot();
-/* ---- Live VBT Track: Athlete = own VBT results + own PDF only · Viewer / Parent = locked, no downloads · staff = full tracker ---- */
-function vbMine(){const M=axMineIds()||new Set();return (db.vbtLog||[]).filter(r=>M.has(r.aid))}
-async function vbMyPdf(){const me=authUser();if(!me||me.role!=='Athlete'){toast('🔒 Download is not available for this account');return}
- const M=axMineIds();const a=db.athletes.find(x=>M&&M.has(x.id));const L=vbMine().filter(r=>a&&r.aid===a.id).sort((x,y)=>String(y.date).localeCompare(String(x.date)));
- if(!a||!L.length){toast('No VBT sessions to download yet');return}toast('Preparing PDF…');
- try{const {PDFDocument,StandardFonts,rgb}=await fcLib();const doc=await PDFDocument.create();const F=await doc.embedFont(StandardFonts.Helvetica),B=await doc.embedFont(StandardFonts.HelveticaBold);
-  const W=595,H=842,M0=40;let pg=doc.addPage([W,H]),y=H-50;const RED=rgb(.79,.07,.18),MUT=rgb(.4,.4,.45),DARK=rgb(.1,.1,.12);
-  const T=(t,x,yy,o={})=>pg.drawText(fcTx(String(t)),{x,y:yy,size:o.z||10,font:o.b?B:F,color:o.c||DARK});
-  const need=h=>{if(y-h<50){pg=doc.addPage([W,H]);y=H-50}};
-  T('BIOMOTOR Sport and Fitness',M0,y,{b:1,z:11,c:RED});y-=22;T('Live VBT Report',M0,y,{b:1,z:20});y-=20;
-  T(a.name+(a.sport?'  ·  '+a.sport:'')+(a.position?' · '+a.position:''),M0,y,{z:12});y-=14;T('Generated '+fmtDate(today())+'  ·  '+L.length+' exercise entries',M0,y,{z:9,c:MUT});y-=26;
-  const best={};L.forEach(r=>{if(r.e1rm&&(!best[r.ex]||r.date>best[r.ex].date))best[r.ex]=r});const BB=Object.values(best);
-  if(BB.length){T('Latest estimated 1RM',M0,y,{b:1,z:12,c:RED});y-=16;BB.forEach(r=>{need(14);T(r.ex,M0,y);T(vbN(r.e1rm,1)+' kg',M0+260,y,{b:1});T(vbN(r.best)+' m/s',M0+360,y);T(fmtDate(r.date),M0+450,y,{c:MUT});y-=14});y-=12}
-  T('Session log',M0,y,{b:1,z:12,c:RED});y-=16;const cols=[['Date',0],['Exercise',70],['Sets x reps',220],['Top load',290],['Best vel.',355],['Power',420],['e1RM',470]];
-  const hdr=()=>{cols.forEach(([l,x])=>T(l,M0+x,y,{b:1,z:9,c:MUT}));y-=13};hdr();
-  L.forEach(r=>{if(y<60){pg=doc.addPage([W,H]);y=H-50;hdr()}const v=[fmtDate(r.date),String(r.ex).slice(0,26),r.sets+' x '+r.reps,vbN(r.maxLoad,1)+' kg',vbN(r.best)+' m/s',r.power?Math.round(r.power)+' W':'-',r.e1rm?vbN(r.e1rm,1)+' kg':'-'];
-   cols.forEach(([l,x],k)=>T(v[k],M0+x,y,{z:9}));y-=13});
-  const bytes=await doc.save();const name=('VBT-Report_'+a.name+'_'+today()).replace(/[^\w.-]+/g,'_')+'.pdf';await fcDownload(bytes,name);toast('PDF ready: '+name)}
- catch(e){console.error(e);toast('PDF failed: '+(e.message||e))}}
-{const _lv=P['live-vbt'];P['live-vbt']=function(){const me=authUser();if(!roUser(me))return _lv();
- if(me.role==='Athlete'){const all=db.vbtLog;let body='';db.vbtLog=vbMine();const keep=VB.aid;VB.aid='';try{body=vbResults()}finally{db.vbtLog=all;VB.aid=keep}
-  return head('Train','Live VBT Track','Your own VBT results: bar speed, power and estimated 1RM from the sessions your coach recorded.',
-   `<div class="row" data-ro-ok><button class="btn pri" onclick="vbMyPdf()">⬇ Download my VBT report (PDF)</button></div>`)+
-   `<div class="pill p-blue" style="display:inline-block;margin-bottom:12px">👁 View only — only your own VBT results are shown</div>`+body}
- return head('Train','Live VBT Track','Camera velocity-based training: bar speed, ROM, power, e1RM and load–velocity profiles.','')+
- `<div class="card" style="border:2px solid var(--accent);text-align:center;padding:28px 18px"><div style="font-size:42px">🔒</div>
- <h3 style="margin:8px 0 6px">Live VBT Track is not available for this account</h3>
- <p class="muted" style="max-width:560px;margin:0 auto">Viewer accounts can open this page but cannot use the tracker or download reports. Coaches and staff use Live VBT Track; athletes see and download only their own VBT results here.</p></div>`}}
