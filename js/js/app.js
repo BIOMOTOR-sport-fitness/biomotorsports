@@ -5501,6 +5501,56 @@ function pvBlur(on){if(!PV.on)return;document.body.classList.toggle('pv-blur',!!
  document.addEventListener('dragstart',e=>{if(PV.on&&e.target&&e.target.tagName==='IMG')e.preventDefault()});
 })();
 
+/* ============ LOGIN LOCK (5 wrong passwords → 15-minute lock with live countdown) ============ */
+var LK={max:5,ms:15*60000,key:'bm_login_lock',t:null,last:''};
+function lkAll(){try{return JSON.parse(localStorage.getItem(LK.key)||'{}')||{}}catch(e){return {}}}
+function lkPut(o){try{localStorage.setItem(LK.key,JSON.stringify(o))}catch(e){}}
+function lkId(){const el=document.getElementById('alI');return String(el&&el.value||'').trim().toLowerCase().replace(/\s+/g,'')}
+function lkRec(id){const o=lkAll();return Object.assign({f:0,u:0},o[id]||{})}
+function lkSave(id,r){const o=lkAll();if(r)o[id]=r;else delete o[id];lkPut(o)}
+function lkLeft(id){const r=lkRec(id);return r.u>Date.now()?r.u-Date.now():0}
+const lkMMSS=ms=>{const s=Math.ceil(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const lkAt=ms=>{const d=new Date(Date.now()+ms);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
+function lkMsg(id){const left=lkLeft(id);return `<div id="lkBox" data-id="${esc(id)}" style="color:var(--bad)"><b>🔒 Login locked for 15 minutes</b><br>5 wrong passwords were entered for this account. You can try again at <b>${lkAt(left)}</b> — <b id="lkT">${lkMMSS(left)}</b> left.<br><span class="muted" style="font-size:12px">Forgot your password? Use "Forgot password" or contact the owner.</span></div>`}
+function lkTick(){clearInterval(LK.t);LK.t=setInterval(()=>{const b=document.getElementById('lkBox');if(!b){clearInterval(LK.t);return}const id=b.dataset.id,left=lkLeft(id);
+ const btn=b.closest('.card,body').querySelector('form button.pri');if(btn)btn.disabled=left>0;
+ if(left>0){const t=document.getElementById('lkT');if(t)t.textContent=lkMMSS(left);return}
+ clearInterval(LK.t);lkSave(id,null);AU.msg='<span style="color:var(--good,#15803d)"><b>🔓 Login unlocked.</b> You can sign in again now.</span>';renderAuth()},1000)}
+function lkShow(id){AU.msg=lkMsg(id);renderAuth();const f=document.getElementById('alI');if(f)f.value=id;lkTick()}
+{const _t=toast;toast=function(m){LK.last=String(m||'');return _t.apply(this,arguments)}}
+function lkWrap(fn){return async function(){const id=lkId();if(!id)return fn.apply(this,arguments);
+ if(lkLeft(id)){lkShow(id);return}
+ LK.last='';await fn.apply(this,arguments);
+ let ok=false;try{ok=!!authUser()}catch(e){}
+ const msg=String(AU&&AU.msg||'')+' '+LK.last;
+ if(ok){lkSave(id,null);return}
+ if(!/wrong (email or )?password|invalid login|too many attempts/i.test(msg))return;
+ const r=lkRec(id);r.f=(r.f||0)+1;
+ if(r.f>=LK.max){r.u=Date.now()+LK.ms;r.f=0;lkSave(id,r);lkShow(id);return}
+ lkSave(id,r);const n=LK.max-r.f;AU.msg=`<span style="color:var(--bad)"><b>Wrong password.</b> ${n} attempt${n>1?'s':''} left — after ${LK.max} wrong passwords, login is locked for 15 minutes.</span>`;renderAuth();const f=document.getElementById('alI');if(f)f.value=id}}
+authLogin=lkWrap(authLogin);cAuthLogin=lkWrap(cAuthLogin);
+
+/* ============ ONE-TAP ACCOUNT LINKING (athlete / parent login → athlete profile) ============ */
+function lnAccs(){let A=[];try{A=(typeof accs==='function'?accs():[])||[]}catch(e){}
+ const seen=new Set(A.map(a=>normEmail(a.email||'')));
+ (db.users||[]).filter(u=>['Athlete','Parent'].includes(u.role)&&u.email&&u.status!=='Archived'&&!seen.has(normEmail(u.email))).forEach(u=>A.push({id:'u_'+u.id,name:uName(u),email:u.email,role:u.role,status:u.status||'Active'}));
+ return A.filter(a=>['Athlete','Parent'].includes(a.role)&&a.email)}
+function lnLinked(a){const em=normEmail(a.email);return db.athletes.filter(x=>a.role==='Athlete'?normEmail(x.email||'')===em:[x.parentEmail,x.guardianEmail].filter(Boolean).map(normEmail).includes(em))}
+function lnCard(){const me=authUser();if(!isAdmin(me))return '';const A=lnAccs();
+ const rows=A.map((a,i)=>{const L=lnLinked(a);return `<tr><td><b>${esc(a.name||a.email)}</b><div class="muted" style="font-size:12px">${esc(a.email)}</div></td><td><span class="pill ${a.role==='Parent'?'p-blue':'p-ok'}">${esc(a.role)}</span>${a.status!=='Active'?` <span class="pill">${esc(a.status)}</span>`:''}</td>
+ <td>${L.length?L.map(x=>`✅ ${esc(x.name)} <button class="btn sm ghost" title="Unlink" onclick="lnUnlink(${i},'${x.id}')">✕</button>`).join('<br>'):'<span style="color:var(--bad)">Not linked</span>'}</td>
+ <td><div class="row" style="gap:6px;flex-wrap:nowrap"><select id="lnSel${i}" style="min-width:150px"><option value="">Choose athlete…</option>${db.athletes.filter(x=>x.status!=='Inactive').map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select><button class="btn sm pri" onclick="lnLink(${i})">Link</button></div></td></tr>`}).join('');
+ return `<div class="card" id="lnCard"><div class="eyebrow" style="letter-spacing:.15em">Athlete &amp; parent logins</div><h3 style="margin:4px 0 6px">Link login → athlete profile (one tap)</h3>
+ <p class="muted" style="margin:0 0 10px;font-size:13px">Choose the athlete profile for each login and press <b>Link</b>. The athlete (or parent) then taps ⟳ and sees their own dashboard. Approve the account first if it is Pending.</p>
+ ${A.length?`<div style="overflow:auto"><table class="st-nt"><thead><tr><th>Login</th><th>Role</th><th>Linked to</th><th>Link to profile</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p class="muted">No athlete or parent logins yet.</p>'}</div>`}
+function lnLink(i){const a=lnAccs()[i];const id=(document.getElementById('lnSel'+i)||{}).value;if(!a||!id){toast('Choose an athlete profile first');return}const x=byId('athletes',id);if(!x)return;
+ if(a.role==='Athlete'){const other=db.athletes.find(y=>y.id!==id&&normEmail(y.email||'')===normEmail(a.email));if(other)other.email='';x.email=a.email}
+ else{if(!x.parentEmail||normEmail(x.parentEmail)===normEmail(a.email))x.parentEmail=a.email;else x.guardianEmail=a.email}
+ save();render();toast(`${a.name||a.email} linked to ${x.name} — ask them to tap ⟳`)}
+function lnUnlink(i,id){const a=lnAccs()[i],x=byId('athletes',id);if(!a||!x)return;const em=normEmail(a.email);
+ if(normEmail(x.email||'')===em)x.email='';if(normEmail(x.parentEmail||'')===em)x.parentEmail='';if(normEmail(x.guardianEmail||'')===em)x.guardianEmail='';save();render();toast('Unlinked')}
+{const _cu=P['coaches-users'];if(_cu)P['coaches-users']=function(){const h=_cu.apply(this,arguments);try{return lnCard()+h}catch(e){return h}}}
+
 /* ============ ACCOUNTS & SIGN-IN (owner: Shubham kale) ============ */
 const SITE_URL='https://biomotorsports.com',siteUrl=()=>(db.org&&db.org.website)||SITE_URL,siteName=()=>siteUrl().replace(/^https?:\/\//,'').replace(/\/$/,'');
 const OWNER_ACC={name:'Shubham kale',email:'founder.shubhamkale@gmail.com',phone:'9321766523'};
@@ -5557,7 +5607,7 @@ async function authOwnerReset(){const o=authDb();const c=aval('afC').toUpperCase
  await setPw(o,w);o.ver=(o.ver||0)+1;const code=genCode();o.rsalt=newSalt();o.rhash=await pwHash(code.replace(/-/g,''),o.rsalt);save();signIn(o,true);AU={view:'code',code,msg:'Password reset. A new recovery code was created:',inv:''};renderAuth()}
 async function authLogin(){authDb();const a=accFind(aval('alI'));const w=aval('alW');if(!a||!a.hash){AU.msg='No account found with that email or mobile number. <a href="javascript:void 0" style="color:var(--accent)" onclick="AU.view=\'signup\';AU.msg=\'\';renderAuth()">Create one</a>.';renderAuth();return}
  a.fails=a.fails||0;if(a.lockUntil&&a.lockUntil>Date.now()){toast('Too many attempts — try again in '+Math.ceil((a.lockUntil-Date.now())/60000)+' min');return}
- if(await pwHash(w,a.salt)!==a.hash){a.fails++;if(a.fails>=5){a.lockUntil=Date.now()+5*60000;a.fails=0}save();toast('Wrong password');return}a.fails=0;a.lockUntil=0;
+ if(await pwHash(w,a.salt)!==a.hash){a.fails++;if(a.fails>=5){a.lockUntil=Date.now()+15*60000;a.fails=0}save();toast('Wrong password');return}a.fails=0;a.lockUntil=0;
  if(a.status==='Pending'){AU.msg=`Your account is waiting for approval by ${esc(OWNER_ACC.name)}. Call or WhatsApp ${esc(OWNER_ACC.phone)} to speed it up.`;renderAuth();return}
  if(a.status!=='Active'){AU.msg='This account is disabled. Contact '+esc(OWNER_ACC.name)+'.';renderAuth();return}
  signIn(a,document.getElementById('alR').checked);AU.msg='';location.hash=a.goto||'dashboard';delete a.goto;applyBrand();render();toast('Welcome, '+a.name)}
