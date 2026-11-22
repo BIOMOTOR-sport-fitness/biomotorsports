@@ -9,12 +9,15 @@ function createWindow() {
     icon: path.join(__dirname, 'www', 'assets', 'icons', 'icon-512.png'),
     webPreferences: { contextIsolation: true, sandbox: true }
   });
+  // Privacy (like Google Pay): screenshots and screen recordings show a black window (Windows + Mac)
+  win.setContentProtection(true);
   win.loadFile(path.join(__dirname, 'www', 'index.html'));
   // web links (WhatsApp, UPI, GitHub…) open in the normal browser; print windows stay inside the app
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^(https?|mailto|tel|upi|whatsapp):/i.test(url)) { shell.openExternal(url); return { action: 'deny' }; }
     return { action: 'allow' };
   });
+  win.webContents.on('did-create-window', w => { try { w.setContentProtection(true); } catch (e) {} });
 }
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
