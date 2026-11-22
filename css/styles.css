@@ -402,6 +402,10 @@ body.vbt-on #aiBtn{display:none}
 .st-norm{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px}.st-norm.on{border-color:var(--accent)}
 .st-nt td.hx{background:color-mix(in srgb,var(--accent) 22%,transparent);font-weight:700}
 .st-psy{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin-top:8px}.st-pt2 td:first-child{width:34%;white-space:normal;vertical-align:top}
+#pvWm{position:fixed;inset:0;z-index:2147483000;pointer-events:none;background-repeat:repeat}
+body.pv{-webkit-user-select:none;user-select:none}body.pv input,body.pv textarea,body.pv select,body.pv [contenteditable]{-webkit-user-select:text;user-select:text}
+body.pv-blur>*:not(#pvWm){filter:blur(22px)!important}
+@media print{body.pv>*{display:none!important}body.pv::before{content:'Printing is disabled on BIOMOTOR.';display:block;font:20px Arial;padding:40px}}
 /* ===== BIOMOTOR Pulse design ===== */
 body.pulse{--radius:20px}
 body.pulse.pulse-font{font-family:"Plus Jakarta Sans",Inter,system-ui,sans-serif}
