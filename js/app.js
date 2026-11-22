@@ -5460,3 +5460,31 @@ gSearch.oninput=()=>{const q=gSearch.value.trim().toLowerCase();if(q.length<2)re
  modal(`<h3 style="margin-top:0">Search: “${esc(q)}”</h3>${hits.length?hits.slice(0,20).map(h=>`<div class="item"><span>${esc(h.t)} <span class="muted" style="font-size:12px">· ${esc(h.c)}</span></span><span class="r" onclick="closeModal();go('${h.pg}')${h.c2?`;setTimeout(()=>openForm('${h.c2}','${h.id}'),50)`:''}">Open</span></div>`).join(''):'<p class="muted">No matches.</p>'}`)},400)};
 window.addEventListener('hashchange',()=>{render();scrollTo(0,0)});
 skBoot();
+/* ---- Live VBT Track: Athlete = own VBT results + own PDF only · Viewer / Parent = locked, no downloads · staff = full tracker ---- */
+function vbMine(){const M=axMineIds()||new Set();return (db.vbtLog||[]).filter(r=>M.has(r.aid))}
+async function vbMyPdf(){const me=authUser();if(!me||me.role!=='Athlete'){toast('🔒 Download is not available for this account');return}
+ const M=axMineIds();const a=db.athletes.find(x=>M&&M.has(x.id));const L=vbMine().filter(r=>a&&r.aid===a.id).sort((x,y)=>String(y.date).localeCompare(String(x.date)));
+ if(!a||!L.length){toast('No VBT sessions to download yet');return}toast('Preparing PDF…');
+ try{const {PDFDocument,StandardFonts,rgb}=await fcLib();const doc=await PDFDocument.create();const F=await doc.embedFont(StandardFonts.Helvetica),B=await doc.embedFont(StandardFonts.HelveticaBold);
+  const W=595,H=842,M0=40;let pg=doc.addPage([W,H]),y=H-50;const RED=rgb(.79,.07,.18),MUT=rgb(.4,.4,.45),DARK=rgb(.1,.1,.12);
+  const T=(t,x,yy,o={})=>pg.drawText(fcTx(String(t)),{x,y:yy,size:o.z||10,font:o.b?B:F,color:o.c||DARK});
+  const need=h=>{if(y-h<50){pg=doc.addPage([W,H]);y=H-50}};
+  T('BIOMOTOR Sport and Fitness',M0,y,{b:1,z:11,c:RED});y-=22;T('Live VBT Report',M0,y,{b:1,z:20});y-=20;
+  T(a.name+(a.sport?'  ·  '+a.sport:'')+(a.position?' · '+a.position:''),M0,y,{z:12});y-=14;T('Generated '+fmtDate(today())+'  ·  '+L.length+' exercise entries',M0,y,{z:9,c:MUT});y-=26;
+  const best={};L.forEach(r=>{if(r.e1rm&&(!best[r.ex]||r.date>best[r.ex].date))best[r.ex]=r});const BB=Object.values(best);
+  if(BB.length){T('Latest estimated 1RM',M0,y,{b:1,z:12,c:RED});y-=16;BB.forEach(r=>{need(14);T(r.ex,M0,y);T(vbN(r.e1rm,1)+' kg',M0+260,y,{b:1});T(vbN(r.best)+' m/s',M0+360,y);T(fmtDate(r.date),M0+450,y,{c:MUT});y-=14});y-=12}
+  T('Session log',M0,y,{b:1,z:12,c:RED});y-=16;const cols=[['Date',0],['Exercise',70],['Sets x reps',220],['Top load',290],['Best vel.',355],['Power',420],['e1RM',470]];
+  const hdr=()=>{cols.forEach(([l,x])=>T(l,M0+x,y,{b:1,z:9,c:MUT}));y-=13};hdr();
+  L.forEach(r=>{if(y<60){pg=doc.addPage([W,H]);y=H-50;hdr()}const v=[fmtDate(r.date),String(r.ex).slice(0,26),r.sets+' x '+r.reps,vbN(r.maxLoad,1)+' kg',vbN(r.best)+' m/s',r.power?Math.round(r.power)+' W':'-',r.e1rm?vbN(r.e1rm,1)+' kg':'-'];
+   cols.forEach(([l,x],k)=>T(v[k],M0+x,y,{z:9}));y-=13});
+  const bytes=await doc.save();const name=('VBT-Report_'+a.name+'_'+today()).replace(/[^\w.-]+/g,'_')+'.pdf';await fcDownload(bytes,name);toast('PDF ready: '+name)}
+ catch(e){console.error(e);toast('PDF failed: '+(e.message||e))}}
+{const _lv=P['live-vbt'];P['live-vbt']=function(){const me=authUser();if(!roUser(me))return _lv();
+ if(me.role==='Athlete'){const all=db.vbtLog;let body='';db.vbtLog=vbMine();const keep=VB.aid;VB.aid='';try{body=vbResults()}finally{db.vbtLog=all;VB.aid=keep}
+  return head('Train','Live VBT Track','Your own VBT results: bar speed, power and estimated 1RM from the sessions your coach recorded.',
+   `<div class="row" data-ro-ok><button class="btn pri" onclick="vbMyPdf()">⬇ Download my VBT report (PDF)</button></div>`)+
+   `<div class="pill p-blue" style="display:inline-block;margin-bottom:12px">👁 View only — only your own VBT results are shown</div>`+body}
+ return head('Train','Live VBT Track','Camera velocity-based training: bar speed, ROM, power, e1RM and load–velocity profiles.','')+
+ `<div class="card" style="border:2px solid var(--accent);text-align:center;padding:28px 18px"><div style="font-size:42px">🔒</div>
+ <h3 style="margin:8px 0 6px">Live VBT Track is not available for this account</h3>
+ <p class="muted" style="max-width:560px;margin:0 auto">Viewer accounts can open this page but cannot use the tracker or download reports. Coaches and staff use Live VBT Track; athletes see and download only their own VBT results here.</p></div>`}}
