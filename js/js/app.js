@@ -5326,9 +5326,9 @@ function axLockNow(){confirmBox('Lock the platform for everyone except you now? 
 {const _sub=P.subscription;P.subscription=()=>axSubCard()+_sub()}
 /* ---- which athletes belong to this account ---- */
 function axMine(me){if(!me)return [];const em=normEmail(me.email);const ids=new Set();const uids=db.users.filter(u=>em&&normEmail(u.email)===em&&u.status!=='Archived').map(u=>u.id);if(me.user)uids.push(me.user);
- (me.role==='Parent'?db.parentLinks:db.athLinks||[]).forEach(l=>{if(l.status==='Active'&&uids.includes(l.user))ids.add(l.athlete)});
+ ((me.role==='Parent'?db.parentLinks:db.athLinks)||[]).forEach(l=>{if(l.status==='Active'&&uids.includes(l.user))ids.add(l.athlete)});
  (db.invites||[]).forEach(i=>{if(em&&normEmail(i.email)===em&&i.role===me.role&&i.athlete&&i.status!=='Revoked')ids.add(i.athlete)});
- db.athletes.forEach(a=>{const e=[a.email,me.role==='Parent'&&a.parentEmail,me.role==='Parent'&&a.guardianEmail].filter(Boolean).map(normEmail);if(em&&(me.role==='Athlete'?normEmail(a.email)===em:e.slice(1).includes(em)))ids.add(a.id)});
+ db.athletes.forEach(a=>{if(!em)return;if(me.role==='Athlete'?normEmail(a.email||'')===em:[a.parentEmail,a.guardianEmail].filter(Boolean).map(normEmail).includes(em))ids.add(a.id)});
  return [...ids].map(id=>byId('athletes',id)).filter(Boolean)}
 let AXP={aid:''};
 function axCur(me){const L=axMine(me);if(!L.some(a=>a.id===AXP.aid))AXP.aid=L[0]?L[0].id:'';return {L,a:byId('athletes',AXP.aid)}}
@@ -5392,6 +5392,39 @@ P['my-team']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me
 {const _r=render;render=function(){AX_RENDERING=true;try{_r()}finally{AX_RENDERING=false}const me=authUser();['gSearch','bellBtn','aiBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=portalUser(me)?'none':''});
  if(me&&me.owner&&!document.body.classList.contains('tvmode')){const L=axLocked();const v=document.getElementById('view');if(L&&v&&!v.querySelector('.ax-own'))v.insertAdjacentHTML('afterbegin',`<div class="card ax-own" style="border:2px solid var(--bad);color:var(--bad)">🔒 Subscription ended ${fmtDate(L.end)} — the platform is locked for everyone except you. <a href="javascript:void 0" style="color:inherit;font-weight:700" onclick="go('subscription')">Verify a payment or extend access</a></div>`)}
  if(me&&roUser(me)&&document.body&&!document.body.classList.contains('tvmode')){const v=document.getElementById('view');if(v&&!portalUser(me)&&!v.querySelector('.ac-tour'))v.insertAdjacentHTML('afterbegin',`<div class="card ac-tour">👁 <b>Tour mode — view only.</b> You can look around every section of the platform; nothing can be added, edited or deleted from this account.</div>`);axLock(v)}}}
+
+/* ============ PORTAL SCOPE (athlete / parent see the full platform, view-only, only their own athlete data) ============ */
+var SC={full:null,on:false};
+const SC_PAGES=['dashboard','communication','athletes','weighins','teams','programs','periodisation','workout-review','speed-log','calendar','testing','testing-library','athlete-goals','fitness-consultation','sports-tests','team-analytics','weekly-summary','recruiting','events','my-profile','help'];
+SC_PAGES.forEach(p=>{if(!PORTAL_PAGES.includes(p))PORTAL_PAGES.push(p)});
+const SC_REF=['athlete','athleteId','aid','athId','ath','athleteID'];
+const SC_NAMEK=['name','athleteName','athlete_name','athName','who'];
+function scMineIds(me,d){const sv=db;db=d;try{return axMine(me).map(a=>a.id)}finally{db=sv}}
+function scScope(me,full){const d=Shubham.parse(Shubham.stringify(full));const ids=new Set(scMineIds(me,full));
+ const names=new Set(full.athletes.filter(a=>ids.has(a.id)).map(a=>axNm(a.name)));const em=normEmail(me.email||'');
+ const keep=(x)=>{if(!x||typeof x!=='object'||Array.isArray(x))return true;
+  for(const k of SC_REF){if(typeof x[k]==='string'&&x[k])return ids.has(x[k]);}
+  if(Array.isArray(x.athletes)&&x.athletes.length&&x.athletes.every(v=>typeof v==='string')){x.athletes=x.athletes.filter(v=>ids.has(v));return x.athletes.length>0}
+  if(SC_REF.some(k=>k in x)){const n=SC_NAMEK.map(k=>axNm(x[k])).find(Boolean);return !!n&&names.has(n)}
+  return true};
+ Object.keys(d).forEach(k=>{const v=d[k];if(!Array.isArray(v))return;
+  if(k==='athletes'){d[k]=v.filter(a=>ids.has(a.id));return}
+  if(k==='users'){d[k]=v.filter(u=>!['Athlete','Parent'].includes(u.role)||normEmail(u.email||'')===em).map(u=>normEmail(u.email||'')===em?u:Object.assign({},u,{email:'',phone:''}));return}
+  if(['payments','invites','accounts','facilities'].includes(k)){d[k]=k==='invites'?v.filter(i=>normEmail(i.email||'')===em):[];return}
+  if(k==='messages'){d[k]=v.filter(m=>keep(m)&&(!m.to||m.to==='all'||m.to===em||ids.has(m.to)));return}
+  d[k]=v.filter(keep)});
+ d.__sc=1;return d}
+function scApply(){let me=null;try{me=authUser()}catch(e){}if(!portalUser(me)){if(SC.on&&SC.full){db=SC.full;SC.full=null;SC.on=false}return}
+ if(db&&db.__sc)return;SC.full=db;try{db=scScope(me,SC.full)}catch(e){db=Object.assign(seed(),{athletes:[],sportTests:[],results:[],weighins:[],__sc:1})}SC.on=true;
+ if(typeof CLOUD!=='undefined'&&CLOUD)try{localStorage.setItem(KEY,Shubham.stringify(db))}catch(e){}}
+axNav=(function(f){return function(me){if(!portalUser(me))return f(me);
+ const g=NAV.map(([gr,items])=>[gr,items.filter(([k])=>SC_PAGES.includes(k))]).filter(([gr,i])=>i.length);return PORTAL_NAV.concat(g)}})(axNav);
+/* team rankings compare with team-mates: use the full roster only while drawing that page (names only, nothing clickable) */
+{const _mt=P['my-team'];P['my-team']=function(){if(!SC.full)return _mt();const me=authUser(),sv=db;const {a}=axCur(me);db=SC.full;try{if(a)AXP.aid=a.id;return _mt()}finally{db=sv}}}
+{const _r=render;render=function(){scApply();return _r.apply(this,arguments)}}
+{const _cp=cloudPull;cloudPull=async function(){const sv=SC.on;if(sv){db=SC.full||db;SC.on=false;SC.full=null}const x=await _cp.apply(this,arguments);try{scApply()}catch(e){}return x}}
+{const _rv=axRevert;axRevert=function(){const r=_rv.apply(this,arguments);try{if(portalUser(authUser())&&!(db&&db.__sc)){db.__sc=1;SC.on=true}}catch(e){}return r}}
+{const _so=signOut;signOut=function(){if(SC.on&&SC.full){db=SC.full}SC.full=null;SC.on=false;return _so.apply(this,arguments)}}
 
 /* ============ LIVE VBT TRACK (camera velocity-based training, embedded tracker + results) ============ */
 window.BMP={get db(){return db},save(){save()},user(){return authUser()}};
