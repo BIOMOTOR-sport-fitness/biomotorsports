@@ -2957,7 +2957,7 @@ async function loadVideoFile(f) {
   sourceReady();
   setupImport(f);
 }
-function seekTo(t, v = video) { return new Promise(r => { v.addEventListener('seeked', r, { once: true }); v.currentTime = t; }); }
+function seekTo(t, v = video) { return new Promise(r => { v.addEventListener('seeked', () => { if (!v.requestVideoFrameCallback) return r(); let ok = false; const go = () => { if (!ok) { ok = true; r(); } }; v.requestVideoFrameCallback(go); setTimeout(go, 250); }, { once: true }); v.currentTime = t; }); }
 function sourceReady() {
   setupDims(); grabFrame(); T.lastT = -1;
   ['#detBtn', '#resetBtn'].forEach(s => $(s).disabled = false);
@@ -3130,6 +3130,7 @@ function lightStats(g, W, H, cx, cy, r) {
 }
 function snapAt(vx, vy) { const G = grayHi(640); return detectPlates(G.g, G.W, G.H, 0.1, { x: vx * G.s, y: vy * G.s }).map(c => ({ x: c.x / G.s, y: c.y / G.s, r: c.r / G.s, frac: c.frac })); }
 function resetCalib() {
+  T.selGray = null; T.selT = null;
   T.phase = 'idle'; T.cands = []; T.sel = null; T.manual = null; T.tracker = null; T.pos = null; T.trail = []; T.lost = 0; T.preview = null; T.auto = { cand: null, hits: 0, lastRun: 0 };
   $('#lockBtn').disabled = true; $('#radSl').disabled = true; updateCTA();
 }
@@ -3142,10 +3143,12 @@ function autoDetect() {
   else { T.sel = null; $('#lockBtn').disabled = true; T.phase = 'manC'; $('#calStatus').textContent = 'No plate found in this frame. Tap the plate centre, then its edge.'; }
   redraw(); updateCTA();
 }
-function selectCand(c) { T.sel = { x: c.x, y: c.y, r: c.r, rv: c.rv || c.r, rh: c.rh || c.r, aspect: c.aspect || 1, contrast: c.contrast ?? null }; T.baseR = c.r; T.baseRv = T.sel.rv; T.baseRh = T.sel.rh; $('#radSl').value = 100; $('#radSl').disabled = false; $('#lockBtn').disabled = false; updatePlateInfo(); }
+function selectCand(c) { T.sel = { x: c.x, y: c.y, r: c.r, rv: c.rv || c.r, rh: c.rh || c.r, aspect: c.aspect || 1, contrast: c.contrast ?? null };
+  if (T.mode === 'file') { try { T.selT = video.currentTime; T.selGray = frameReader(video, 400).read(); } catch (e) { T.selGray = null; } } T.baseR = c.r; T.baseRv = T.sel.rv; T.baseRh = T.sel.rh; $('#radSl').value = 100; $('#radSl').disabled = false; $('#lockBtn').disabled = false; updatePlateInfo(); }
 $('#detBtn').onclick = autoDetect;
 $('#resetBtn').onclick = async () => { if (T.set) await endSet(); resetCalib(); if (T.mode) T.phase = 'auto'; $('#calStatus').textContent = 'Reset. The ring follows the plate again – or tap the plate centre, then its edge.'; hideFB(); redraw(); };
 $('#radSl').oninput = e => { if (T.sel && !T.tracker) { const k = e.target.value / 100; T.sel.r = T.baseR * k; T.sel.rv = T.baseRv * k; T.sel.rh = T.baseRh * k; updatePlateInfo(); redraw(); } };
+$('#radSl').onchange = () => selGrab();
 $('#lockBtn').onclick = () => { if (!T.sel && T.preview) selectCand(refineVideoCircle(T.preview.x, T.preview.y, T.preview.r, 0.15) || T.preview); lockPlate(); };
 function lockPlate(auto) {
   if (!T.sel || !T.gray) return false;
@@ -3166,7 +3169,8 @@ const RG = { p: new Map(), mode: null, replay: false, start: null };
 const rgVid = (cx, cy) => { const rc = view.getBoundingClientRect(); return { x: (cx - rc.left) * (view.width / rc.width) / T.vs, y: (cy - rc.top) * (view.height / rc.height) / T.vs }; };
 const rgOn = () => T.mode && !T.busy && !T.tracker && T.sel;
 function rgScale(k) { const S = T.sel; k = clamp(k, 0.4, 2.5); S.r *= k; S.rv *= k; S.rh *= k; T.baseR = S.r; T.baseRv = S.rv; T.baseRh = S.rh; $('#radSl').value = 100; }
-function rgDone() { T.phase = 'set'; T.manual = null; $('#lockBtn').disabled = false; $('#calStatus').textContent = 'Circle adjusted. Make sure it sits exactly on the plate rim, then Lock.'; updatePlateInfo(); redraw(); updateCTA(); }
+function selGrab() { if (T.mode === 'file' && T.sel) try { T.selT = video.currentTime; T.selGray = frameReader(video, 400).read(); } catch (e) { T.selGray = null; } }
+function rgDone() { selGrab(); T.phase = 'set'; T.manual = null; $('#lockBtn').disabled = false; $('#calStatus').textContent = 'Circle adjusted. Make sure it sits exactly on the plate rim, then Lock.'; updatePlateInfo(); redraw(); updateCTA(); }
 view.addEventListener('pointerdown', e => {
   if (RG.replay || !rgOn()) return;
   e.stopImmediatePropagation(); e.preventDefault(); try { view.setPointerCapture(e.pointerId); } catch (er) {}
@@ -3471,7 +3475,7 @@ async function analyzeVideo(blob, opts = {}) {
     if (!isFinite(v.duration)) { v.currentTime = 1e6; await new Promise(r => v.addEventListener('durationchange', r, { once: true })); }
     const FR = frameReader(v, 400), n = FR.W * FR.H, prog = opts.progress || (() => {});
     let plate = opts.plate || null, tplGray = null, tplT = 0;
-    if (plate) { await seekTo(plate.t || 0, v); tplGray = FR.read(); tplT = plate.t || 0; }
+    if (plate) { tplT = plate.t || 0; if (plate.gray && plate.gray.length === n) tplGray = plate.gray; else { await seekTo(tplT, v); tplGray = FR.read(); } }
     else {
       // pass 1: largest round plate that moves
       const S = { gray: new Float32Array(n), prevGray: null, motion: null, motionFrac: 0 }; let best = null, k = 0;
@@ -3579,7 +3583,9 @@ async function analyseFile() {
   const t0 = performance.now();
   video.pause();
   let plate = null;
-  if (T.sel) { const r = T.sel; plate = { x: r.x, y: r.y, r: r.r, t: video.currentTime }; }
+  if (T.sel) { const r = T.sel; plate = { x: r.x, y: r.y, r: r.r, t: T.selT != null ? T.selT : video.currentTime, gray: T.selGray || null };
+    // the frame on screen may have moved on since the ring was set: go back to it before analysing
+    if (!plate.gray && Math.abs(video.currentTime - plate.t) > 0.02) await seekTo(plate.t); if (!plate.gray) try { plate.gray = frameReader(video, 400).read(); } catch (e) {} }
   const rec = newRec(ref.s); rec.source = 'file'; rec.imported = true; rec.time = new Date(T.file.lastModified || Date.now()).toISOString(); rec.fileName = T.file.name;
   const out = await runAnalysis(T.file, { plate, rec });
   if (!out) return;

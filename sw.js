@@ -1,5 +1,5 @@
 /* BIOMOTOR Sport and Fitness — offline support for the installed app */
-const VERSION = 'biomotor-v30-2026-11-23';
+const VERSION = 'biomotor-v31-2026-11-23';
 const SHELL = ['./', './index.html', './download.html', './css/styles.css', './js/app.js', './sk/config.sk', './manifest.webmanifest',
   './assets/bm-logo.png', './assets/bm-mark.png', './assets/bm-fav.png', './assets/icons/icon-192.png', './assets/icons/icon-512.png'];
 const CDN = /^(https:\/\/(cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|fonts\.googleapis\.com|fonts\.gstatic\.com|storage\.googleapis\.com\/mediapipe-models))/;
