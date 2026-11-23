@@ -5425,9 +5425,18 @@ axNav=(function(f){return function(me){if(!portalUser(me))return f(me);
 {const _cp=cloudPull;cloudPull=async function(){const sv=SC.on;if(sv){db=SC.full||db;SC.on=false;SC.full=null}const x=await _cp.apply(this,arguments);try{scApply()}catch(e){}return x}}
 {const _rv=axRevert;axRevert=function(){const r=_rv.apply(this,arguments);try{if(portalUser(authUser())&&!(db&&db.__sc)){db.__sc=1;SC.on=true}}catch(e){}return r}}
 {const _so=signOut;signOut=function(){if(SC.on&&SC.full){db=SC.full}SC.full=null;SC.on=false;return _so.apply(this,arguments)}}
-/* athletes / parents land on the main Dashboard (scoped to their own data) */
-PORTAL_NAV[0][1]=PORTAL_NAV[0][1].filter(x=>x[0]!=='my-portal');
-{const _r2=render;render=function(){try{const me=authUser();if(portalUser(me)&&(location.hash==='#my-portal'||location.hash===''||location.hash==='#')){history.replaceState(null,'','#dashboard')}}catch(e){}return _r2.apply(this,arguments)}}
+/* ============ ATHLETE PHONE MENU (athlete / parent see only what helps them) ============ */
+/* Coach tools (roster, program builder, periodisation, testing entry, analytics, admin) are hidden.
+   Athletes land on My Dashboard; every page still shows only their own data, view-only. */
+const ATH_NAV=[
+ ['HOME',[['my-portal','My Dashboard'],['communication','Messages']]],
+ ['MY TRAINING',[['my-program','My Program'],['calendar','Calendar'],['speed-log','Speed Log'],['weighins','Weigh-ins']]],
+ ['MY PROGRESS',[['my-reports','My Reports'],['my-team','Team Rankings']]],
+ ['ACCOUNT',[['my-profile','Profile']]]];
+PORTAL_PAGES.length=0;ATH_NAV.forEach(([g,items])=>items.forEach(([k])=>PORTAL_PAGES.push(k)));
+TITLES['my-portal']='My Dashboard';
+axNav=(function(f){return function(me){return portalUser(me)?ATH_NAV:f(me)}})(axNav);
+{const _r2=render;render=function(){try{const me=authUser();if(portalUser(me)&&['','#','#dashboard'].includes(location.hash)){history.replaceState(null,'','#my-portal')}}catch(e){}return _r2.apply(this,arguments)}}
 /* safety: a view-only / scoped account never writes to the cloud */
 {const _cp2=cloudPush;cloudPush=async function(){let me=null;try{me=authUser()}catch(e){}if((db&&db.__sc)||roUser(me))return;return _cp2.apply(this,arguments)}}
 
@@ -5498,7 +5507,7 @@ var SKI={
  reports:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9 17v-3M12 17v-6M15 17v-4"/>',
  program:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/>'};
 var SKMAP={dashboard:'home',communication:'chat',athletes:'users',weighins:'scale',teams:'team',programs:'clip',periodisation:'wave','workout-review':'check','live-lift':'bar','live-vbt':'gauge','speed-log':'bolt',calendar:'cal',testing:'flask','video-jump':'video','testing-library':'book','athlete-goals':'target','fitness-consultation':'steth','sports-tests':'medal','import-data':'upload','team-analytics':'chart','weekly-summary':'doc',recruiting:'star',events:'ticket',organization:'build','coaches-users':'ucog',onboarding:'rocket',facility:'pin',branding:'brush','app-settings':'gear',subscription:'card',payments:'rupee',beta:'beta','my-profile':'user',help:'help','my-portal':'home','my-reports':'reports','my-program':'program','my-team':'medal'};
-var SKGRP={TODAY:'Home',ATHLETES:'Roster',TRAIN:'Training',TEST:'Testing & assessment',INSIGHTS:'Analytics',ADMIN:'Organisation','MY BIOMOTOR':'My BIOMOTOR'};
+var SKGRP={TODAY:'Home',ATHLETES:'Roster',TRAIN:'Training',TEST:'Testing & assessment',INSIGHTS:'Analytics',ADMIN:'Organisation','MY BIOMOTOR':'My BIOMOTOR',HOME:'Home','MY TRAINING':'My training','MY PROGRESS':'My progress',ACCOUNT:'Account'};
 const skIco=k=>`<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">${SKI[SKMAP[k]||k]||SKI.doc}</svg></span>`;
 drawNav=function(cur){const me=authUser();const el=document.getElementById('nav');
  el.innerHTML=axNav(me).map(([g,items])=>`<div class="grp">${esc(SKGRP[g]||g)}</div>`+items.map(([k,l])=>`<a href="#${k}" class="${k===cur?'on':''}" title="${esc(l)}">${skIco(k)}<span>${esc(l)}</span></a>`).join('')).join('');
