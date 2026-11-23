@@ -60,6 +60,7 @@ th:first-child,td:first-child{text-align:left} th{color:var(--ink2);font-weight:
 .tools button small{font-size:10px;margin-top:2px;color:#ddd;white-space:nowrap}
 .tools button.on{border-color:var(--brand)}
 .tools button.rec small{color:#ff6b6b}
+.tools button.pathoff{opacity:.6}.tools button.pathoff small{color:#aaa}
 .panel{position:absolute;left:72px;top:8px;width:min(330px,calc(100% - 82px));background:rgba(24,24,22,.95);border:1px solid var(--line);border-radius:14px;padding:12px;z-index:5;display:none;backdrop-filter:blur(8px)}
 .panel.on{display:block}
 .panel .pr{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0}
@@ -334,6 +335,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
       <button data-tool="flip">🔄<small id="tFlip">Back</small></button>
       <button data-tool="zoom">🔍<small id="tZoom">1×</small></button>
       <button data-tool="rec">⏺<small id="tRec">Rec on</small></button>
+      <button data-tool="path" title="Show / hide the bar path">〰<small id="tPath">Path on</small></button>
     </div>
     <div class="panel" id="pnl-plate">
       <b>Plate size</b>
@@ -424,7 +426,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
     <div class="muted" id="dDate"></div>
     <h2 id="dTitle" style="margin:2px 0 10px"></h2>
     <div class="vwrap" id="dVwrap" style="display:none"><video id="dVideo" controls playsinline></video><canvas class="ov" id="dOv"></canvas></div>
-    <div class="row" id="dVidBtns" style="margin-top:6px;display:none"><button class="btn sm" id="dVidShare">📤 Share video</button><button class="btn sm" id="dVidDl">⬇ Export to camera roll</button><button class="btn sm" id="dVidEx">🎬 Export with overlay</button><button class="btn sm" id="dFav">☆ Favourite</button><button class="btn sm" id="dVset" title="Video settings">⚙</button></div>
+    <div class="row" id="dVidBtns" style="margin-top:6px;display:none"><button class="btn sm" id="dVidShare">📤 Share video</button><button class="btn sm" id="dVidDl">⬇ Export to camera roll</button><button class="btn sm" id="dVidEx">🎬 Export with overlay</button><button class="btn sm" id="dPath">〰 Bar path: On</button><button class="btn sm" id="dFav">☆ Favourite</button><button class="btn sm" id="dVset" title="Video settings">⚙</button></div>
     <div class="hud" id="dTiles" style="grid-template-columns:repeat(4,1fr)"></div>
   </div>
   <div class="card" id="dReview" style="display:none"><h2 style="margin-bottom:8px">Set review</h2><div id="dWarn"></div><div id="dPR"></div><div class="row" style="margin:6px 0"><span class="muted">How hard was it?</span><select id="dRPE" style="width:auto"></select><select id="dRIR" style="width:auto"></select></div><div id="dRpeHint"></div><div id="dPlate"></div><div class="row" style="margin-top:8px"><button class="btn" id="dDiscard" style="color:var(--critical)">🗑 Discard set data</button><span class="sp"></span><button class="btn" id="dSave">✓ Save</button><button class="btn pri" id="dNext">Next ›</button></div><button class="btn sm" id="dBug" style="margin-top:8px">🐞 Report a problem</button><button class="btn" id="dWkUp" style="display:none;margin-top:8px;width:100%">🎬 Start a workout and upload more</button></div>
@@ -3187,19 +3189,65 @@ function drawCardAt(ctx, W, H, o) {
   if (o.rec) { ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(W - 5 * u, 5 * u, 1.6 * u, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = `700 ${3.2 * u}px system-ui`; ctx.textAlign = 'right'; ctx.fillText('REC', W - 8 * u, 6.1 * u); }
   ctx.restore();
 }
+/* ================= bar path rendering (display only — never changes trace, velocity or rep data) ================= */
+const BP = {
+  on: () => DB.settings.bpShow !== false,
+  col: () => DB.settings.ovPath || '#3ddc5a',
+  // spike-robust smoothing for drawing: median of 5 removes single-frame jumps, then a 7-point weighted average.
+  // The window shrinks at both ends, so the newest point stays (almost) where the bar is — no lag at the marker.
+  smooth(xs, ys, a, b) {
+    const n = b - a + 1, mx = new Array(n), my = new Array(n), w = [];
+    const med = (arr, i) => { w.length = 0; for (let j = Math.max(a, i - 2), hi = Math.min(b, i + 2); j <= hi; j++) w.push(arr[j]); w.sort((p, q) => p - q); return w[(w.length - 1) >> 1]; };
+    for (let i = 0; i < n; i++) { const h = Math.min(2, i, n - 1 - i); mx[i] = h ? med(xs, a + i) : xs[a + i]; my[i] = h ? med(ys, a + i) : ys[a + i]; }
+    const K = [1, 2, 3, 4, 3, 2, 1], X = new Array(n), Y = new Array(n);
+    for (let i = 0; i < n; i++) { const h = Math.min(3, i, n - 1 - i); let sx = 0, sy = 0, sw = 0; for (let d = -h; d <= h; d++) { const k = K[d + 3]; sx += mx[i + d] * k; sy += my[i + d] * k; sw += k; } X[i] = sx / sw; Y[i] = sy / sw; }
+    return [X, Y];
+  },
+  // smooth curve through the points (quadratic segments through midpoints); (ex, ey) = optional exact end point
+  trace(ctx, X, Y, s, ox, oy, ex, ey) {
+    const n = X.length; if (!n) return; ctx.beginPath(); ctx.moveTo(ox + X[0] * s, oy + Y[0] * s);
+    for (let i = 1; i < n - 1; i++) ctx.quadraticCurveTo(ox + X[i] * s, oy + Y[i] * s, ox + (X[i] + X[i + 1]) / 2 * s, oy + (Y[i] + Y[i + 1]) / 2 * s);
+    if (n > 1) ctx.lineTo(ox + X[n - 1] * s, oy + Y[n - 1] * s);
+    if (ex != null) ctx.lineTo(ex, ey);
+  },
+  line(ctx, X, Y, s, ox, oy, lw, cur, ex, ey) {
+    if (X.length < 2 && ex == null) return;
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    BP.trace(ctx, X, Y, s, ox, oy, ex, ey);
+    if (cur) { ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = lw * 1.8 + 2.5; ctx.stroke(); ctx.strokeStyle = BP.col(); ctx.lineWidth = lw * 1.8; ctx.stroke(); }
+    else { ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = lw + 1.5; ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,0.38)'; ctx.lineWidth = lw; ctx.stroke(); }
+    ctx.restore();
+  },
+  // live tracking marker: filled circle with a white border and a thin dark halo, visible on any background
+  marker(ctx, x, y, lw, lost) {
+    const r = lw * 4.2; ctx.save();
+    ctx.beginPath(); ctx.arc(x, y, r + lw * 1.4, 0, 7); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = lw * 0.9; ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = lost ? '#ff4040' : BP.col(); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = lw * 1.3; ctx.stroke();
+    ctx.restore();
+  },
+  // playback cache: smoothed pixel path + rep number of every sample (built once per set)
+  cache: new WeakMap(), seg: new WeakMap(),
+  prep(rec) {
+    const P = rec.px, tr = rec.trace, n = Math.min(P.x.length, tr.t.length); let c = BP.cache.get(rec);
+    if (c && c.n === n && c.reps === rec.reps.length) return c;
+    const [X, Y] = n ? BP.smooth(P.x, P.y, 0, n - 1) : [[], []]; const ends = rec.reps.map(r => r.endT).sort((a, b) => a - b), rep = new Int32Array(n);
+    for (let i = 0, j = 0; i < n; i++) { while (j < ends.length && ends[j] < tr.t[i]) j++; rep[i] = j; }
+    c = { n, reps: rec.reps.length, X, Y, rep }; BP.cache.set(rec, c); return c;
+  }
+};
 function redraw() {
   if (!T.mode || !video.videoWidth) return;
   drawSrc(vctx, view.width, view.height);
   const s = T.vs, W = view.width, lw = Math.max(2, W / 360);
-  if (T.trail.length > 1) {
-    const cur = T.set ? T.set.reps.length : -1;
-    vctx.lineCap = 'round'; vctx.lineJoin = 'round';
-    for (let pass = 0; pass < 2; pass++) {
-      vctx.beginPath(); let started = false;
-      for (const [x, y, k] of T.trail) { const isCur = k === cur; if ((pass === 0) === isCur) { started = false; continue; } if (!started) { vctx.moveTo(x * s, y * s); started = true; } else vctx.lineTo(x * s, y * s); }
-      vctx.strokeStyle = pass === 0 ? 'rgba(200,200,200,0.55)' : '#3ddc5a'; vctx.lineWidth = pass === 0 ? lw : lw * 1.6; vctx.stroke();
-    }
-    const [sx, sy] = T.trail[0]; vctx.fillStyle = '#3ddc5a'; vctx.beginPath(); vctx.arc(sx * s, sy * s, lw * 3, 0, 7); vctx.fill();
+  let bpEnd = null;
+  if (BP.on() && T.trail.length > 1) {
+    const cur = T.set ? T.set.reps.length : -1, tx = T.trail.map(p => p[0]), ty = T.trail.map(p => p[1]);
+    for (let a = 0; a < T.trail.length;) { let b = a; while (b + 1 < T.trail.length && T.trail[b + 1][2] === T.trail[a][2]) b++;
+      const isCur = T.trail[a][2] === cur, done = !isCur && b < T.trail.length - 1, hit = done && BP.seg.get(T.trail[a]);
+      const [X, Y] = hit && hit.n === b - a + 1 ? hit.xy : BP.smooth(tx, ty, a, b); if (done && !(hit && hit.n === b - a + 1)) BP.seg.set(T.trail[a], { n: b - a + 1, xy: [X, Y] });
+      BP.line(vctx, X, Y, s, 0, 0, lw, isCur);
+      if (isCur && b === T.trail.length - 1) bpEnd = { x: X[X.length - 1], y: Y[Y.length - 1] }; a = b + 1; }
+    const [sx, sy] = T.trail[0]; vctx.fillStyle = BP.col(); vctx.strokeStyle = '#fff'; vctx.lineWidth = lw * 0.8; vctx.beginPath(); vctx.arc(sx * s, sy * s, lw * 2.2, 0, 7); vctx.fill(); vctx.stroke();
   }
   const ring = (x, y, r, col, cross, dash) => { vctx.strokeStyle = col; vctx.lineWidth = lw; if (dash) vctx.setLineDash([10, 7]); vctx.beginPath(); vctx.arc(x * s, y * s, r * s, 0, 7); vctx.stroke(); vctx.setLineDash([]); if (cross) { vctx.beginPath(); vctx.moveTo((x - r * .25) * s, y * s); vctx.lineTo((x + r * .25) * s, y * s); vctx.moveTo(x * s, (y - r * .25) * s); vctx.lineTo(x * s, (y + r * .25) * s); vctx.stroke(); } };
   if (!T.tracker) {
@@ -3209,7 +3257,7 @@ function redraw() {
     if (T.manual && T.phase === 'manE' && !T.sel) { vctx.fillStyle = '#3ddc5a'; vctx.beginPath(); vctx.arc(T.manual.x * s, T.manual.y * s, lw * 3, 0, 7); vctx.fill(); }
   } else if (T.pos) {
     ring(T.pos.x, T.pos.y, T.sel.r, T.lost ? '#ff4040' : 'rgba(61,220,90,0.9)');
-    vctx.fillStyle = T.lost ? '#ff4040' : '#3ddc5a'; vctx.beginPath(); vctx.arc(T.pos.x * s, T.pos.y * s, lw * 3.2, 0, 7); vctx.fill();
+    const mk = bpEnd && !T.lost ? bpEnd : T.pos; BP.marker(vctx, mk.x * s, mk.y * s, lw, T.lost);
   }
   const ref = curSetRef();
   if (ref && (T.tracker || T.set)) {
@@ -3610,35 +3658,39 @@ function overlayState(rec, vt) {
 }
 function drawOverlayFrame(ctx, rec, vt, s, ox, oy, W, H) {
   const P = rec.px; if (!P || !P.x.length) return; const st = overlayState(rec, vt), lw = Math.max(2, W / 360), X = window._EXPO || {};
-  if (st.k >= 0 && X.path !== false) {
-    const repIdx = i => { const tt = rec.trace.t[i]; let n = 0; for (const r of rec.reps) if (r.endT < tt) n++; return n; };
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    for (let pass = 0; pass < 2; pass++) {
-      ctx.beginPath(); let started = false;
-      for (let i = Math.max(0, st.k - 3000); i <= st.k; i++) { const isCur = repIdx(i) === st.curRep; if ((pass === 0) === isCur) { started = false; continue; } const x = ox + P.x[i] * s, y = oy + P.y[i] * s; if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y); }
-      ctx.strokeStyle = pass === 0 ? 'rgba(200,200,200,0.55)' : (DB.settings.ovPath || '#3ddc5a'); ctx.lineWidth = pass === 0 ? lw : lw * 1.6; ctx.stroke();
+  const showPath = window._EXPO ? X.path !== false : BP.on();
+  if (st.k >= 0 && showPath) {
+    const C = BP.prep(rec), k = Math.min(st.k, C.n - 1), tt = rec.trace.t, t = vt - (rec.vOff || 0);
+    if (k >= 0) {
+      // marker between two samples, in step with the exact video frame time
+      let mx = C.X[k], my = C.Y[k];
+      if (k + 1 < C.n && C.rep[k + 1] === C.rep[k] && tt[k + 1] > tt[k]) { const f = Math.max(0, Math.min(1, (t - tt[k]) / (tt[k + 1] - tt[k]))); mx += (C.X[k + 1] - mx) * f; my += (C.Y[k + 1] - my) * f; }
+      for (let a = Math.max(0, k - 3000); a <= k;) { let b = a; while (b + 1 <= k && C.rep[b + 1] === C.rep[a]) b++;
+        const isCur = C.rep[a] === st.curRep && b === k; BP.line(ctx, C.X.slice(a, b + 1), C.Y.slice(a, b + 1), s, ox, oy, lw, isCur, isCur ? ox + mx * s : null, isCur ? oy + my * s : null); a = b + 1; }
+      const x = ox + mx * s, y = oy + my * s;
+      if (rec.plateR) { ctx.strokeStyle = 'rgba(61,220,90,0.85)'; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(x, y, rec.plateR * s, 0, 7); ctx.stroke(); }
+      BP.marker(ctx, x, y, lw, false);
     }
-    const x = ox + P.x[st.k] * s, y = oy + P.y[st.k] * s;
-    if (rec.plateR) { ctx.strokeStyle = 'rgba(61,220,90,0.85)'; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(x, y, rec.plateR * s, 0, 7); ctx.stroke(); }
-    ctx.fillStyle = DB.settings.ovPath || '#3ddc5a'; ctx.beginPath(); ctx.arc(x, y, lw * 3, 0, 7); ctx.fill();
   }
   const m = X.metric || ST_().fb.metric, L = st.last;
   drawCardAt(ctx, W, H, { load: rec.load, done: st.done, target: rec.targetReps, value: L ? metricFmt(metricVal(L, m), m) : null, color: L ? STCOL[L.status] || '#fff' : null, label: MLABEL[m] });
 }
 function attachOverlay(vEl, cv, rec) {
   let on = true;
-  const draw = () => {
-    if (!on) return; const W = vEl.clientWidth, H = vEl.clientHeight; if (!W || !vEl.videoWidth) return;
+  const draw = (mt) => {
+    if (!on) return; const W = vEl.clientWidth, H = vEl.clientHeight; if (!W || !vEl.videoWidth) return; const vt = typeof mt === 'number' ? mt : vEl.currentTime;
     const dpr = window.devicePixelRatio || 1; if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
     const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
     const s = Math.min(W / vEl.videoWidth, H / vEl.videoHeight), ox = (W - vEl.videoWidth * s) / 2, oy = (H - vEl.videoHeight * s) / 2;
     ctx.save(); ctx.beginPath(); ctx.rect(ox, oy, vEl.videoWidth * s, vEl.videoHeight * s); ctx.clip(); ctx.translate(ox, oy);
-    drawOverlayFrame(ctx, rec, vEl.currentTime, s, 0, 0, vEl.videoWidth * s, vEl.videoHeight * s); ctx.restore();
+    drawOverlayFrame(ctx, rec, vt, s, 0, 0, vEl.videoWidth * s, vEl.videoHeight * s); ctx.restore();
   };
-  const loop = () => { if (!on) return; draw(); if (!vEl.paused) (vEl.requestVideoFrameCallback ? vEl.requestVideoFrameCallback(loop) : requestAnimationFrame(loop)); };
-  ['play', 'seeked', 'loadeddata', 'pause', 'timeupdate'].forEach(ev => vEl.addEventListener(ev, ev === 'play' ? loop : draw));
-  return () => { on = false; };
+  const loop = (now, meta) => { if (!on) return; draw(meta && meta.mediaTime != null ? meta.mediaTime : undefined); if (!vEl.paused) (vEl.requestVideoFrameCallback ? vEl.requestVideoFrameCallback(loop) : requestAnimationFrame(loop)); };
+  const onEv = e => { if (e.type === 'play') return loop(); if (e.type === 'timeupdate' && !vEl.paused) return; draw(); };
+  ['play', 'seeked', 'loadeddata', 'pause', 'timeupdate'].forEach(ev => vEl.addEventListener(ev, onEv));
+  const onBp = () => draw(); window.addEventListener('bp-change', onBp);
+  return () => { on = false; window.removeEventListener('bp-change', onBp); };
 }
 async function exportWithOverlay(blob, rec, name) {
   const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.style.cssText = video.style.cssText; document.body.appendChild(v); v.src = URL.createObjectURL(blob);
@@ -3680,7 +3732,7 @@ function renderPanels() {
   const S = ST_(), F = S.fb;
   $('#tPlate').textContent = `${S.plateCm} cm`; $('[data-tool=plate]').classList.toggle('custom', !S.plateDefault);
   seg($('#plateDef'), [[0, 'Off'], [1, 'On']], S.plateDefault ? 1 : 0, v => { if (T.set) return toast('Finish the set first'); S.plateDefault = v === '1'; setPlate(S.plateDefault ? 45 : S.plateCustom); });
-  $('#plateCustomBox').style.display = S.plateDefault ? 'none' : ''; $('#tRec').textContent = S.rec ? 'Rec on' : 'Rec off'; $('[data-tool=rec]').classList.toggle('rec', S.rec);
+  $('#plateCustomBox').style.display = S.plateDefault ? 'none' : ''; $('#tRec').textContent = S.rec ? 'Rec on' : 'Rec off'; bpLabels(); $('[data-tool=rec]').classList.toggle('rec', S.rec);
   $('#tZoom').textContent = `${S.zoom}×`; $('#tFlip').textContent = S.facing === 'user' ? 'Front' : 'Back';
   $('#plateChips').innerHTML = [40, 35, 30, 25, 20].map(c => `<button class="btn sm ${S.plateCustom === c ? 'pri' : ''}" data-plate="${c}">${c} cm</button>`).join('');
   $('#plateCustom').value = S.plateCustom; $('#minRom').value = S.minRomCm;
@@ -3719,9 +3771,12 @@ $('#tools').onclick = async e => {
   if (['plate', 'fb', 'tempo'].includes(t)) { const p = $('#pnl-' + t), was = p.classList.contains('on'); closePanels(); if (!was) { p.classList.add('on'); b.classList.add('on'); renderPanels(); } return; }
   closePanels();
   if (t === 'rec') { S.rec = !S.rec; save(); renderPanels(); toast(S.rec ? 'Sets will be recorded to the video library' : 'Recording off'); }
+  if (t === 'path') { bpToggle(); }
   if (t === 'flip') { if (T.set) return toast('Finish the set first'); S.facing = S.facing === 'user' ? 'environment' : 'user'; save(); renderPanels(); if (T.mode === 'camera') startCamera(); }
   if (t === 'zoom') { if (T.set) return toast('Finish the set first'); S.zoom = S.zoom >= 2 ? 1 : S.zoom === 1 ? 1.5 : 2; save(); renderPanels(); if (T.mode) { await applyZoom(true); } }
 };
+function bpLabels() { const on = BP.on(); const t = $('#tPath'); if (t) { t.textContent = on ? 'Path on' : 'Path off'; $('[data-tool=path]').classList.toggle('pathoff', !on); } const d = $('#dPath'); if (d) d.textContent = '〰 Bar path: ' + (on ? 'On' : 'Off'); const v = $('#vsShow'); if (v) v.checked = on; }
+function bpToggle(force) { DB.settings.bpShow = force == null ? !BP.on() : !!force; save(); bpLabels(); try { redraw(); } catch (e) {} window.dispatchEvent(new Event('bp-change')); toast(BP.on() ? 'Bar path shown' : 'Bar path hidden'); }
 async function applyZoom(recalib) {
   const S = ST_(); T.nativeZoom = false;
   if (T.mode === 'camera' && T.stream) { const tr = T.stream.getVideoTracks()[0]; const cap = tr.getCapabilities ? tr.getCapabilities() : {}; if (cap.zoom) { try { await tr.applyConstraints({ advanced: [{ zoom: clamp(S.zoom, cap.zoom.min, cap.zoom.max) }] }); T.nativeZoom = true; } catch (e) {} } }
@@ -3761,7 +3816,7 @@ async function openDetail(id, review) {
   $('#dDate').textContent = `${new Date(w.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · ${esc(athlete()?.name || '')}`;
   $('#dTitle').textContent = `${e.name} · ${rec.load} kg × ${sm.n || 0}`;
   const vEl = $('#dVideo'); $('#dVwrap').style.display = 'none'; paintFav(); $('#dVidBtns').style.display = 'none'; if (vEl.src) { URL.revokeObjectURL(vEl.src); vEl.removeAttribute('src'); } if (detOvOff) detOvOff();
-  if (rec.video) { const blob = await Store.get('vid', s.id).catch(() => null); if (blob) { vEl.src = URL.createObjectURL(blob); $('#dVwrap').style.display = 'block'; $('#dVidBtns').style.display = 'flex'; $('#dVidEx').style.display = rec.px && rec.px.x.length ? '' : 'none'; detOvOff = rec.px && rec.px.x.length ? attachOverlay(vEl, $('#dOv'), rec) : null; } }
+  if (rec.video) { const blob = await Store.get('vid', s.id).catch(() => null); if (blob) { vEl.src = URL.createObjectURL(blob); $('#dVwrap').style.display = 'block'; $('#dVidBtns').style.display = 'flex'; $('#dVidEx').style.display = rec.px && rec.px.x.length ? '' : 'none'; $('#dPath').style.display = rec.px && rec.px.x.length ? '' : 'none'; bpLabels(); detOvOff = rec.px && rec.px.x.length ? attachOverlay(vEl, $('#dOv'), rec) : null; } }
   const fk = e.focus || focusFor(e.name), st = exStats(e), bm = bmOf(f.w);
   const TILE = { mean: ['Mean vel', fmt(sm.mean), 'm/s'], peak: ['Peak vel', fmt(Math.max(...rec.reps.map(r => r.pv), 0)), 'm/s'], ppow: ['Peak power', fmt(sm.ppow, 0), 'W'], mpow: ['Mean power', fmt(sm.mpow, 0), 'W'], eccPow: ['Ecc power', fmt(sm.eccPow, 0), 'W'],
     cons: ['Consistency', rec.reps.length > 2 ? fmt(100 - (Math.sqrt(rec.reps.reduce((a, r) => a + (r.mcv - sm.mean) ** 2, 0) / rec.reps.length) / sm.mean * 100), 0) : '–', '%'], last: ['Last rep', rec.reps.length ? fmt(rec.reps[rec.reps.length - 1].mcv) : '–', 'm/s'], low: ['Lowest rep', rec.reps.length ? fmt(Math.min(...rec.reps.map(r => r.mcv))) : '–', 'm/s'],
@@ -3858,6 +3913,7 @@ $('#dSave').onclick = () => { $('#dReview').style.display = 'none'; showTab('tra
 $('#dNext').onclick = () => { const n = $('#dNext').dataset.next; if (n) { const [ei, si] = n.split(':').map(Number); CUR = { ei, si }; } showTab(n ? 'track' : 'workout'); };
 $('#dVidEx').onclick = async () => { const f = findSet(detailId); if (!f) return; const b = await Store.get('vid', detailId); if (b) exportWithOverlay(b, f.s.result, vidName(f)); };
 $('#detBack').onclick = () => showTab(lastTab === 'detail' ? 'workout' : lastTab);
+$('#dPath').onclick = () => bpToggle();
 $('#dVidShare').onclick = async () => { const f = findSet(detailId); if (!f) return; const b = await Store.get('vid', detailId); if (!b) return; const file = new File([b], vidName(f), { type: b.type });
   try { if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: f.e.name }); else { saveFile(file.name, b, b.type); toast('Sharing is not supported here – the video was downloaded'); } } catch (e) {} };
 $('#dVset').onclick = () => { showTab('videos'); setTimeout(() => { $('#vSet').onclick(); $('#vPanel').scrollIntoView({ behavior: 'smooth' }); }, 100); };
@@ -3997,6 +4053,7 @@ $('#vSet').onclick = () => { const st = ST_();
     <label class="row" style="margin-top:8px;cursor:pointer"><input type="checkbox" id="vsAuto" ${DB.settings.autoExport ? 'checked' : ''} style="width:20px;height:20px"><span style="flex:1"><b>Auto-export every set</b><br><span class="muted" style="font-size:12px">Saves a copy of each set video to your phone's Downloads / Files (photos app on share-enabled phones).</span></span></label>
     <h3 style="margin-top:12px">Keep videos for</h3><div class="seg" id="vsKeep" style="flex-wrap:wrap"></div>
     <label class="row" style="margin-top:6px;cursor:pointer"><input type="checkbox" id="vsFav" ${DB.settings.keepFav !== false ? 'checked' : ''} style="width:20px;height:20px"><span style="flex:1"><b>Keep favourites forever</b> <span class="muted" style="font-size:12px">★ sets survive the age limit</span></span></label>
+    <label class="row" style="margin-top:8px;cursor:pointer"><input type="checkbox" id="vsShow" ${DB.settings.bpShow !== false ? 'checked' : ''} style="width:20px;height:20px"><span style="flex:1"><b>Show bar path in the app</b><br><span class="muted" style="font-size:12px">Live tracking and video playback. Same as the 〰 button.</span></span></label>
     <h3 style="margin-top:12px">Exported video shows</h3>
     <label class="row" style="cursor:pointer"><input type="checkbox" id="vsPath" ${DB.settings.exPath !== false ? 'checked' : ''} style="width:20px;height:20px"><span style="flex:1"><b>Show bar path</b></span></label>
     <label class="row" style="margin-top:6px"><span style="flex:1"><b>Video overlay metric</b></span><select id="vsMet" style="width:auto"><option value="">Same as live feedback</option>${Object.entries(MLABEL).map(([k, l]) => `<option value="${k}" ${DB.settings.exMetric === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -4011,7 +4068,8 @@ $('#vSet').onclick = () => { const st = ST_();
     <div class="row" style="margin-top:8px"><button class="btn sm" id="vPanelX">Close</button></div></div>`;
   seg($('#vsKeep'), [[0, 'No limit'], [30, '30 days'], [60, '60 days'], [90, '90 days'], [180, '180 days']], DB.settings.vKeep || 0, v => { DB.settings.vKeep = +v; save(); $('#vSet').onclick(); purgeTempVideos(); renderVideos(); });
   $('#vsFav').onchange = e => { DB.settings.keepFav = e.target.checked; save(); };
-  $('#vsPC').oninput = e => { DB.settings.ovPath = e.target.value; save(); };
+  $('#vsPC').oninput = e => { DB.settings.ovPath = e.target.value; save(); window.dispatchEvent(new Event('bp-change')); };
+  $('#vsShow').onchange = e => bpToggle(e.target.checked);
   const mc = () => { DB.settings.ovMetCol = $('#vsMCon').checked ? $('#vsMC').value : null; save(); }; $('#vsMCon').onchange = mc; $('#vsMC').oninput = () => { $('#vsMCon').checked = true; mc(); };
   seg($('#vsPos'), [['tl', '↖'], ['tr', '↗'], ['bl', '↙'], ['br', '↘']], DB.settings.ovPos || 'bl', v => { DB.settings.ovPos = v; save(); $('#vSet').onclick(); });
   $('#vsPath').onchange = e => { DB.settings.exPath = e.target.checked; save(); };
