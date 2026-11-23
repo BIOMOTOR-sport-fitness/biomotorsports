@@ -346,7 +346,9 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
         <div class="row" style="margin:4px 0 8px" id="plateChips"></div>
         <div class="muted">Change plate, rubber/tri-grip or 1-inch gym plate, or a tracking disc? Measure across the full face with a tape and round to the nearest cm.</div>
       </div>
-      <div class="pr"><span>Min. rep ROM (cm)</span><input id="minRom" type="number" step="1" inputmode="numeric" style="width:90px"></div>
+      <div class="pr"><span>Min. rep ROM – auto</span><div class="seg" id="minRomMode"></div></div>
+      <div class="pr" id="minRomRow"><span>Min. rep ROM (cm)</span><input id="minRom" type="number" step="1" inputmode="numeric" style="width:90px"></div>
+      <div class="muted" id="minRomHint" style="margin-bottom:6px"></div>
       <div class="muted" id="plateInfo"></div>
     </div>
     <div class="panel" id="pnl-fb">
@@ -426,7 +428,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
     <div class="muted" id="dDate"></div>
     <h2 id="dTitle" style="margin:2px 0 10px"></h2>
     <div class="vwrap" id="dVwrap" style="display:none"><video id="dVideo" controls playsinline></video><canvas class="ov" id="dOv"></canvas></div>
-    <div class="row" id="dVidBtns" style="margin-top:6px;display:none"><button class="btn sm" id="dVidShare">📤 Share video</button><button class="btn sm" id="dVidDl">⬇ Export to camera roll</button><button class="btn sm" id="dVidEx">🎬 Export with overlay</button><button class="btn sm" id="dPath">〰 Bar path: On</button><button class="btn sm" id="dFav">☆ Favourite</button><button class="btn sm" id="dVset" title="Video settings">⚙</button></div>
+    <div class="row" id="dVidBtns" style="margin-top:6px;display:none"><button class="btn sm" id="dVidShare">📤 Share video</button><button class="btn sm" id="dVidDl" title="The original video, without overlay">⬇ Save original video</button><button class="btn sm" id="dVidEx">🎬 Export with overlay</button><button class="btn sm pri" id="dVidShareOv" style="display:none">📤 Share overlay video</button><button class="btn sm" id="dPath">〰 Bar path: On</button><button class="btn sm" id="dFav">☆ Favourite</button><button class="btn sm" id="dVset" title="Video settings">⚙</button></div>
     <div class="hud" id="dTiles" style="grid-template-columns:repeat(4,1fr)"></div>
   </div>
   <div class="card" id="dReview" style="display:none"><h2 style="margin-bottom:8px">Set review</h2><div id="dWarn"></div><div id="dPR"></div><div class="row" style="margin:6px 0"><span class="muted">How hard was it?</span><select id="dRPE" style="width:auto"></select><select id="dRIR" style="width:auto"></select></div><div id="dRpeHint"></div><div id="dPlate"></div><div class="row" style="margin-top:8px"><button class="btn" id="dDiscard" style="color:var(--critical)">🗑 Discard set data</button><span class="sp"></span><button class="btn" id="dSave">✓ Save</button><button class="btn pri" id="dNext">Next ›</button></div><button class="btn sm" id="dBug" style="margin-top:8px">🐞 Report a problem</button><button class="btn" id="dWkUp" style="display:none;margin-top:8px;width:100%">🎬 Start a workout and upload more</button></div>
@@ -686,7 +688,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
   <div class="card">
     <h2>Video storage and sharing</h2>
     <ul>
-      <li><b>Share one video</b>: open the set review (from a workout, History or the video library) → <b>📤 Share video</b> (share sheet: WhatsApp, Drive, AirDrop…), <b>⬇ Export to camera roll</b> (saves the file), or <b>🎬 Export with overlay</b> (bar path + metric burned in).</li>
+      <li><b>Share one video</b>: open the set review (from a workout, History or the video library) → <b>📤 Share video</b> (share sheet: WhatsApp, Drive, AirDrop…), <b>⬇ Save original video</b> (the file as recorded, no overlay), or <b>🎬 Export with overlay</b> (bar path + metric burned in) → then <b>📤 Share overlay video</b> to send it to WhatsApp or choose <b>Save Video</b> to put it in Photos / Gallery.</li>
       <li><b>⚙ Video settings</b> (Videos tab): Save videos in-app (off = kept 24 h), Auto-export to camera roll, <b>Keep videos for</b> 30 / 60 / 90 / 180 days or no limit, and <b>Keep favourites forever</b>. Mark a set ★ Favourite in its review; “★ only” filters the library. Retention deletes old videos for good – the set's bar speed, reps and history stay.</li>
       <li><b>What the exported video shows</b>: Show bar path, Video overlay metric, Auto-trim for export (cut to the lifting part). They change the exported file, not the video in the app.</li>
       <li><b>Cloud video storage</b> (upload with each set, watch on any device, coach's switch covering the roster, storage pool) needs the Biomotor cloud backend – it is the next big step. Until then videos stay on the phone that recorded them.</li>
@@ -1107,7 +1109,7 @@ const FOCUS = {
 const focusFor = name => (DB.exSettings && DB.exSettings[name] && DB.exSettings[name].focus) || focusDef(name);
 const focusDef = name => /clean|snatch|jerk|high pull/i.test(name) ? 'oly' : /jump|throw|push press/i.test(name) ? 'speed' : 'sc';
 const ZONES = { 'Absolute strength': [0.15, 0.50], 'Accelerative strength': [0.50, 0.75], 'Strength-speed': [0.75, 1.00], 'Speed-strength': [1.00, 1.30], 'Starting strength': [1.30, 1.80] };
-const DEF_SETTINGS = { plateCm: 45, plateDefault: true, plateCustom: 35, minRomCm: 10, fb: { on: true, mode: 'target', metric: 'mcv', target: 0.5, vl: 20, voice: true, beep: true }, tempo: { on: false, cue: false, ecc: 2.0 }, rec: true, zoom: 1, facing: 'environment' };
+const DEF_SETTINGS = { plateCm: 45, plateDefault: true, plateCustom: 35, minRomCm: 10, minRomAuto: true, fb: { on: true, mode: 'target', metric: 'mcv', target: 0.5, vl: 20, voice: true, beep: true }, tempo: { on: false, cue: false, ecc: 2.0 }, rec: true, zoom: 1, facing: 'environment' };
 let DB = { athletes: [], workouts: [], templates: [], curAthlete: null, curWorkout: {}, settings: JSON.parse(JSON.stringify(DEF_SETTINGS)), logo: null };
 let saveTimer;
 function save(now) { if (typeof scheduleSync === 'function') scheduleSync(); clearTimeout(saveTimer); const go = () => Store.set('kv', 'data', JSON.parse(JSON.stringify(DB))).catch(e => toast('Could not save: ' + e.message)); if (now) return go(); saveTimer = setTimeout(go, 400); }
@@ -1313,8 +1315,14 @@ function refineRep(tr, rep, lo, hi) {
 function finalizeSet(rec, params) {
   const tr = rec.trace;
   tr.v = velCentered(tr.t, tr.y, 0.05);
-  const det = new RepDetector(params);
-  for (let i = 0; i < tr.t.length; i++) det.push(tr.t[i], tr.y[i], tr.v[i], i);
+  const run = minRom => { const d = new RepDetector(Object.assign({}, params, { minRom })); for (let i = 0; i < tr.t.length; i++) d.push(tr.t[i], tr.y[i], tr.v[i], i); return d; };
+  let det = run(params.minRom); rec.minRomUsed = params.minRom; rec.minRomAuto = !!params.auto;
+  // Auto: the limit comes from this set — 45 % of its typical (median) rep range, between 8 and 30 cm
+  if (params.auto && det.reps.length >= 2) {
+    const R = det.reps.map(r => r.rom).sort((a, b) => a - b), med = R[R.length >> 1], thr = clamp(ROM_AUTO.share * med, ROM_AUTO.floor, ROM_AUTO.max);
+    if (thr > params.minRom + 0.005) { const d2 = run(thr); if (d2.reps.length) det = d2; }
+    rec.minRomUsed = thr;
+  }
   if (det.reps.length || !rec.reps.length) rec.reps = det.reps;
   rec.reps.forEach((r, k) => { const prev = rec.reps[k - 1], next = rec.reps[k + 1]; refineRep(tr, r, prev ? prev.endI + 1 : 0, next ? next.startI - 1 : tr.t.length - 1); });
   let best = 0;
@@ -1509,7 +1517,9 @@ class Tracker {
   }
 }
 
-function detParams() { return { vStart: 0.08, vEnd: 0.04, vZero: 0.03, minRom: (ST_().minRomCm || 10) / 100 }; }
+const ROM_AUTO = { floor: 0.08, share: 0.45, max: 0.30 };
+const romAuto = () => ST_().minRomAuto !== false;
+function detParams() { const auto = romAuto(); return { vStart: 0.08, vEnd: 0.04, vZero: 0.03, minRom: auto ? ROM_AUTO.floor : (ST_().minRomCm || 10) / 100, auto }; }
 // unracks / re-racks: a first or last "rep" with under half the median range of motion (3+ reps) is hidden from the set
 function autoHide(rec) { rec.hiddenReps = []; const R = rec.reps; if (DB.settings.autoHide === false || R.length < 3) return;
   const med = [...R.map(r => r.rom)].sort((a, b) => a - b)[R.length >> 1], bad = r => r.rom < 0.5 * med;
@@ -2008,7 +2018,7 @@ const I18N = {
   'Tonnage': ['टनेज', 'टनेज'], 'Workouts': ['वर्कआउट्स', 'वर्कआउट'], 'Training days': ['ट्रेनिंग दिवस', 'ट्रेनिंग दिन'], 'Week streak': ['आठवड्यांची साखळी', 'हफ़्तों की लय'],
   'Record': ['रेकॉर्ड', 'रिकॉर्ड'], 'Stop': ['थांबवा', 'रोकें'], 'Feedback': ['फीडबॅक', 'फीडबैक'], 'Tempo': ['टेम्पो', 'टेम्पो'],
   '☑ Select': ['☑ निवडा', '☑ चुनें'], '💾 Storage details': ['💾 स्टोरेज माहिती', '💾 स्टोरेज जानकारी'], '⚙ Video settings': ['⚙ व्हिडिओ सेटिंग्ज', '⚙ वीडियो सेटिंग्स'],
-  'Select all': ['सर्व निवडा', 'सब चुनें'], '📤 Share video': ['📤 व्हिडिओ शेअर करा', '📤 वीडियो शेयर करें'], '⬇ Export to camera roll': ['⬇ फोनमध्ये सेव्ह करा', '⬇ फ़ोन में सेव करें'],
+  'Select all': ['सर्व निवडा', 'सब चुनें'], '📤 Share video': ['📤 व्हिडिओ शेअर करा', '📤 वीडियो शेयर करें'], '⬇ Export to camera roll': ['⬇ फोनमध्ये सेव्ह करा', '⬇ फ़ोन में सेव करें'], '⬇ Save original video': ['⬇ मूळ व्हिडिओ सेव्ह करा', '⬇ मूल वीडियो सेव करें'], '📤 Share overlay video': ['📤 ओव्हरले व्हिडिओ शेअर करा', '📤 ओवरले वीडियो शेयर करें'],
   '🎬 Export with overlay': ['🎬 ओव्हरलेसह एक्सपोर्ट', '🎬 ओवरले के साथ एक्सपोर्ट'], 'Set review': ['सेट आढावा', 'सेट समीक्षा'],
   '✓ Save': ['✓ सेव्ह', '✓ सेव'], 'Next ›': ['पुढे ›', 'आगे ›'], '🗑 Discard set data': ['🗑 सेट डेटा काढा', '🗑 सेट डेटा हटाएँ'],
   '📄 Download PDF': ['📄 PDF डाउनलोड', '📄 PDF डाउनलोड'], '⬇ Export data (CSV)': ['⬇ डेटा एक्सपोर्ट (CSV)', '⬇ डेटा एक्सपोर्ट (CSV)'],
@@ -3767,7 +3777,8 @@ async function exportWithOverlay(blob, rec, name) {
     await playFrames(v, 1, t => { ctx.drawImage(v, 0, 0, W, H); drawOverlayFrame(ctx, rec, t, sc, 0, 0, W, H); const pc = Math.min(100, Math.round((t - t0) / span * 100)); if (pc >= lastP + 5) { lastP = pc; toast(`Exporting video… ${pc}% – keep this screen open`, 60000); } }, t1);
     window._EXPO = null;
     const out = await stopRec(recd); toast('Export ready');
-    if (out) saveFile(name.replace(/\.(mp4|webm)$/, '') + '_overlay.' + (out.type.includes('mp4') ? 'mp4' : 'webm'), out, out.type);
+    if (out) { saveFile(name.replace(/\.(mp4|webm|mov)$/, '') + '_overlay.' + vidExt(out.type), out, out.type); toast('Overlay video saved – tap 📤 Share overlay video to send it to WhatsApp or save it to Photos', 6000); }
+    return out;
   } catch (e) { toast('Export failed: ' + (e.message || e)); } finally { window._EXPO = null; v.pause(); v.remove(); }
 }
 
@@ -3796,6 +3807,7 @@ function renderPanels() {
   $('#tZoom').textContent = `${S.zoom}×`; $('#tFlip').textContent = S.facing === 'user' ? 'Front' : 'Back';
   $('#plateChips').innerHTML = [40, 35, 30, 25, 20].map(c => `<button class="btn sm ${S.plateCustom === c ? 'pri' : ''}" data-plate="${c}">${c} cm</button>`).join('');
   $('#plateCustom').value = S.plateCustom; $('#minRom').value = S.minRomCm;
+  { const au = S.minRomAuto !== false; seg($('#minRomMode'), [[0, 'Off'], [1, 'On']], au ? 1 : 0, v => { S.minRomAuto = v === '1'; save(); renderPanels(); }); $('#minRomRow').style.display = au ? 'none' : ''; $('#minRomHint').textContent = au ? 'Auto: a rep must move at least 45 % of this set\'s typical range (8–30 cm) – unracks and small wobbles are ignored, every real rep counts.' : 'Manual: movements shorter than this are not counted as reps. Bench / squat: 10–15 cm.'; }
   seg($('#fbOn'), [[0, 'Off'], [1, 'On']], F.on ? 1 : 0, v => { F.on = v === '1'; save(); renderPanels(); });
   seg($('#fbMode'), [['read', 'Read'], ['target', 'Target'], ['loss', 'Loss']], F.mode, v => { F.mode = v; if (v === 'loss' && !['mcv', 'pv'].includes(F.metric)) { F.metric = 'mcv'; F.target = defaultTarget('mcv'); } save(); renderPanels(); redraw(); });
   const mopts = F.mode === 'loss' ? [['mcv', 'M Vel'], ['pv', 'P Vel']] : [['mcv', 'M Vel'], ['pv', 'P Vel'], ['mpv', 'Prop Vel'], ['rom', 'ROM'], ['mpow', 'M Pow'], ['ppow', 'P Pow'], ['ppw', 'Prop Pow'], ['ecp', 'Ecc Pow'], ['ttpv', 'TTPV']];
@@ -3876,7 +3888,8 @@ async function openDetail(id, review) {
   $('#dDate').textContent = `${new Date(w.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} · ${esc(athlete()?.name || '')}`;
   $('#dTitle').textContent = `${e.name} · ${rec.load} kg × ${sm.n || 0}`;
   const vEl = $('#dVideo'); $('#dVwrap').style.display = 'none'; paintFav(); $('#dVidBtns').style.display = 'none'; if (vEl.src) { URL.revokeObjectURL(vEl.src); vEl.removeAttribute('src'); } if (detOvOff) detOvOff();
-  if (rec.video) { const blob = await Store.get('vid', s.id).catch(() => null); if (blob) { vEl.src = URL.createObjectURL(blob); $('#dVwrap').style.display = 'block'; $('#dVidBtns').style.display = 'flex'; $('#dVidEx').style.display = rec.px && rec.px.x.length ? '' : 'none'; $('#dPath').style.display = rec.px && rec.px.x.length ? '' : 'none'; bpLabels(); detOvOff = rec.px && rec.px.x.length ? attachOverlay(vEl, $('#dOv'), rec) : null; } }
+  DV.id = s.id; DV.blob = null; DV.ov = null; $('#dVidShareOv').style.display = 'none';
+  if (rec.video) { const blob = await Store.get('vid', s.id).catch(() => null); if (blob) { DV.blob = blob; vEl.src = URL.createObjectURL(blob); $('#dVwrap').style.display = 'block'; $('#dVidBtns').style.display = 'flex'; $('#dVidEx').style.display = rec.px && rec.px.x.length ? '' : 'none'; $('#dPath').style.display = rec.px && rec.px.x.length ? '' : 'none'; bpLabels(); detOvOff = rec.px && rec.px.x.length ? attachOverlay(vEl, $('#dOv'), rec) : null; } }
   const fk = e.focus || focusFor(e.name), st = exStats(e), bm = bmOf(f.w);
   const TILE = { mean: ['Mean vel', fmt(sm.mean), 'm/s'], peak: ['Peak vel', fmt(Math.max(...rec.reps.map(r => r.pv), 0)), 'm/s'], ppow: ['Peak power', fmt(sm.ppow, 0), 'W'], mpow: ['Mean power', fmt(sm.mpow, 0), 'W'], eccPow: ['Ecc power', fmt(sm.eccPow, 0), 'W'],
     cons: ['Consistency', rec.reps.length > 2 ? fmt(100 - (Math.sqrt(rec.reps.reduce((a, r) => a + (r.mcv - sm.mean) ** 2, 0) / rec.reps.length) / sm.mean * 100), 0) : '–', '%'], last: ['Last rep', rec.reps.length ? fmt(rec.reps[rec.reps.length - 1].mcv) : '–', 'm/s'], low: ['Lowest rep', rec.reps.length ? fmt(Math.min(...rec.reps.map(r => r.mcv))) : '–', 'm/s'],
@@ -3940,7 +3953,7 @@ function renderReview(f, review) {
   $('#dRIR').onchange = e => { rec.rir = e.target.value === '' ? null : +e.target.value; save(); };
   hintRpe();
   $('#dReview').style.display = 'block';
-  $('#dWarn').innerHTML = (W.length ? W.map(([k, what, fix]) => `<div class="warn-item ${['Analysed from recording', 'Angle corrected'].includes(k) ? 'info' : ''}"><b>${['Analysed from recording', 'Angle corrected'].includes(k) ? 'ℹ' : '⚠'} ${esc(k)}</b>${esc(what)} <span class="muted">→ ${esc(fix)}</span></div>`).join('') : '<div class="warn-item okk"><b>✓ Recording looks good</b>No problems detected.</div>') + (rec.fps ? `<p class="muted" style="margin:4px 0 0">Tracked at ${Math.round(rec.fps)} fps${rec.plateR ? ` · plate ${Math.round(2 * (rec.plateRv || rec.plateR))} px tall = ${rec.plateCm || 45} cm` : ''}</p>` : '');
+  $('#dWarn').innerHTML = (W.length ? W.map(([k, what, fix]) => `<div class="warn-item ${['Analysed from recording', 'Angle corrected'].includes(k) ? 'info' : ''}"><b>${['Analysed from recording', 'Angle corrected'].includes(k) ? 'ℹ' : '⚠'} ${esc(k)}</b>${esc(what)} <span class="muted">→ ${esc(fix)}</span></div>`).join('') : '<div class="warn-item okk"><b>✓ Recording looks good</b>No problems detected.</div>') + (rec.fps ? `<p class="muted" style="margin:4px 0 0">Tracked at ${Math.round(rec.fps)} fps${rec.plateR ? ` · plate ${Math.round(2 * (rec.plateRv || rec.plateR))} px tall = ${rec.plateCm || 45} cm` : ''}${rec.minRomUsed ? ` · min rep ROM ${Math.round(rec.minRomUsed * 100)} cm${rec.minRomAuto ? ' (auto)' : ''}` : ''}</p>` : '');
   ['#dDiscard', '#dSave', '#dNext'].forEach(x => $(x).style.display = review ? '' : 'none');
   $('#dPlate').innerHTML = rec.trace.t.length ? `<div class="row" style="margin-top:8px"><span class="muted">Plate size used</span><input id="dPlateCm" type="number" step="0.5" min="10.5" inputmode="decimal" value="${rec.plateCm || 45}" style="width:80px"><span class="muted">cm</span><button class="btn sm" id="dPlateFix">Recalculate</button></div><p class="muted" style="margin:4px 0 0">Wrong plate size? Enter the real diameter – every speed, ROM and power is rescaled.</p>` : '';
   const fx = $('#dPlateFix'); if (fx) fx.onclick = () => rescalePlate(f, parseFloat($('#dPlateCm').value));
@@ -3971,17 +3984,27 @@ $('#dBug').onclick = async () => {
 $('#dDiscard').onclick = () => { const f = findSet(detailId); if (!f) return; if (f.s.result && f.s.result.video) Store.del('vid', f.s.id); f.s.result = null; save(); CUR = { ei: f.w.exercises.indexOf(f.e), si: f.e.sets.indexOf(f.s) }; showTab('track'); toast('Set data discarded – record it again'); };
 $('#dSave').onclick = () => { $('#dReview').style.display = 'none'; showTab('track'); toast('Set saved'); };
 $('#dNext').onclick = () => { const n = $('#dNext').dataset.next; if (n) { const [ei, si] = n.split(':').map(Number); CUR = { ei, si }; } showTab(n ? 'track' : 'workout'); };
-$('#dVidEx').onclick = async () => { const f = findSet(detailId); if (!f) return; const b = await Store.get('vid', detailId); if (b) exportWithOverlay(b, f.s.result, vidName(f)); };
+$('#dVidEx').onclick = async () => { const f = findSet(detailId); if (!f) return; const id = detailId, b = DV.id === id && DV.blob || await Store.get('vid', id); if (!b) return; const out = await exportWithOverlay(b, f.s.result, vidName(f, b)); if (out && detailId === id) { DV.ov = out; $('#dVidShareOv').style.display = ''; } };
 $('#detBack').onclick = () => showTab(lastTab === 'detail' ? 'workout' : lastTab);
 $('#dPath').onclick = () => bpToggle();
-$('#dVidShare').onclick = async () => { const f = findSet(detailId); if (!f) return; const b = await Store.get('vid', detailId); if (!b) return; const file = new File([b], vidName(f), { type: b.type });
-  try { if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: f.e.name }); else { saveFile(file.name, b, b.type); toast('Sharing is not supported here – the video was downloaded'); } } catch (e) {} };
+const DV = { id: null, blob: null, ov: null };
+// share a video file through the phone's share sheet (WhatsApp, Drive, Save Video…); falls back to a download
+async function shareVideo(b, name, title) {
+  const type = b.type || ('video/' + (name.endsWith('.mov') ? 'quicktime' : name.endsWith('.webm') ? 'webm' : 'mp4'));
+  const file = new File([b], name, { type });
+  if (!(navigator.canShare && navigator.canShare({ files: [file] }))) { await saveFile(name, b, type); return toast('Sharing is not available here – the video was downloaded instead'); }
+  try { await navigator.share({ files: [file], title }); }
+  catch (e) { if (e && e.name === 'AbortError') return; if (e && e.name === 'NotAllowedError') return toast('Tap Share again'); toast('Could not share: ' + (e && e.message || e)); }
+}
+$('#dVidShare').onclick = async () => { const f = findSet(detailId); if (!f) return; let b = DV.id === detailId && DV.blob; if (!b) { b = await Store.get('vid', detailId); if (!b) return; DV.id = detailId; DV.blob = b; return toast('Video ready – tap Share again'); } shareVideo(b, vidName(f, b), f.e.name); };
+$('#dVidShareOv').onclick = () => { const f = findSet(detailId); if (!f || !DV.ov || DV.id !== detailId) return; shareVideo(DV.ov, vidName(f, DV.ov).replace(/\.(\w+)$/, '_overlay.$1'), f.e.name); };
 $('#dVset').onclick = () => { showTab('videos'); setTimeout(() => { $('#vSet').onclick(); $('#vPanel').scrollIntoView({ behavior: 'smooth' }); }, 100); };
 $('#dFav').onclick = () => { const f = findSet(detailId); if (!f || !f.s.result) return; f.s.result.fav = !f.s.result.fav; save(); paintFav(); toast(f.s.result.fav ? '★ Favourite – kept when old videos are cleared' : 'Removed from favourites'); };
 function paintFav() { const f = findSet(detailId); $('#dFav').textContent = f && f.s.result && f.s.result.fav ? '★ Favourite' : '☆ Favourite'; }
-$('#dVidDl').onclick = async () => { const f = findSet(detailId); if (!f) return; const b = await Store.get('vid', detailId); if (b) saveFile(vidName(f), b, b.type); };
+$('#dVidDl').onclick = async () => { const f = findSet(detailId); if (!f) return; const b = DV.id === detailId && DV.blob || await Store.get('vid', detailId); if (b) saveFile(vidName(f, b), b, b.type); };
 $('#detRedo').onclick = () => { const f = findSet(detailId); if (!f) return; const ei = f.w.exercises.indexOf(f.e), si = f.e.sets.indexOf(f.s); DB.curWorkout[f.w.athleteId] = f.w.id; CUR = { ei, si }; showTab('track'); toast('Start the set again – the new result replaces the old one'); };
-const vidName = f => `${(athlete()?.name || 'athlete').replace(/\W+/g, '_')}_${f.e.name.replace(/\W+/g, '_')}_${f.s.result.load}kg_${f.w.date}.${(f.s.result.video?.mime || '').includes('mp4') ? 'mp4' : 'webm'}`;
+const vidExt = type => { type = String(type || ''); return type.includes('mp4') ? 'mp4' : type.includes('quicktime') ? 'mov' : type.includes('webm') ? 'webm' : 'mp4'; };
+const vidName = (f, b) => `${(athlete()?.name || 'athlete').replace(/\W+/g, '_')}_${f.e.name.replace(/\W+/g, '_')}_${f.s.result.load}kg_${f.w.date}.${vidExt((b && b.type) || f.s.result.video?.mime)}`;
 
 /* ================= personal records ================= */
 const PRDEF = [['Best load', s => s.result.load, 'kg', 1], ['Most reps', s => s.result.summary.n, '', 0], ['Mean velocity', s => s.result.summary.best, 'm/s', 2], ['Peak velocity', s => Math.max(...s.result.reps.map(r => r.pv)), 'm/s', 2], ['Mean power', s => Math.max(...s.result.reps.map(r => r.power || 0)), 'W', 0], ['Peak power', s => s.result.summary.ppow || 0, 'W', 0]];
