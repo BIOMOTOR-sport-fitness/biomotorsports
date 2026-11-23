@@ -385,7 +385,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
   <div class="card" style="margin-top:10px">
     <div class="row">
       <button class="btn sm" id="detBtn" disabled>🎯 Auto-detect</button>
-      <label class="f" style="flex:1;min-width:130px">Circle size<input type="range" id="radSl" min="60" max="140" value="100" disabled></label>
+      <label class="f" style="flex:1;min-width:130px">Circle size<input type="range" id="radSl" min="40" max="200" value="100" disabled></label>
       <button class="btn sm go" id="lockBtn" disabled>🔒 Lock</button>
       <button class="btn sm" id="resetBtn" disabled>↺ Reset</button>
       <span id="fileCtl" style="display:none" class="row"><button class="btn sm" id="playBtn">⏯</button><select id="rateSel" style="width:auto"><option value="1">1×</option><option value="0.5" selected>0.5×</option><option value="0.25">0.25×</option></select></span>
@@ -1420,30 +1420,44 @@ function detectPlates(g, W, H, minFrac = 0.35, hint = null, gate = null) {
 
 /* ================= vision: template tracker (NCC) ================= */
 class Tracker {
+  // NCC template tracker. The plate is sampled on a circular grid; the grid can be scaled, so a plate that grows or
+  // shrinks on screen (bar moving towards / away from the camera, slight zoom) is still matched. Scale 1 = locked size.
   lock(g, W, H, cx, cy, r) {
     this.W = W; this.H = H; this.G = 28;
     // sample only inside the plate (circular mask) so the moving background never dominates the template
     this.half = Math.min(0.92 * r, 0.32 * Math.min(W, H));
-    const step = (2 * this.half) / (this.G - 1), offs = [];
+    const step = (2 * this.half) / (this.G - 1), fx = [], fy = [];
     for (let gy = 0; gy < this.G; gy++) for (let gx = 0; gx < this.G; gx++) {
-      const fx = gx * step - this.half, fy = gy * step - this.half;
-      if (fx * fx + fy * fy > this.half * this.half) continue;
-      offs.push(Math.round(fy) * W + Math.round(fx));
+      const ox = gx * step - this.half, oy = gy * step - this.half;
+      if (ox * ox + oy * oy > this.half * this.half) continue;
+      fx.push(ox); fy.push(oy);
     }
-    this.offs = Int32Array.from(offs);
-    this.ext = Math.ceil(this.half) + 1;
-    this.S = clamp(Math.round(0.55 * r), 8, 48);
+    this.fx = Float32Array.from(fx); this.fy = Float32Array.from(fy); this.oc = new Map();
+    this.r0 = r; this.useScale(1);
     this.x = cx; this.y = cy; this.vx = 0; this.vy = 0; this.lastT = null; this.score = 1;
     const ix = Math.round(cx), iy = Math.round(cy);
     if (!this.inb(ix, iy)) return false;
     this.tpl = this.sample(g, ix, iy); return !!this.tpl;
   }
-  // global re-acquisition of the plate template anywhere in the frame
+  // offsets for one scale (cached); at scale 1 they are exactly the original grid
+  grid(sc) {
+    const key = Math.round(sc * 100); let o = this.oc.get(key);
+    if (!o) { const k = key / 100, W = this.W, n = this.fx.length, a = new Int32Array(n); for (let i = 0; i < n; i++) a[i] = Math.round(this.fy[i] * k) * W + Math.round(this.fx[i] * k); o = { offs: a, ext: Math.ceil(this.half * k) + 1, k }; this.oc.set(key, o); }
+    return o;
+  }
+  useScale(sc) { const o = this.grid(clamp(sc, 0.6, 1.8)); this.sc = o.k; this.offs = o.offs; this.ext = o.ext; this.S = clamp(Math.round(0.55 * this.r0 * this.sc), 8, 48); }
+  // global re-acquisition of the plate template anywhere in the frame (current size first, then larger / smaller)
   reacquire(g) {
-    let best = -3, bx = 0, by = 0; const e = this.ext;
-    for (let y = e; y < this.H - e; y += 3) for (let x = e; x < this.W - e; x += 3) { const c = this.ncc(g, x, y); if (c > best) { best = c; bx = x; by = y; } }
+    const keep = this.sc, scales = [keep, ...[0.8, 0.9, 1, 1.15, 1.3, 1.5].map(k => k * (keep > 1.2 ? 1.15 : 1)).filter(k => Math.abs(k - keep) > 0.04)];
+    let best = -3, bx = 0, by = 0, bs = keep;
+    for (const sc of scales) {
+      this.useScale(sc); const e = this.ext, st = sc === keep ? 3 : 4;
+      for (let y = e; y < this.H - e; y += st) for (let x = e; x < this.W - e; x += st) { const c = this.ncc(g, x, y); if (c > best) { best = c; bx = x; by = y; bs = this.sc; } }
+    }
+    this.useScale(bs);
     const cx = bx, cy = by; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const c = this.ncc(g, cx + dx, cy + dy); if (c > best) { best = c; bx = cx + dx; by = cy + dy; } }
-    if (best < 0.55) return false; this.x = bx; this.y = by; this.vx = 0; this.vy = 0; this.score = best; this.lastT = null; return true;
+    if (best < 0.55) { this.useScale(keep); return false; }
+    this.x = bx; this.y = by; this.vx = 0; this.vy = 0; this.score = best; this.lastT = null; return true;
   }
   inb(ix, iy) { return ix - this.ext >= 0 && iy - this.ext >= 0 && ix + this.ext < this.W && iy + this.ext < this.H; }
   sample(g, ix, iy) {
@@ -1467,12 +1481,19 @@ class Tracker {
     for (let dy = -S; dy <= S; dy += 2) for (let dx = -S; dx <= S; dx += 2) {
       const c = this.ncc(g, pix + dx, piy + dy); if (c > best) { best = c; bx = pix + dx; by = piy + dy; }
     }
+    // size check: the plate may have grown or shrunk since the last frame
+    const sc0 = this.sc; let bsc = sc0;
+    for (const f of [0.94, 1.06]) {
+      this.useScale(sc0 * f); if (this.sc === sc0) continue;
+      for (let dy = -2; dy <= 2; dy += 2) for (let dx = -2; dx <= 2; dx += 2) { const c = this.ncc(g, bx + dx, by + dy); if (c > best + 0.01) { best = c; bx += dx; by += dy; bsc = this.sc; } }
+    }
+    this.useScale(bsc);
     const cx0 = bx, cy0 = by;
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
       const c = this.ncc(g, cx0 + dx, cy0 + dy); if (c > best) { best = c; bx = cx0 + dx; by = cy0 + dy; }
     }
     this.score = best;
-    if (best < 0.45) { this.lastT = t; return { ok: false, score: best }; }
+    if (best < 0.45) { this.useScale(sc0); this.lastT = t; return { ok: false, score: best }; }
     const l = this.ncc(g, bx - 1, by), r = this.ncc(g, bx + 1, by), u = this.ncc(g, bx, by - 1), d = this.ncc(g, bx, by + 1);
     let sx = 0, sy = 0;
     if (l > -2 && r > -2) { const den = l - 2 * best + r; if (den < 0) sx = clamp(0.5 * (l - r) / den, -0.5, 0.5); }
@@ -1484,7 +1505,7 @@ class Tracker {
       const fresh = this.sample(g, bx, by);
       if (fresh) { let s2 = 0; for (let k = 0; k < fresh.length; k++) { this.tpl[k] = 0.93 * this.tpl[k] + 0.07 * fresh[k]; s2 += this.tpl[k] ** 2; } const inv = 1 / Math.sqrt(s2); for (let k = 0; k < fresh.length; k++) this.tpl[k] *= inv; }
     }
-    return { ok: true, x: nx, y: ny, score: best };
+    return { ok: true, x: nx, y: ny, score: best, sc: this.sc };
   }
 }
 
@@ -3140,6 +3161,37 @@ function lockPlate(auto) {
   if (auto) beep('lock');
   updatePlateInfo(); redraw(); updateCTA(); return true;
 }
+/* ring adjust: one finger drags the circle, two fingers pinch it (mouse wheel on a computer). A tap without moving still works as before. */
+const RG = { p: new Map(), mode: null, replay: false, start: null };
+const rgVid = (cx, cy) => { const rc = view.getBoundingClientRect(); return { x: (cx - rc.left) * (view.width / rc.width) / T.vs, y: (cy - rc.top) * (view.height / rc.height) / T.vs }; };
+const rgOn = () => T.mode && !T.busy && !T.tracker && T.sel;
+function rgScale(k) { const S = T.sel; k = clamp(k, 0.4, 2.5); S.r *= k; S.rv *= k; S.rh *= k; T.baseR = S.r; T.baseRv = S.rv; T.baseRh = S.rh; $('#radSl').value = 100; }
+function rgDone() { T.phase = 'set'; T.manual = null; $('#lockBtn').disabled = false; $('#calStatus').textContent = 'Circle adjusted. Make sure it sits exactly on the plate rim, then Lock.'; updatePlateInfo(); redraw(); updateCTA(); }
+view.addEventListener('pointerdown', e => {
+  if (RG.replay || !rgOn()) return;
+  e.stopImmediatePropagation(); e.preventDefault(); try { view.setPointerCapture(e.pointerId); } catch (er) {}
+  RG.p.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (RG.p.size === 1) { RG.mode = 'tap'; RG.start = { x: e.clientX, y: e.clientY, sx: T.sel.x, sy: T.sel.y, ev: e }; }
+  else if (RG.p.size === 2) { const [a, b] = [...RG.p.values()]; RG.mode = 'pinch'; RG.d0 = Math.hypot(a.x - b.x, a.y - b.y) || 1; RG.r0 = T.sel.r; }
+});
+view.addEventListener('pointermove', e => {
+  if (!RG.p.has(e.pointerId) || !rgOn()) return; RG.p.set(e.pointerId, { x: e.clientX, y: e.clientY }); e.preventDefault();
+  if (RG.mode === 'pinch' && RG.p.size >= 2) { const [a, b] = [...RG.p.values()]; rgScale(RG.r0 * (Math.hypot(a.x - b.x, a.y - b.y) / RG.d0) / T.sel.r); redraw(); }
+  else if (RG.p.size === 1 && RG.start && (RG.mode === 'drag' || Math.hypot(e.clientX - RG.start.x, e.clientY - RG.start.y) > 8)) {
+    const a = rgVid(RG.start.x, RG.start.y), b = rgVid(e.clientX, e.clientY);
+    if (RG.mode !== 'drag') { RG.mode = 'drag'; if (Math.hypot(a.x - T.sel.x, a.y - T.sel.y) > T.sel.r * 1.4) { RG.mode = 'none'; return; } }
+    T.sel.x = RG.start.sx + (b.x - a.x); T.sel.y = RG.start.sy + (b.y - a.y); redraw();
+  }
+});
+const rgUp = e => {
+  if (!RG.p.has(e.pointerId)) return; RG.p.delete(e.pointerId);
+  if (RG.p.size) return;
+  const m = RG.mode, st = RG.start; RG.mode = null; RG.start = null;
+  if (m === 'pinch' || m === 'drag') return rgDone();
+  if (m === 'tap' && st && e.type === 'pointerup') { RG.replay = true; try { view.dispatchEvent(new PointerEvent('pointerdown', { clientX: st.x, clientY: st.y, bubbles: true, pointerId: st.ev.pointerId, pointerType: st.ev.pointerType, isPrimary: true })); } finally { RG.replay = false; } }
+};
+view.addEventListener('pointerup', rgUp); view.addEventListener('pointercancel', rgUp);
+view.addEventListener('wheel', e => { if (!rgOn()) return; e.preventDefault(); rgScale(Math.exp(-e.deltaY * 0.0015)); rgDone(); }, { passive: false });
 view.addEventListener('pointerdown', e => {
   if (!T.mode || T.busy) return; closePanels();
   const rc = view.getBoundingClientRect();
@@ -3149,7 +3201,7 @@ view.addEventListener('pointerdown', e => {
   const x = (e.clientX - rc.left) * (view.width / rc.width) / T.vs, y = (e.clientY - rc.top) * (view.height / rc.height) / T.vs;
   if (T.tracker) return;
   if (T.phase === 'manE') {
-    const c = T.sel || T.manual, r = Math.hypot(x - c.x, y - c.y);
+    const c = T.manual || T.sel, r = Math.hypot(x - c.x, y - c.y);
     if (r < 6) return toast('Tap the plate edge, a bit further from the centre');
     selectCand(refineVideoCircle(c.x, c.y, r, 0.1) || { x: c.x, y: c.y, r }); T.phase = 'set'; T.manual = null;
     $('#calStatus').textContent = 'Plate set. Check the green circle sits exactly on the rim (size slider), then Lock.';
@@ -3256,7 +3308,7 @@ function redraw() {
     if (T.sel) ring(T.sel.x, T.sel.y, T.sel.r, '#3ddc5a', true);
     if (T.manual && T.phase === 'manE' && !T.sel) { vctx.fillStyle = '#3ddc5a'; vctx.beginPath(); vctx.arc(T.manual.x * s, T.manual.y * s, lw * 3, 0, 7); vctx.fill(); }
   } else if (T.pos) {
-    ring(T.pos.x, T.pos.y, T.sel.r, T.lost ? '#ff4040' : 'rgba(61,220,90,0.9)');
+    ring(T.pos.x, T.pos.y, T.sel.r * ((T.tracker && T.tracker.sc) || 1), T.lost ? '#ff4040' : 'rgba(61,220,90,0.9)');
     const mk = bpEnd && !T.lost ? bpEnd : T.pos; BP.marker(vctx, mk.x * s, mk.y * s, lw, T.lost);
   }
   const ref = curSetRef();
@@ -3448,8 +3500,10 @@ async function analyzeVideo(blob, opts = {}) {
     const mpp = ((opts.plateCm || ST_().plateCm) / 100) / (2 * (plate.rv || plate.r)), mppH = ((opts.plateCm || ST_().plateCm) / 100) / (2 * (plate.rh || plate.r));
     const light = lightStats(tplGray, FR.W, FR.H, plate.x * FR.s, plate.y * FR.s, plate.r * FR.s);
     const trace = { t: [], y: [], x: [], v: [] }, px = { x: [], y: [] }, stats = { lost: 0, edge: 0, movedEv: 0, motionEv: 0 };
+    // 4K and other very large videos: play the tracking pass at half speed, so the phone can read every frame instead of skipping them
+    const rate2 = Math.max(v.videoWidth, v.videoHeight) > 1920 ? 0.5 : 1;
     await seekTo(0, v); const g = new Float32Array(n); let first = true, y0 = null, x0 = null, lostRun = 0;
-    await playFrames(v, 1, t => {
+    await playFrames(v, rate2, t => {
       FR.read(g); prog(45 + Math.min(54, t / v.duration * 54));
       if (first) { first = false; if (!tk.reacquire(g)) { tk.x = plate.x * FR.s; tk.y = plate.y * FR.s; } }
       const r = tk.update(g, t);
