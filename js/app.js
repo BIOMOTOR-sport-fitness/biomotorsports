@@ -5325,10 +5325,10 @@ function axExtend(n){const s=subDb();const e=axSubEnd(s);axSetUntil(addD(e&&e>to
 function axLockNow(){confirmBox('Lock the platform for everyone except you now? It opens again when you verify a payment or extend access.',()=>{const s=subDb();s.status='Active';s.nextCharge=addD(today(),-1);db.meta.access=db.meta.access||{};db.meta.access.autoLock=true;db.meta.access.grace=0;save();render();toast('Platform locked')})}
 {const _sub=P.subscription;P.subscription=()=>axSubCard()+_sub()}
 /* ---- which athletes belong to this account ---- */
-function axMine(me){if(!me)return [];const em=normEmail(me.email);const ids=new Set();const uids=db.users.filter(u=>em&&normEmail(u.email)===em&&u.status!=='Archived').map(u=>u.id);if(me.user)uids.push(me.user);
- ((me.role==='Parent'?db.parentLinks:db.athLinks)||[]).forEach(l=>{if(l.status==='Active'&&uids.includes(l.user))ids.add(l.athlete)});
- (db.invites||[]).forEach(i=>{if(em&&normEmail(i.email)===em&&i.role===me.role&&i.athlete&&i.status!=='Revoked')ids.add(i.athlete)});
- db.athletes.forEach(a=>{if(!em)return;if(me.role==='Athlete'?normEmail(a.email||'')===em:[a.parentEmail,a.guardianEmail].filter(Boolean).map(normEmail).includes(em))ids.add(a.id)});
+function axMine(me){if(!me)return [];const em=normEmail(me.email);const ids=new Set();const uids=(db.users||[]).filter(u=>u&&em&&normEmail(u.email)===em&&u.status!=='Archived').map(u=>u.id);if(me.user)uids.push(me.user);
+ ((me.role==='Parent'?db.parentLinks:db.athLinks)||[]).forEach(l=>{if(l&&l.status==='Active'&&uids.includes(l.user))ids.add(l.athlete)});
+ (db.invites||[]).forEach(i=>{if(i&&em&&normEmail(i.email)===em&&i.role===me.role&&i.athlete&&i.status!=='Revoked')ids.add(i.athlete)});
+ (db.athletes||[]).forEach(a=>{if(!a||!em)return;if(me.role==='Athlete'?normEmail(a.email||'')===em:[a.parentEmail,a.guardianEmail].filter(Boolean).map(normEmail).includes(em))ids.add(a.id)});
  return [...ids].map(id=>byId('athletes',id)).filter(Boolean)}
 let AXP={aid:''};
 function axCur(me){const L=axMine(me);if(!L.some(a=>a.id===AXP.aid))AXP.aid=L[0]?L[0].id:'';return {L,a:byId('athletes',AXP.aid)}}
@@ -5336,7 +5336,10 @@ const axNm=s=>String(s||'').trim().toLowerCase();
 const axFor=(a,r,nameKeys)=>r.athlete===a.id||(!r.athlete&&nameKeys.some(k=>axNm(fcGet(r,k))&&axNm(fcGet(r,k))===axNm(a.name)));
 function axHead(me,title,sub){const {L,a}=axCur(me);const pick=L.length>1?`<select data-ro-ok style="width:auto" onchange="AXP.aid=this.value;render()">${L.map(x=>`<option value="${x.id}" ${x.id===AXP.aid?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`:'';
  return head(me.role==='Parent'?'Parent portal':'Athlete portal',title,sub,pick)+`<div class="pill p-blue" style="display:inline-block;margin-bottom:12px">👁 View only — your coach updates this information</div>`}
-function axNone(me){return `<div class="card"><h3 style="margin-top:0">Your account is not linked yet</h3><p class="muted">${me.role==='Parent'?'Your account needs to be linked to your child\'s athlete profile.':'Your account needs to be linked to your athlete profile.'} Ask your coach or ${esc(OWNER_ACC.name)} (${esc(OWNER_ACC.phone)}) to link it in <b>Coaches &amp; Users → ${me.role==='Parent'?'Parent':'Athlete'} links</b>. Use the same email you signed in with: <b>${esc(me.email||'')}</b>.</p></div>`}
+function axNone(me){return `<div class="card"><h3 style="margin-top:0">Your account is not linked yet</h3><p class="muted">${me.role==='Parent'?'Your account needs to be linked to your child\'s athlete profile.':'Your account needs to be linked to your athlete profile.'} Ask your coach or ${esc(OWNER_ACC.name)} (${esc(OWNER_ACC.phone)}) to link it in <b>Coaches &amp; Users → ${me.role==='Parent'?'Parent':'Athlete'} links</b>. Use the same email you signed in with: <b>${esc(me.email||'')}</b>.</p>${axDiag(me)}</div>`}
+function axDiag(me){try{const F=(typeof SC!=='undefined'&&SC.full)||db;const em=normEmail(me.email||'');const L=(F.athletes||[]).filter(Boolean);
+ const hit=L.filter(a=>me.role==='Parent'?[a.parentEmail,a.guardianEmail].filter(Boolean).map(normEmail).includes(em):normEmail(a.email||'')===em).length;
+ return `<p class="muted" style="font-size:11px;margin:10px 0 0;opacity:.75">Check: ${L.length} athlete profiles · ${hit} with this email · sync ${esc(typeof CSYNC!=='undefined'?CSYNC.state||'-':'-')}${typeof CSYNC!=='undefined'&&CSYNC.err?' · '+esc(CSYNC.err):''}${typeof SC!=='undefined'&&SC.err?' · '+esc(SC.err):''}</p>`}catch(e){return `<p class="muted" style="font-size:11px">Check error: ${esc(String(e&&e.message||e))}</p>`}}
 const axTeams=a=>db.teams.filter(t=>!t.archived&&tMembers(t).includes(a.id));
 /* latest value per metric for one athlete (Testing results + Sports Specific Test) */
 function axMetrics(aid){const out={};const put=(k,o)=>{const p=out[k];if(!p||String(o.date)>String(p.date)||(o.date===p.date&&(o.dir==='lo'?o.val<p.val:o.val>p.val)))out[k]=o};
@@ -5394,12 +5397,13 @@ P['my-team']=()=>{const me=authUser();const {a}=axCur(me);if(!a)return axHead(me
  if(me&&roUser(me)&&document.body&&!document.body.classList.contains('tvmode')){const v=document.getElementById('view');if(v&&!portalUser(me)&&!v.querySelector('.ac-tour'))v.insertAdjacentHTML('afterbegin',`<div class="card ac-tour">👁 <b>Tour mode — view only.</b> You can look around every section of the platform; nothing can be added, edited or deleted from this account.</div>`);axLock(v)}}}
 
 /* ============ PORTAL SCOPE (athlete / parent see the full platform, view-only, only their own athlete data) ============ */
-var SC={full:null,on:false};
+var SC={full:null,on:false,err:''};
 const SC_PAGES=['dashboard','communication','athletes','weighins','teams','programs','periodisation','workout-review','speed-log','calendar','testing','testing-library','athlete-goals','fitness-consultation','sports-tests','team-analytics','weekly-summary','recruiting','events','my-profile','help'];
 SC_PAGES.forEach(p=>{if(!PORTAL_PAGES.includes(p))PORTAL_PAGES.push(p)});
 const SC_REF=['athlete','athleteId','aid','athId','ath','athleteID'];
 const SC_NAMEK=['name','athleteName','athlete_name','athName','who'];
-function scMineIds(me,d){const sv=db;db=d;try{return axMine(me).map(a=>a.id)}finally{db=sv}}
+function scMineIds(me,d){const sv=db;db=d;try{return axMine(me).map(a=>a.id)}catch(e){SC.err='link: '+(e&&e.message||e);const em=normEmail(me&&me.email||'');
+ return (d.athletes||[]).filter(a=>a&&em&&(me.role==='Parent'?[a.parentEmail,a.guardianEmail].filter(Boolean).map(normEmail).includes(em):normEmail(a.email||'')===em)).map(a=>a.id)}finally{db=sv}}
 function scScope(me,full){const d=Shubham.parse(Shubham.stringify(full));const ids=new Set(scMineIds(me,full));
  const names=new Set(full.athletes.filter(a=>ids.has(a.id)).map(a=>axNm(a.name)));const em=normEmail(me.email||'');
  const keep=(x)=>{if(!x||typeof x!=='object'||Array.isArray(x))return true;
@@ -5407,15 +5411,15 @@ function scScope(me,full){const d=Shubham.parse(Shubham.stringify(full));const i
   if(Array.isArray(x.athletes)&&x.athletes.length&&x.athletes.every(v=>typeof v==='string')){x.athletes=x.athletes.filter(v=>ids.has(v));return x.athletes.length>0}
   if(SC_REF.some(k=>k in x)){const n=SC_NAMEK.map(k=>axNm(x[k])).find(Boolean);return !!n&&names.has(n)}
   return true};
- Object.keys(d).forEach(k=>{const v=d[k];if(!Array.isArray(v))return;
-  if(k==='athletes'){d[k]=v.filter(a=>ids.has(a.id));return}
-  if(k==='users'){d[k]=v.filter(u=>!['Athlete','Parent'].includes(u.role)||normEmail(u.email||'')===em).map(u=>normEmail(u.email||'')===em?u:Object.assign({},u,{email:'',phone:''}));return}
+ Object.keys(d).forEach(k=>{const v=d[k];if(!Array.isArray(v))return;try{
+  if(k==='athletes'){d[k]=v.filter(a=>a&&ids.has(a.id));return}
+  if(k==='users'){d[k]=v.filter(u=>u&&(!['Athlete','Parent'].includes(u.role)||normEmail(u.email||'')===em)).map(u=>normEmail(u.email||'')===em?u:Object.assign({},u,{email:'',phone:''}));return}
   if(['payments','invites','accounts','facilities'].includes(k)){d[k]=k==='invites'?v.filter(i=>normEmail(i.email||'')===em):[];return}
   if(k==='messages'){d[k]=v.filter(m=>keep(m)&&(!m.to||m.to==='all'||m.to===em||ids.has(m.to)));return}
-  d[k]=v.filter(keep)});
+  d[k]=v.filter(keep)}catch(e){d[k]=k==='athletes'?(full.athletes||[]).filter(a=>a&&ids.has(a.id)):[];SC.err=(SC.err?SC.err+'; ':'')+k+': '+(e&&e.message||e)}});
  d.__sc=1;return d}
 function scApply(){let me=null;try{me=authUser()}catch(e){}if(!portalUser(me)){if(SC.on&&SC.full){db=SC.full;SC.full=null;SC.on=false}return}
- if(db&&db.__sc)return;SC.full=db;try{db=scScope(me,SC.full)}catch(e){db=Object.assign(seed(),{athletes:[],sportTests:[],results:[],weighins:[],__sc:1})}SC.on=true;
+ if(db&&db.__sc)return;SC.full=db;SC.err='';try{db=scScope(me,SC.full)}catch(e){SC.err='scope: '+(e&&e.message||e);db=Object.assign(seed(),{athletes:[],sportTests:[],results:[],weighins:[],__sc:1})}SC.on=true;
  if(typeof CLOUD!=='undefined'&&CLOUD)try{localStorage.setItem(KEY,Shubham.stringify(db))}catch(e){}}
 axNav=(function(f){return function(me){if(!portalUser(me))return f(me);
  const g=NAV.map(([gr,items])=>[gr,items.filter(([k])=>SC_PAGES.includes(k))]).filter(([gr,i])=>i.length);return PORTAL_NAV.concat(g)}})(axNav);
@@ -5848,4 +5852,23 @@ gSearch.oninput=()=>{const q=gSearch.value.trim().toLowerCase();if(q.length<2)re
  Object.entries(TITLES).forEach(([k,l])=>{if(l.toLowerCase().includes(q))hits.push({t:l,c:'Page',pg:k})});
  modal(`<h3 style="margin-top:0">Search: “${esc(q)}”</h3>${hits.length?hits.slice(0,20).map(h=>`<div class="item"><span>${esc(h.t)} <span class="muted" style="font-size:12px">· ${esc(h.c)}</span></span><span class="r" onclick="closeModal();go('${h.pg}')${h.c2?`;setTimeout(()=>openForm('${h.c2}','${h.id}'),50)`:''}">Open</span></div>`).join(''):'<p class="muted">No matches.</p>'}`)},400)};
 window.addEventListener('hashchange',()=>{render();scrollTo(0,0)});
+/* ============ ACCOUNT ↔ MEMBER SYNC (every active login becomes an org member; its invites close themselves) ============ */
+/* A person can sign up (account Active) without an invite ever being "accepted" on their own phone — athletes, parents and
+   viewers cannot write to the cloud, so their acceptance never saved. The owner / admin device now does it for everyone. */
+function acctSync(){let me=null;try{me=authUser()}catch(e){}if(!isAdmin(me)||(db&&db.__sc))return 0;let ch=0;
+ const A=(accs()||[]).filter(a=>a&&!a.owner&&a.status==='Active'&&a.email&&!['Owner'].includes(a.role));
+ A.forEach(a=>{try{const em=normEmail(a.email),nm=String(a.name||em).trim(),pp=nm.split(/\s+/);db.users=db.users||[];
+  let u=db.users.find(x=>x&&normEmail(x.email||'')===em&&x.status!=='Archived');
+  if(!u){u={id:uid('us'),first:pp[0],last:pp.slice(1).join(' '),name:nm,email:em,phone:a.phone||'',role:a.role,status:'Active',joined:today(),authId:CLOUD?a.id:''};db.users.push(u);ch++}
+  else{if(u.role!==a.role&&u.role!=='Owner'){u.role=a.role;ch++}if(u.status!=='Active'){u.status='Active';ch++}if(CLOUD&&!u.authId){u.authId=a.id;ch++}if(!u.phone&&a.phone){u.phone=a.phone;ch++}}
+  (db.invites||[]).filter(i=>i&&i.status==='Pending'&&normEmail(i.email||'')===em).forEach(i=>{if(i.role===a.role){try{invAccept(i.id,true)}catch(e){}}else{i.status='Accepted';i.accepted=today()}ch++});
+  if(a.role==='Athlete'){const at=(db.athletes||[]).find(x=>x&&normEmail(x.email||'')===em);db.athLinks=db.athLinks||[];
+   if(at&&!db.athLinks.some(l=>l&&l.user===u.id&&l.athlete===at.id&&l.status==='Active')){db.athLinks.push({id:uid('al'),user:u.id,athlete:at.id,rel:'self',status:'Active',date:today()});u.athlete=at.id;ch++}}
+  if(a.role==='Parent'){db.parentLinks=db.parentLinks||[];(db.athletes||[]).filter(x=>x&&[x.parentEmail,x.guardianEmail].filter(Boolean).map(normEmail).includes(em)).forEach(at=>{
+   if(!db.parentLinks.some(l=>l&&l.user===u.id&&l.athlete===at.id&&l.status==='Active')){db.parentLinks.push({id:uid('pl'),user:u.id,athlete:at.id,rel:'parent',status:'Active',date:today()});ch++}})}
+ }catch(e){}});
+ if(ch)save();return ch}
+{const _cp=cloudProfiles;cloudProfiles=async function(){const r=await _cp.apply(this,arguments);try{if(acctSync()&&cur()==='coaches-users')render()}catch(e){}return r}}
+{const _me=cloudMe;cloudMe=async function(){const r=await _me.apply(this,arguments);try{if(CME&&isAdmin(CME)){CPROF_OK=1;cloudProfiles()}}catch(e){}return r}}
+{const _rd=render;let busy=0;render=function(){const x=_rd.apply(this,arguments);if(!CLOUD&&!busy)try{busy=1;if(acctSync())_rd.apply(this,arguments)}catch(e){}finally{busy=0}return x}}
 skBoot();
