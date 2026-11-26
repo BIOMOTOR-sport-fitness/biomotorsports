@@ -1,5 +1,5 @@
 /* BIOMOTOR Sport and Fitness — offline support for the installed app */
-const VERSION = 'biomotor-v39-2026-11-26';
+const VERSION = 'biomotor-v41-2026-11-26';
 const SHELL = ['./', './index.html', './download.html', './css/styles.css', './js/app.js', './sk/config.sk', './manifest.webmanifest',
   './assets/bm-logo.png', './assets/bm-mark.png', './assets/bm-fav.png', './assets/icons/icon-192.png', './assets/icons/icon-512.png'];
 const CDN = /^(https:\/\/(cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|fonts\.googleapis\.com|fonts\.gstatic\.com|storage\.googleapis\.com\/mediapipe-models))/;
@@ -22,7 +22,7 @@ self.addEventListener('fetch', e => {
   }
   if (url.origin === location.origin) {
     // pages, code and settings: network first so updates arrive, cache when offline
-    e.respondWith(fetch(req).then(r => { if (r.ok) { const c = r.clone(); caches.open(VERSION).then(x => x.put(req, c)); } return r; })
+    e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => { if (r.ok) { const c = r.clone(); caches.open(VERSION).then(x => x.put(req, c)); } return r; })
       .catch(() => caches.match(req).then(m => m || (req.mode === 'navigate' ? caches.match('./index.html') : undefined))));
     return;
   }

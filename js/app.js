@@ -6202,4 +6202,21 @@ function medReqReject(id){const c=byId('medCerts',id),me=authUser();if(!c||!c.re
 notifExtra=(function(f){return function(){const it=f.apply(this,arguments)||[];try{const me=authUser();medInit();
  if(isAdmin(me)){const n=db.medCerts.filter(c=>c.req&&c.req.status==='Pending').length;if(n)it.unshift({u:1,txt:`🩺 ${n} medical certificate change request(s) waiting for your approval`,go:'medical'})}
  if(medIsDoc(me)){const em=normEmail(me.email);db.medCerts.filter(c=>c.req&&c.req.by===em&&['Approved','Rejected'].includes(c.req.status)&&c.req.decidedAt>daysAgo(3)).forEach(c=>it.unshift({u:2,txt:`🩺 ${c.no}: change request ${c.req.status.toLowerCase()}${c.req.status==='Approved'?' ('+c.req.left+' left)':''}`,go:'medical'}))}}catch(e){}return it}})(notifExtra);
+/* ============ AUTO UPDATE (a new version was published → the app reloads itself when nobody is typing) ============ */
+/* BM_APP_VER must equal VERSION in sw.js – both change with every release. */
+const BM_APP_VER='biomotor-v41-2026-11-26';
+var UPD={shown:false,t:null};
+function updCheck(){if(UPD.shown||!/^https?:$/.test(location.protocol)||globalThis.BIOMOTOR_NATIVE)return;
+ fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=String(t).match(/VERSION\s*=\s*'([^']+)'/);if(!m||m[1]===BM_APP_VER)return;
+  try{if(sessionStorage.getItem('bm_upd_tried')===m[1])return}catch(e){}updShow(m[1])}).catch(()=>{})}
+// new version found: update by itself, but never while someone is typing, has a box open or the page is hidden
+function updBusy(){const a=document.activeElement,m=document.getElementById('modal');return document.hidden||!!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)&&a.type!=='checkbox')||!!(m&&m.classList.contains('open'))||!!(typeof MED!=='undefined'&&MED.busy)||!!(typeof AX_EVT!=='undefined'&&Date.now()-AX_EVT<15000)||!!(typeof CSYNC!=='undefined'&&/Saving/.test(CSYNC.state||''))}
+function updShow(v){UPD.v=v;if(UPD.shown)return;UPD.shown=true;updTry()}
+function updTry(){clearTimeout(UPD.t);if(updBusy()){UPD.t=setTimeout(updTry,20000);return}
+ const d=document.createElement('div');d.id='updBar';d.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483646;background:#1d1d22;color:#fff;border-radius:14px;padding:10px 16px;box-shadow:0 10px 30px rgba(0,0,0,.35);font:14px Inter,system-ui,sans-serif';
+ d.textContent='🔄 Updating BIOMOTOR to the new version…';document.body.appendChild(d);
+ setTimeout(async()=>{if(updBusy()){d.remove();UPD.t=setTimeout(updTry,20000);return}try{sessionStorage.setItem('bm_upd_tried',UPD.v)}catch(e){}
+  try{const r=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration();if(r)await r.update()}catch(e){}
+  try{const ks=await caches.keys();await Promise.all(ks.filter(k=>k!==UPD.v).map(k=>caches.delete(k)))}catch(e){}setTimeout(()=>location.reload(),600)},2000)}
+setTimeout(updCheck,4000);setInterval(updCheck,2*60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)updCheck()});
 skBoot();
