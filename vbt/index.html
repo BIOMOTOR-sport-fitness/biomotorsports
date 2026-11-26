@@ -338,13 +338,19 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
       <button data-tool="path" title="Show / hide the bar path">〰<small id="tPath">Path on</small></button>
     </div>
     <div class="panel" id="pnl-plate">
-      <b>Plate size</b>
+      <b>What to track</b>
+      <div class="seg" id="pnlTgt" style="margin:6px 0 4px;flex-wrap:wrap"></div>
+      <div class="pr" id="pnlJointRow" style="display:none"><span>Joint</span><select id="pnlJoint" style="width:auto"></select></div>
+      <div id="pnlScale" style="display:none;margin:6px 0"></div>
+      <div id="pnlPlateBox">
+      <b style="display:block;margin-top:8px">Plate size</b>
       <div class="muted" style="margin-top:2px">Diameter of the LARGEST plate on the bar – every speed is scaled to it.</div>
       <div class="pr"><span>Use default (45 cm Olympic / bumper)</span><div class="seg" id="plateDef"></div></div>
       <div id="plateCustomBox">
         <div class="pr"><span>Custom Ø (cm)</span><input id="plateCustom" type="number" step="0.5" min="10.5" inputmode="decimal" style="width:90px"></div>
         <div class="row" style="margin:4px 0 8px" id="plateChips"></div>
         <div class="muted">Change plate, rubber/tri-grip or 1-inch gym plate, or a tracking disc? Measure across the full face with a tape and round to the nearest cm.</div>
+      </div>
       </div>
       <div class="pr"><span>Min. rep ROM – auto</span><div class="seg" id="minRomMode"></div></div>
       <div class="pr" id="minRomRow"><span>Min. rep ROM (cm)</span><input id="minRom" type="number" step="1" inputmode="numeric" style="width:90px"></div>
@@ -3226,7 +3232,14 @@ function poseTracker(getSrc, W, H, joint) {
 function tgtRender() { const S = ST_(), k = tgtKind();
   seg($('#tgtSeg'), Object.entries(TGT).map(([v, t]) => [v, t.icon + ' ' + t.label]), k, v => tgtSet(v));
   const j = $('#tgtJoint'); j.style.display = k === 'joint' ? '' : 'none'; if (!j.options.length) j.innerHTML = JOINTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); j.value = S.joint || 'R_WRIST';
-  $('#scaleBtn').style.display = k === 'plate' ? 'none' : ''; $('#detBtn').style.display = k === 'plate' ? '' : 'none'; }
+  $('#scaleBtn').style.display = k === 'plate' ? 'none' : ''; $('#detBtn').style.display = k === 'plate' ? '' : 'none';
+  seg($('#pnlTgt'), Object.entries(TGT).map(([v, t]) => [v, t.icon + ' ' + t.label]), k, v => tgtSet(v));
+  const pj = $('#pnlJoint'); if (!pj.options.length) pj.innerHTML = JOINTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); pj.value = S.joint || 'R_WRIST'; $('#pnlJointRow').style.display = k === 'joint' ? 'flex' : 'none';
+  $('#pnlPlateBox').style.display = k === 'plate' ? '' : 'none'; $('#plateInfo').style.display = k === 'plate' ? '' : 'none'; const sc = $('#pnlScale'); sc.style.display = k === 'plate' ? 'none' : 'block';
+  sc.innerHTML = `<div class="muted" style="margin-bottom:6px">${T.scale ? `Scale: <b>${fmt(T.scale.cm, 1)} cm = ${fmt(T.scale.px, 0)} px</b> (1 px = ${fmt(T.scale.cm * 10 / T.scale.px, 2)} mm)` : 'No scale yet – tap two points a known distance apart and enter the cm.'}</div><button class="btn sm pri" id="pnlScaleBtn">📏 ${T.scale ? 'Set scale again' : 'Set scale'}</button>`;
+  $('#pnlScaleBtn').onclick = () => { closePanels(); if (T.tracker) { $('#resetBtn').onclick(); setTimeout(scaleStart, 150); } else scaleStart(); };
+  const tp = $('#tPlate'); if (tp) tp.textContent = k === 'plate' ? `${S.plateCm} cm` : k === 'joint' ? 'Joint' : k === 'db' ? 'Dumbbell' : 'Barbell';
+  const tb = document.querySelector('[data-tool=plate]'); if (tb && tb.firstChild && tb.firstChild.nodeType === 3) tb.firstChild.nodeValue = TGT[k].icon; }
 function tgtSet(v) { if (T.set) return toast('Finish the set first'); const S = ST_(); S.target = v; if (!S.joint) S.joint = 'R_WRIST'; save(); resetCalib(); T.scale = null; scaleHide();
   if (T.mode) { T.phase = v === 'plate' ? 'auto' : 'manT'; $('#calStatus').textContent = tgtHelp(); } if (v === 'joint') poseLoadV().then(() => { if (tgtKind() === 'joint') toast('Body tracking ready'); }).catch(() => toast('Body tracking could not load – check the internet connection'));
   tgtRender(); redraw(); updateCTA(); }
@@ -3234,7 +3247,8 @@ function tgtHelp() { const k = tgtKind(); if (k === 'plate') return 'The ring fo
   const step2 = '2) 📏 Scale: tap two points a known distance apart (e.g. plate edge to edge, dumbbell end to end, athlete height) and enter the cm. 3) 🔒 Lock.';
   if (k === 'joint') return `Body joint: ${jointName()}. 1) Keep the whole body in the picture, side-on. ${step2}`;
   return `1) Tap the ${k === 'db' ? 'dumbbell head' : 'end of the bar (sleeve or collar)'} – drag / pinch the green circle to fit it. ${step2}`; }
-$('#tgtJoint').onchange = e => { ST_().joint = e.target.value; save(); if (T.tracker && tgtKind() === 'joint') { T.tracker = null; T.phase = 'manT'; } $('#calStatus').textContent = tgtHelp(); redraw(); updateCTA(); };
+$('#pnlJoint').onchange = e => { $('#tgtJoint').value = e.target.value; $('#tgtJoint').onchange(e); };
+$('#tgtJoint').onchange = e => { ST_().joint = e.target.value; save(); tgtRender(); if (T.tracker && tgtKind() === 'joint') { T.tracker = null; T.phase = 'manT'; } $('#calStatus').textContent = tgtHelp(); redraw(); updateCTA(); };
 /* --- scale: two taps + known length --- */
 function scaleStart() { if (!T.mode) return toast('Start the camera or load a video first'); if (T.tracker) return toast('Reset first to set a new scale'); T.scaleTap = []; T.phase = 'scaleA'; $('#calStatus').textContent = '📏 Tap the FIRST end of something you know the length of.'; scaleHide(); redraw(); }
 function scaleHide() { $('#scaleRow').style.display = 'none'; }
@@ -3243,7 +3257,7 @@ function scaleAsk() { const a = athlete(), S = ST_(), chips = [['45', 'Plate 45 
 $('#scaleChips').onclick = e => { const b = e.target.closest('[data-cm]'); if (b) $('#scaleCm').value = b.dataset.cm; };
 $('#scaleSave').onclick = () => { const cm = parseFloat($('#scaleCm').value), P = T.scaleTap || []; if (!(cm > 0.5) || P.length < 2) return toast('Enter the real length in cm');
   const px = Math.hypot(P[1].x - P[0].x, P[1].y - P[0].y); if (px < 20) return toast('The two points are too close – tap two points further apart');
-  T.scale = { cm, px, a: P[0], b: P[1] }; ST_().scaleCm = cm; save(); scaleHide(); T.phase = 'manT'; $('#lockBtn').disabled = !(T.sel || tgtKind() === 'joint');
+  T.scale = { cm, px, a: P[0], b: P[1] }; ST_().scaleCm = cm; save(); scaleHide(); tgtRender(); T.phase = 'manT'; $('#lockBtn').disabled = !(T.sel || tgtKind() === 'joint');
   $('#calStatus').textContent = `Scale set: ${fmt(cm, 1)} cm = ${fmt(px, 0)} px (1 px = ${fmt(cm * 10 / px, 2)} mm). ${tgtKind() === 'joint' ? 'Now tap 🔒 Lock.' : T.sel ? 'Now tap 🔒 Lock.' : 'Now tap the ' + tgtLabel().toLowerCase() + '.'}`; redraw(); updateCTA(); };
 $('#scaleCancel').onclick = () => { scaleHide(); T.scaleTap = []; T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); redraw(); };
 $('#scaleBtn').onclick = scaleStart;
@@ -3267,6 +3281,7 @@ view.addEventListener('pointerdown', e => {
   updatePlateInfo(); redraw(); updateCTA();
 });
 // keep the plate flow untouched; non-plate targets start in manual mode
+{ const _rp = renderPanels; renderPanels = function () { const x = _rp.apply(this, arguments); try { tgtRender(); } catch (e) {} return x; }; }
 { const _sr = sourceReady; sourceReady = function () { const x = _sr.apply(this, arguments); tgtRender(); if (tgtKind() !== 'plate') { T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); updateCTA(); } if (tgtKind() === 'joint') poseLoadV().catch(() => {}); return x; }; }
 { const _rc = resetCalib; resetCalib = function () { const x = _rc.apply(this, arguments); if (tgtKind() !== 'plate') { T.scale = null; T.scaleTap = []; scaleHide(); } return x; }; }
 { const _rb = $('#resetBtn').onclick; $('#resetBtn').onclick = async () => { await _rb(); if (tgtKind() !== 'plate' && T.mode) { T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); redraw(); } }; }
