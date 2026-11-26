@@ -385,13 +385,16 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
   </div>
 
   <div class="card" style="margin-top:10px">
+    <div class="row" id="tgtRow" style="margin-bottom:10px;gap:8px;flex-wrap:wrap;align-items:center"><b>What to track</b><div class="seg" id="tgtSeg"></div><select id="tgtJoint" style="width:auto;display:none"></select></div>
     <div class="row">
       <button class="btn sm" id="detBtn" disabled>🎯 Auto-detect</button>
+      <button class="btn sm" id="scaleBtn" style="display:none">📏 Scale</button>
       <label class="f" style="flex:1;min-width:130px">Circle size<input type="range" id="radSl" min="40" max="200" value="100" disabled></label>
       <button class="btn sm go" id="lockBtn" disabled>🔒 Lock</button>
       <button class="btn sm" id="resetBtn" disabled>↺ Reset</button>
       <span id="fileCtl" style="display:none" class="row"><button class="btn sm" id="playBtn">⏯</button><select id="rateSel" style="width:auto"><option value="1">1×</option><option value="0.5" selected>0.5×</option><option value="0.25">0.25×</option></select></span>
     </div>
+    <div class="row" id="scaleRow" style="margin-top:8px;gap:6px;flex-wrap:wrap;align-items:center;display:none"><span>Real length between the 2 points</span><input id="scaleCm" type="number" step="0.5" min="1" inputmode="decimal" style="width:90px"><span class="muted">cm</span><span id="scaleChips" class="row" style="gap:6px;flex-wrap:wrap"></span><button class="btn sm pri" id="scaleSave">✓ Use</button><button class="btn sm" id="scaleCancel">✕</button></div>
     <div class="muted" id="calStatus" style="margin-top:6px">Waiting for a video source.</div>
   </div>
 
@@ -3001,6 +3004,7 @@ function onFrame(now, meta) {
 function sizeVerdict(r, W, H) { const m = Math.min(W, H); return r < 0.04 * m ? 'far' : r > 0.3 * m ? 'close' : 'ok'; }
 // ring preview + auto-lock on the largest moving plate
 function autoSearch(t) {
+  if (tgtKind() !== 'plate') return;
   if (t - T.auto.lastRun < 0.35) return; T.auto.lastRun = t;
   let c = null;
   if (T.motion && T.motionFrac > 0.002 && T.motionFrac < 0.5) { const gate = motionGate(T.motion, T.PW, T.PH); c = detectPlates(T.gray, T.PW, T.PH, 0.3, null, gate)[0]; if (c) c.moving = true; }
@@ -3161,19 +3165,116 @@ $('#radSl').oninput = e => { if (T.sel && !T.tracker) { const k = e.target.value
 $('#radSl').onchange = () => selGrab();
 $('#lockBtn').onclick = () => { if (!T.sel && T.preview) selectCand(refineVideoCircle(T.preview.x, T.preview.y, T.preview.r, 0.15) || T.preview); lockPlate(); };
 function lockPlate(auto) {
+  const kind = tgtKind();
+  if (kind !== 'plate') { if (auto) return false; if (!T.scale) { toast('Set the scale first: tap 📏 Scale, then two points a known distance apart'); scaleStart(); return false; }
+    if (kind === 'joint') { if (!T.gray) return false; if (!POSE.lm) { toast(POSE.err ? 'Body tracking could not load: ' + POSE.err : 'Loading body tracking… try Lock again in a moment'); poseLoadV(); return false; } const r0 = 0.03 * Math.min(T.vw, T.vh); T.sel = T.sel || { x: T.vw / 2, y: T.vh / 2, r: r0, rv: r0, rh: r0, aspect: 1, contrast: null }; }
+    else if (!T.sel) { toast(kind === 'db' ? 'Tap the dumbbell head first' : 'Tap the end of the bar (sleeve / collar) first'); return false; } }
   if (!T.sel || !T.gray) return false;
-  const tr = new Tracker();
-  if (!tr.lock(T.gray, T.PW, T.PH, T.sel.x * T.ps, T.sel.y * T.ps, T.sel.r * T.ps)) { if (!auto) toast('Plate is too close to the frame edge – move the camera back'); return false; }
+  const tr = kind === 'joint' ? poseTracker(() => ({ src: video, crop: T.crop }), T.PW, T.PH) : new Tracker();
+  if (kind === 'joint') { const r = tr.update(T.gray, 0); if (!r.ok) { toast('No ' + jointName() + ' found – make sure the whole body is in the picture'); return false; } T.sel.x = r.x / T.ps; T.sel.y = r.y / T.ps; tr.lastT = null; }
+  else if (!tr.lock(T.gray, T.PW, T.PH, T.sel.x * T.ps, T.sel.y * T.ps, T.sel.r * T.ps)) { if (!auto) toast((kind === 'plate' ? 'Plate' : 'The marked point') + ' is too close to the frame edge – move the camera back'); return false; }
   T.tracker = tr; T.phase = 'locked'; T.cands = []; T.preview = null;
   T.mpp = (ST_().plateCm / 100) / (2 * T.sel.rv); T.mppH = (ST_().plateCm / 100) / (2 * T.sel.rh);
+  if (kind !== 'plate') { T.mpp = T.mppH = (T.scale.cm / 100) / T.scale.px; }
   T.light = lightStats(T.gray, T.PW, T.PH, T.sel.x * T.ps, T.sel.y * T.ps, T.sel.r * T.ps);
   T.x0 = T.sel.x; T.y0 = T.sel.y; T.pos = { x: T.sel.x, y: T.sel.y }; T.buf = { t: [], y: [], x: [] };
   if (T.set) { T.set.lockedLate = true; T.set.t0 = null; T.set.trace = { t: [], y: [], x: [], v: [] }; T.set.px = { x: [], y: [] }; T.det = new RepDetector(detParams()); T.set.reps = []; }
   $('#radSl').disabled = true; $('#lockBtn').disabled = true;
+  if (kind !== 'plate') { $('#radSl').disabled = true; $('#lockBtn').disabled = true; $('#calStatus').textContent = `Locked on the ${tgtLabel()}. Scale ${fmt(T.scale.cm, 1)} cm = ${fmt(T.scale.px, 0)} px → 1 px = ${fmt(T.mpp * 1000, 2)} mm.`; beep('lock'); updatePlateInfo(); redraw(); updateCTA(); return true; }
   $('#calStatus').textContent = `${auto ? 'Plate found and locked automatically' : 'Locked'}${angleOf(T.sel.aspect) > 12 ? ` (plate oval ~${Math.round(angleOf(T.sel.aspect))}° – corrected)` : ''}. Plate Ø ${ST_().plateCm} cm = ${fmt(2 * T.sel.rv, 0)} px → 1 px = ${fmt(T.mpp * 1000, 2)} mm.`;
   if (auto) beep('lock');
   updatePlateInfo(); redraw(); updateCTA(); return true;
 }
+/* ================= TRACK TARGET: plate · barbell end · dumbbell · body joint ================= */
+/* Plate: scale from the plate diameter (as before). Barbell / dumbbell: tap the point to follow, then set the scale by
+   tapping two points a known distance apart. Body joint: MediaPipe Pose follows the chosen joint; same scale step.
+   Velocity, ROM, power and reps use exactly the same maths for every target. */
+const TGT = { plate: { label: 'Plate', icon: '◎' }, bar: { label: 'Barbell end', icon: '▬' }, db: { label: 'Dumbbell', icon: '🏋' }, joint: { label: 'Body joint', icon: '🦴' } };
+const JOINTS = [['R_WRIST', 'Right wrist', 16], ['L_WRIST', 'Left wrist', 15], ['R_ELBOW', 'Right elbow', 14], ['L_ELBOW', 'Left elbow', 13], ['R_SHOULDER', 'Right shoulder', 12], ['L_SHOULDER', 'Left shoulder', 11], ['R_HIP', 'Right hip', 24], ['L_HIP', 'Left hip', 23], ['R_KNEE', 'Right knee', 26], ['L_KNEE', 'Left knee', 25], ['R_ANKLE', 'Right ankle', 28], ['L_ANKLE', 'Left ankle', 27], ['NOSE', 'Head (nose)', 0]];
+const tgtKind = () => (ST_().target in TGT ? ST_().target : 'plate');
+const jointName = j => ((JOINTS.find(x => x[0] === (j || ST_().joint)) || JOINTS[0])[1]);
+const tgtLabel = () => tgtKind() === 'joint' ? jointName() : TGT[tgtKind()].label;
+/* --- MediaPipe Pose (self-hosted first, then CDN) --- */
+const POSE = { lm: null, err: '', p: null };
+function poseLoadV() {
+  if (POSE.lm) return Promise.resolve(POSE.lm); if (POSE.p) return POSE.p;
+  const V = '0.10.14', cdn = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${V}`;
+  const tries = [[new URL('../assets/mediapipe/vision_bundle.mjs', location.href).href, new URL('../assets/mediapipe/wasm', location.href).href, new URL('../assets/mediapipe/pose_landmarker_full.task', location.href).href],
+    [cdn + '/vision_bundle.mjs', cdn + '/wasm', 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task']];
+  POSE.p = (async () => { let last;
+    for (const [js, wasm, model] of tries) { try { const m = await import(js); const fs = await m.FilesetResolver.forVisionTasks(wasm);
+      for (const delegate of ['GPU', 'CPU']) { try { POSE.lm = await m.PoseLandmarker.createFromOptions(fs, { baseOptions: { modelAssetPath: model, delegate }, runningMode: 'VIDEO', numPoses: 1, minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5 }); POSE.err = ''; return POSE.lm; } catch (e) { last = e; } } } catch (e) { last = e; } }
+    POSE.err = String(last && last.message || last || 'unknown'); POSE.p = null; throw last; })();
+  POSE.p.catch(() => {}); return POSE.p;
+}
+// a tracker with the same interface as Tracker (update / reacquire / x / y / sc) that follows one pose landmark
+function poseTracker(getSrc, W, H, joint) {
+  const idx = (JOINTS.find(x => x[0] === (joint || ST_().joint)) || JOINTS[0])[2], cv = document.createElement('canvas'), cx = cv.getContext('2d');
+  const k = Math.min(1, 640 / Math.max(W, H)) * Math.max(1, 640 / Math.max(W, H)); cv.width = Math.round(W * 640 / Math.max(W, H)); cv.height = Math.round(H * 640 / Math.max(W, H));
+  let ts = 0;
+  const o = { x: 0, y: 0, sc: 1, score: 0, lastT: null,
+    update(g, t) { const S = getSrc(); if (!POSE.lm || !S.src) return { ok: false, score: 0 };
+      try { if (S.crop) cx.drawImage(S.src, S.crop.x, S.crop.y, S.crop.w, S.crop.h, 0, 0, cv.width, cv.height); else cx.drawImage(S.src, 0, 0, cv.width, cv.height);
+        ts = Math.max(ts + 1, Math.round(performance.now())); const res = POSE.lm.detectForVideo(cv, ts), L = res && res.landmarks && res.landmarks[0], p = L && L[idx];
+        const vis = p ? (p.visibility == null ? 1 : p.visibility) : 0; o.score = vis;
+        if (!p || vis < 0.5 || p.x < 0 || p.y < 0 || p.x > 1 || p.y > 1) return { ok: false, score: vis };
+        o.x = p.x * W; o.y = p.y * H; o.lastT = t; return { ok: true, x: o.x, y: o.y, score: vis, sc: 1 }; } catch (e) { return { ok: false, score: 0 }; } },
+    reacquire(g) { return this.update(g, this.lastT || 0).ok; } };
+  return o;
+}
+/* --- target selector --- */
+function tgtRender() { const S = ST_(), k = tgtKind();
+  seg($('#tgtSeg'), Object.entries(TGT).map(([v, t]) => [v, t.icon + ' ' + t.label]), k, v => tgtSet(v));
+  const j = $('#tgtJoint'); j.style.display = k === 'joint' ? '' : 'none'; if (!j.options.length) j.innerHTML = JOINTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); j.value = S.joint || 'R_WRIST';
+  $('#scaleBtn').style.display = k === 'plate' ? 'none' : ''; $('#detBtn').style.display = k === 'plate' ? '' : 'none'; }
+function tgtSet(v) { if (T.set) return toast('Finish the set first'); const S = ST_(); S.target = v; if (!S.joint) S.joint = 'R_WRIST'; save(); resetCalib(); T.scale = null; scaleHide();
+  if (T.mode) { T.phase = v === 'plate' ? 'auto' : 'manT'; $('#calStatus').textContent = tgtHelp(); } if (v === 'joint') poseLoadV().then(() => { if (tgtKind() === 'joint') toast('Body tracking ready'); }).catch(() => toast('Body tracking could not load – check the internet connection'));
+  tgtRender(); redraw(); updateCTA(); }
+function tgtHelp() { const k = tgtKind(); if (k === 'plate') return 'The ring follows the plate – or tap the plate centre, then its edge.';
+  const step2 = '2) 📏 Scale: tap two points a known distance apart (e.g. plate edge to edge, dumbbell end to end, athlete height) and enter the cm. 3) 🔒 Lock.';
+  if (k === 'joint') return `Body joint: ${jointName()}. 1) Keep the whole body in the picture, side-on. ${step2}`;
+  return `1) Tap the ${k === 'db' ? 'dumbbell head' : 'end of the bar (sleeve or collar)'} – drag / pinch the green circle to fit it. ${step2}`; }
+$('#tgtJoint').onchange = e => { ST_().joint = e.target.value; save(); if (T.tracker && tgtKind() === 'joint') { T.tracker = null; T.phase = 'manT'; } $('#calStatus').textContent = tgtHelp(); redraw(); updateCTA(); };
+/* --- scale: two taps + known length --- */
+function scaleStart() { if (!T.mode) return toast('Start the camera or load a video first'); if (T.tracker) return toast('Reset first to set a new scale'); T.scaleTap = []; T.phase = 'scaleA'; $('#calStatus').textContent = '📏 Tap the FIRST end of something you know the length of.'; scaleHide(); redraw(); }
+function scaleHide() { $('#scaleRow').style.display = 'none'; }
+function scaleAsk() { const a = athlete(), S = ST_(), chips = [['45', 'Plate 45 cm']]; if (a && +a.height > 50) chips.push([String(+a.height), 'Athlete ' + (+a.height) + ' cm']); chips.push(['100', '1 m']);
+  $('#scaleChips').innerHTML = chips.map(([v, l]) => `<button class="btn sm" data-cm="${v}">${l}</button>`).join(''); $('#scaleCm').value = S.scaleCm || ''; $('#scaleRow').style.display = 'flex'; $('#scaleCm').focus(); }
+$('#scaleChips').onclick = e => { const b = e.target.closest('[data-cm]'); if (b) $('#scaleCm').value = b.dataset.cm; };
+$('#scaleSave').onclick = () => { const cm = parseFloat($('#scaleCm').value), P = T.scaleTap || []; if (!(cm > 0.5) || P.length < 2) return toast('Enter the real length in cm');
+  const px = Math.hypot(P[1].x - P[0].x, P[1].y - P[0].y); if (px < 20) return toast('The two points are too close – tap two points further apart');
+  T.scale = { cm, px, a: P[0], b: P[1] }; ST_().scaleCm = cm; save(); scaleHide(); T.phase = 'manT'; $('#lockBtn').disabled = !(T.sel || tgtKind() === 'joint');
+  $('#calStatus').textContent = `Scale set: ${fmt(cm, 1)} cm = ${fmt(px, 0)} px (1 px = ${fmt(cm * 10 / px, 2)} mm). ${tgtKind() === 'joint' ? 'Now tap 🔒 Lock.' : T.sel ? 'Now tap 🔒 Lock.' : 'Now tap the ' + tgtLabel().toLowerCase() + '.'}`; redraw(); updateCTA(); };
+$('#scaleCancel').onclick = () => { scaleHide(); T.scaleTap = []; T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); redraw(); };
+$('#scaleBtn').onclick = scaleStart;
+/* taps for non-plate targets (registered before the ring-adjust handler, so it runs first) */
+view.addEventListener('pointerdown', e => {
+  const k = tgtKind(); if (k === 'plate' || !T.mode || T.busy || T.tracker) return;
+  const rc = view.getBoundingClientRect(), x = (e.clientX - rc.left) * (view.width / rc.width) / T.vs, y = (e.clientY - rc.top) * (view.height / rc.height) / T.vs;
+  if (T.phase === 'scaleA' || T.phase === 'scaleB') { e.stopImmediatePropagation(); e.preventDefault(); if (typeof RG !== 'undefined' && RG.replay) return;
+    T.scaleTap = T.phase === 'scaleA' ? [{ x, y }] : [T.scaleTap[0], { x, y }];
+    if (T.phase === 'scaleA') { T.phase = 'scaleB'; $('#calStatus').textContent = '📏 Now tap the OTHER end.'; } else { T.phase = 'scaleC'; $('#calStatus').textContent = 'Enter the real length between the two points.'; scaleAsk(); }
+    redraw(); return; }
+  if (k === 'joint') { e.stopImmediatePropagation(); return; }
+  const replay = typeof RG !== 'undefined' && RG.replay;
+  if (T.sel && !replay) return; // ring-adjust handler: drag / pinch, a plain tap comes back here as a replay
+  e.stopImmediatePropagation();
+  const r = T.sel ? T.sel.r : Math.max(8, 0.035 * Math.min(T.vw, T.vh));
+  T.sel = { x, y, r, rv: r, rh: r, aspect: 1, contrast: null }; T.baseR = r; T.baseRv = r; T.baseRh = r; $('#radSl').value = 100; $('#radSl').disabled = false;
+  if (T.mode === 'file') { try { T.selT = video.currentTime; T.selGray = frameReader(video, 400).read(); } catch (er) { T.selGray = null; } }
+  $('#lockBtn').disabled = !T.scale; $('#calStatus').textContent = T.scale ? `${tgtLabel()} marked – fit the green circle to it (drag / pinch), then 🔒 Lock.` : `${tgtLabel()} marked. Now 📏 Scale: tap two points a known distance apart.`;
+  if (!T.scale) setTimeout(scaleStart, 300);
+  updatePlateInfo(); redraw(); updateCTA();
+});
+// keep the plate flow untouched; non-plate targets start in manual mode
+{ const _sr = sourceReady; sourceReady = function () { const x = _sr.apply(this, arguments); tgtRender(); if (tgtKind() !== 'plate') { T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); updateCTA(); } if (tgtKind() === 'joint') poseLoadV().catch(() => {}); return x; }; }
+{ const _rc = resetCalib; resetCalib = function () { const x = _rc.apply(this, arguments); if (tgtKind() !== 'plate') { T.scale = null; T.scaleTap = []; scaleHide(); } return x; }; }
+{ const _rb = $('#resetBtn').onclick; $('#resetBtn').onclick = async () => { await _rb(); if (tgtKind() !== 'plate' && T.mode) { T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); redraw(); } }; }
+// draw the scale line and the live joint marker
+{ const _rd = redraw; redraw = function () { _rd.apply(this, arguments); if (!T.mode || !video.videoWidth || tgtKind() === 'plate') return; const s = T.vs, lw = Math.max(2, view.width / 360), P = T.scale ? [T.scale.a, T.scale.b] : (T.scaleTap || []);
+  if (P.length) { vctx.save(); vctx.strokeStyle = '#ffd23f'; vctx.fillStyle = '#ffd23f'; vctx.lineWidth = lw; vctx.setLineDash([8, 6]); if (P.length > 1) { vctx.beginPath(); vctx.moveTo(P[0].x * s, P[0].y * s); vctx.lineTo(P[1].x * s, P[1].y * s); vctx.stroke(); } vctx.setLineDash([]);
+    P.forEach(p => { vctx.beginPath(); vctx.arc(p.x * s, p.y * s, lw * 3, 0, 7); vctx.fill(); }); if (T.scale) { vctx.font = `700 ${Math.round(lw * 7)}px system-ui`; vctx.fillText(fmt(T.scale.cm, 1) + ' cm', (P[0].x + P[1].x) / 2 * s + lw * 4, (P[0].y + P[1].y) / 2 * s - lw * 3); } vctx.restore(); } }; }
+setTimeout(() => { try { tgtRender(); } catch (e) {} }, 0);
 /* ring adjust: one finger drags the circle, two fingers pinch it (mouse wheel on a computer). A tap without moving still works as before. */
 const RG = { p: new Map(), mode: null, replay: false, start: null };
 const rgVid = (cx, cy) => { const rc = view.getBoundingClientRect(); return { x: (cx - rc.left) * (view.width / rc.width) / T.vs, y: (cy - rc.top) * (view.height / rc.height) / T.vs }; };
@@ -3213,7 +3314,7 @@ view.addEventListener('pointerdown', e => {
     const adv = {}; if (cap.focusMode && cap.focusMode.includes('single-shot')) adv.focusMode = 'single-shot'; if (cap.exposureMode && cap.exposureMode.includes('continuous')) adv.exposureMode = 'continuous';
     if (Object.keys(adv).length || 'pointsOfInterest' in (trk.getSettings ? trk.getSettings() : {})) trk.applyConstraints({ advanced: [{ ...adv, pointsOfInterest: [{ x: px, y: py }] }] }).then(() => toast('Focus & exposure set on the plate', 1200)).catch(() => {}); }
   const x = (e.clientX - rc.left) * (view.width / rc.width) / T.vs, y = (e.clientY - rc.top) * (view.height / rc.height) / T.vs;
-  if (T.tracker) return;
+  if (T.tracker || tgtKind() !== 'plate') return;
   if (T.phase === 'manE') {
     const c = T.manual || T.sel, r = Math.hypot(x - c.x, y - c.y);
     if (r < 6) return toast('Tap the plate edge, a bit further from the centre');
@@ -3351,12 +3452,13 @@ function updateCTA() {
   if (T.busy) { b.className = 'cta wait'; b.innerHTML = `Processing set… <span id="procPct">${T.busyPct || 0}%</span><small>finding the plate and measuring every rep</small>`; b.disabled = true; return; }
   if (!T.mode) { b.className = 'cta wait'; b.innerHTML = 'Start a source<small>Live camera or load a video</small>'; return; }
   const ref = curSetRef(), what = ref ? `${esc(ref.e.name)} · ${ref.s.load} kg × ${ref.s.reps}` : 'add a set in Workout';
+  if (T.mode === 'file' && tgtKind() !== 'plate') { b.className = 'cta ready'; b.innerHTML = `Analyse – ${esc(tgtLabel())}<small>${what} · ${T.scale ? 'scale ' + fmt(T.scale.cm, 1) + ' cm' : 'set the scale first'}</small>`; return; }
   if (T.mode === 'file') { b.className = 'cta ready'; b.innerHTML = `${T.tracker || T.sel ? 'Analyse with this plate' : 'Analyse video'}<small>${what} · plate Ø ${ST_().plateCm} cm${ST_().plateDefault ? '' : ' (custom)'}</small>`; return; }
   if (T.set) { b.className = 'cta live'; b.innerHTML = `● ${T.recorder ? 'Recording' : 'Tracking'} · ${T.set.reps.length}/${T.set.targetReps}<small>${T.tracker ? 'tap to stop' : 'finding the plate… tap to stop'}</small>`; return; }
-  b.className = 'cta ready'; b.innerHTML = `${T.tracker ? 'Ready – tap to record' : 'Tap to record'}<small>${T.tracker ? what : 'plate locks when the bar moves · ' + what}</small>`;
+  b.className = 'cta ready'; b.innerHTML = `${T.tracker ? 'Ready – tap to record' : 'Tap to record'}<small>${T.tracker ? what : (tgtKind() === 'plate' ? 'plate locks when the bar moves · ' : 'mark the ' + esc(tgtLabel().toLowerCase()) + ', set the scale and Lock · ') + what}</small>`;
 }
 $('#cta').onclick = () => { if (T.busy) return; if (!T.mode) return startCamera(); if (T.mode === 'file') return analyseFile(); T.set ? endSet() : startSet(); };
-function newRec(s) { return { lastRepWall: null, plateCm: ST_().plateCm, setId: s.id, load: s.load, targetReps: s.reps, vMin: s.vMin, vMax: s.vMax, t0: null, reps: [], trace: { t: [], y: [], x: [], v: [] }, px: { x: [], y: [] }, source: T.mode, time: new Date().toISOString(), stats: { lost: 0, edge: 0, movedEv: 0, motionEv: 0 } }; }
+function newRec(s) { return { target: tgtKind(), joint: tgtKind() === 'joint' ? ST_().joint : undefined, scalePx: tgtKind() !== 'plate' && T.scale ? T.scale.px : undefined, lastRepWall: null, plateCm: tgtKind() !== 'plate' && T.scale ? T.scale.cm : ST_().plateCm, setId: s.id, load: s.load, targetReps: s.reps, vMin: s.vMin, vMax: s.vMax, t0: null, reps: [], trace: { t: [], y: [], x: [], v: [] }, px: { x: [], y: [] }, source: T.mode, time: new Date().toISOString(), stats: { lost: 0, edge: 0, movedEv: 0, motionEv: 0 } }; }
 function startSet() {
   const ref = curSetRef(); if (!ref) return toast('Add an exercise and set in the Workout tab');
   if (!T.tracker && !pickMime()) return toast('This browser cannot record – lock the plate first (tap centre, then edge)');
@@ -3438,9 +3540,9 @@ async function commitSet({ w, e, s }, rec, blob, review) {
 function setWarnings(rec) {
   const W = [], st = rec.stats || {}, tr = rec.trace, fr = rec.frame || { w: T.vw, h: T.vh };
   if (!rec.reps.length) W.push(['No reps detected', 'No complete rep was found.', 'Check the angle, zoom and plate lock, then record again.']);
-  if (st.noPlate) W.push(['Plate not found', 'No moving round plate was found in the video.', 'Use round plates on the camera side, film from the side, or tap the plate centre and edge before analysing.']);
+  if (st.noPlate) W.push((rec.target && rec.target !== 'plate') ? ['Target not found', 'The marked ' + (TGT[rec.target] || TGT.plate).label.toLowerCase() + ' could not be followed.', 'Mark it again on a clear frame and set the scale.'] : ['Plate not found', 'No moving round plate was found in the video.', 'Use round plates on the camera side, film from the side, or tap the plate centre and edge before analysing.']);
   if (st.lost > 3 || st.edge > 2) W.push(['Bar left frame', 'The plate left the screen or was hidden during a rep.', 'Zoom out or move the phone back.']);
-  if (rec.plateR && fr.w) { const m = Math.min(fr.w, fr.h), r = rec.plateR; const travel = tr.y.length ? (Math.max(...tr.y) - Math.min(...tr.y)) / (((rec.plateCm || ST_().plateCm) / 100) / (2 * r)) : 0;
+  if (rec.plateR && fr.w && (!rec.target || rec.target === 'plate')) { const m = Math.min(fr.w, fr.h), r = rec.plateR; const travel = tr.y.length ? (Math.max(...tr.y) - Math.min(...tr.y)) / (((rec.plateCm || ST_().plateCm) / 100) / (2 * r)) : 0;
     if (r < 0.04 * m) W.push(['Too far away', `The plate was only ${Math.round(2 * r)} px wide.`, 'Move closer or zoom in.']);
     if (2 * r + travel > 0.95 * fr.h) W.push(['Too close', 'The plate plus its travel almost filled the frame.', 'Move back or zoom out.']); }
   if (tr.t.length > 10) {
@@ -3509,9 +3611,11 @@ async function analyzeVideo(blob, opts = {}) {
       tplGray = FR.read(); tplT = best.t;
     }
     // pass 2: track from the start of the video
-    const tk = new Tracker();
-    if (!tk.lock(tplGray, FR.W, FR.H, plate.x * FR.s, plate.y * FR.s, plate.r * FR.s)) return { ok: false, reason: 'edge' };
-    const mpp = ((opts.plateCm || ST_().plateCm) / 100) / (2 * (plate.rv || plate.r)), mppH = ((opts.plateCm || ST_().plateCm) / 100) / (2 * (plate.rh || plate.r));
+    const isJoint = !!(plate && plate.kind === 'joint');
+    const tk = isJoint ? poseTracker(() => ({ src: v, crop: null }), FR.W, FR.H, plate.joint) : new Tracker();
+    if (!isJoint && !tk.lock(tplGray, FR.W, FR.H, plate.x * FR.s, plate.y * FR.s, plate.r * FR.s)) return { ok: false, reason: 'edge' };
+    let mpp = ((opts.plateCm || ST_().plateCm) / 100) / (2 * (plate.rv || plate.r)), mppH = ((opts.plateCm || ST_().plateCm) / 100) / (2 * (plate.rh || plate.r));
+    if (plate.scale) { mpp = mppH = (plate.scale.cm / 100) / plate.scale.px; }
     const light = lightStats(tplGray, FR.W, FR.H, plate.x * FR.s, plate.y * FR.s, plate.r * FR.s);
     const trace = { t: [], y: [], x: [], v: [] }, px = { x: [], y: [] }, stats = { lost: 0, edge: 0, movedEv: 0, motionEv: 0 };
     // 4K and other very large videos: play the tracking pass at half speed, so the phone can read every frame instead of skipping them
@@ -3519,7 +3623,7 @@ async function analyzeVideo(blob, opts = {}) {
     await seekTo(0, v); const g = new Float32Array(n); let first = true, y0 = null, x0 = null, lostRun = 0;
     await playFrames(v, rate2, t => {
       FR.read(g); prog(45 + Math.min(54, t / v.duration * 54));
-      if (first) { first = false; if (!tk.reacquire(g)) { tk.x = plate.x * FR.s; tk.y = plate.y * FR.s; } }
+      if (first) { first = false; if (!isJoint && !tk.reacquire(g)) { tk.x = plate.x * FR.s; tk.y = plate.y * FR.s; } }
       const r = tk.update(g, t);
       if (!r.ok) { stats.lost++; if (++lostRun % 4 === 0) tk.reacquire(g); return; }
       lostRun = 0;
@@ -3544,6 +3648,7 @@ async function runAnalysis(blob, { hintR, plate, rec }) {
   out.analysed = true; out.source = T.mode;
   if (!res.ok) { out.stats = out.stats || {}; out.stats.noPlate = true; out.trace = { t: [], y: [], x: [], v: [] }; out.px = { x: [], y: [] }; finishRec(out); toast(res.reason === 'noPlate' ? 'No moving plate found – tap the plate centre and edge, then analyse again' : 'Analysis failed: ' + res.reason); return out; }
   const t0 = res.trace.t[0] || 0; out.trace = { t: res.trace.t.map(t => +(t - t0).toFixed(4)), y: res.trace.y, x: res.trace.x, v: [] }; out.px = res.px; out.vOff = t0;
+  if (res.plate.kind) { out.target = res.plate.kind; out.joint = res.plate.joint; out.scalePx = res.plate.scale.px; out.plateCm = res.plate.scale.cm; }
   out.plateR = res.plate.r; out.plateRv = res.plate.rv; out.aspect = res.plate.aspect; out.contrast = res.plate.contrast; out.light = res.light; out.frame = res.frame; out.stats = Object.assign(out.stats || {}, { lost: res.stats.lost, edge: res.stats.edge }); out.thumb = res.thumb;
   finishRec(out);
   return out;
@@ -3593,14 +3698,18 @@ async function analyseFile() {
   const t0 = performance.now();
   video.pause();
   let plate = null;
-  if (T.sel) { const r = T.sel; plate = { x: r.x, y: r.y, r: r.r, t: T.selT != null ? T.selT : video.currentTime, gray: T.selGray || null };
+  const kind = tgtKind();
+  if (kind !== 'plate') { if (!T.scale) { toast('Set the scale first: tap 📏 Scale, then two points a known distance apart'); return scaleStart(); } if (kind !== 'joint' && !T.sel) return toast(kind === 'db' ? 'Pause on a clear frame and tap the dumbbell head first' : 'Pause on a clear frame and tap the end of the bar first');
+    if (kind === 'joint' && !POSE.lm) { try { await poseLoadV(); } catch (e) {} if (!POSE.lm) return toast('Body tracking could not load' + (POSE.err ? ': ' + POSE.err : '')); } }
+  if (kind === 'joint') { const r0 = 0.03 * Math.min(video.videoWidth, video.videoHeight); plate = { kind, joint: ST_().joint, scale: T.scale, x: video.videoWidth / 2, y: video.videoHeight / 2, r: r0, t: video.currentTime }; }
+  else if (T.sel) { const r = T.sel; plate = { x: r.x, y: r.y, r: r.r, t: T.selT != null ? T.selT : video.currentTime, gray: T.selGray || null }; if (kind !== 'plate') Object.assign(plate, { kind, scale: T.scale });
     // the frame on screen may have moved on since the ring was set: go back to it before analysing
     if (!plate.gray && Math.abs(video.currentTime - plate.t) > 0.02) await seekTo(plate.t); if (!plate.gray) try { plate.gray = frameReader(video, 400).read(); } catch (e) {} }
   const rec = newRec(ref.s); rec.source = 'file'; rec.imported = true; rec.time = new Date(T.file.lastModified || Date.now()).toISOString(); rec.fileName = T.file.name;
   const out = await runAnalysis(T.file, { plate, rec });
   if (!out) return;
   out.procRatio = (performance.now() - t0) / 1000 / (video.duration || 1); out.warn = setWarnings(out);
-  if (T.sel) out.analysed = false, out.warn = setWarnings(out);
+  if (T.sel && tgtKind() === 'plate') out.analysed = false, out.warn = setWarnings(out);
   await commitSet(ref, out, T.file, true);
 }
 $('#playBtn').onclick = () => { if (video.paused) { video.playbackRate = +$('#rateSel').value; video.play(); } else video.pause(); };
@@ -3955,14 +4064,14 @@ function renderReview(f, review) {
   $('#dReview').style.display = 'block';
   $('#dWarn').innerHTML = (W.length ? W.map(([k, what, fix]) => `<div class="warn-item ${['Analysed from recording', 'Angle corrected'].includes(k) ? 'info' : ''}"><b>${['Analysed from recording', 'Angle corrected'].includes(k) ? 'ℹ' : '⚠'} ${esc(k)}</b>${esc(what)} <span class="muted">→ ${esc(fix)}</span></div>`).join('') : '<div class="warn-item okk"><b>✓ Recording looks good</b>No problems detected.</div>') + (rec.fps ? `<p class="muted" style="margin:4px 0 0">Tracked at ${Math.round(rec.fps)} fps${rec.plateR ? ` · plate ${Math.round(2 * (rec.plateRv || rec.plateR))} px tall = ${rec.plateCm || 45} cm` : ''}${rec.minRomUsed ? ` · min rep ROM ${Math.round(rec.minRomUsed * 100)} cm${rec.minRomAuto ? ' (auto)' : ''}` : ''}</p>` : '');
   ['#dDiscard', '#dSave', '#dNext'].forEach(x => $(x).style.display = review ? '' : 'none');
-  $('#dPlate').innerHTML = rec.trace.t.length ? `<div class="row" style="margin-top:8px"><span class="muted">Plate size used</span><input id="dPlateCm" type="number" step="0.5" min="10.5" inputmode="decimal" value="${rec.plateCm || 45}" style="width:80px"><span class="muted">cm</span><button class="btn sm" id="dPlateFix">Recalculate</button></div><p class="muted" style="margin:4px 0 0">Wrong plate size? Enter the real diameter – every speed, ROM and power is rescaled.</p>` : '';
+  $('#dPlate').innerHTML = rec.trace.t.length ? `<div class="row" style="margin-top:8px"><span class="muted">${rec.target && rec.target !== 'plate' ? 'Reference length used (' + esc((TGT[rec.target] || TGT.plate).label) + ')' : 'Plate size used'}</span><input id="dPlateCm" type="number" step="0.5" min="1" inputmode="decimal" value="${rec.plateCm || 45}" style="width:80px"><span class="muted">cm</span><button class="btn sm" id="dPlateFix">Recalculate</button></div><p class="muted" style="margin:4px 0 0">Wrong plate size? Enter the real diameter – every speed, ROM and power is rescaled.</p>` : '';
   const fx = $('#dPlateFix'); if (fx) fx.onclick = () => rescalePlate(f, parseFloat($('#dPlateCm').value));
   const L = allSetsFlat(f.w), i = L.findIndex(x => x.s === f.s), nx = L.slice(i + 1).find(x => !isDone(x.s));
   $('#dNext').textContent = nx ? `Next: ${nx.s.load} kg ›` : 'Done ✓';
   $('#dWkUp').style.display = review && f.w.quick && rec.imported ? '' : 'none'; $('#dNext').dataset.next = nx ? `${nx.ei}:${nx.si}` : '';
 }
 function rescalePlate(f, cm) {
-  const rec = f.s.result, old = rec.plateCm || 45; if (!(cm > 10)) return toast('Plate diameter must be more than 10 cm'); if (Math.abs(cm - old) < 0.01) return;
+  const rec = f.s.result, old = rec.plateCm || 45, np = rec.target && rec.target !== 'plate'; if (!(cm > (np ? 1 : 10))) return toast(np ? 'Enter the real length in cm' : 'Plate diameter must be more than 10 cm'); if (Math.abs(cm - old) < 0.01) return;
   const k = cm / old, tr = rec.trace; tr.y = tr.y.map(v => +(v * k).toFixed(5)); tr.x = tr.x.map(v => +(v * k).toFixed(5));
   rec.plateCm = cm; rec.reps = []; finalizeSet(rec, detParams()); addPowerAndTempo(rec); tr.v = tr.v.map(v => +v.toFixed(4)); rec.warn = setWarnings(rec);
   save(true); toast(`Recalculated for a ${cm} cm plate (×${fmt(k, 3)})`); openDetail(f.s.id, $('#dDiscard').style.display !== 'none');
