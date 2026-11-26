@@ -3004,7 +3004,7 @@ function defSave(){const d=Object.fromEntries(new FormData(document.getElementBy
 const defLoc=k=>{const f=db.facilities.find(x=>x.status!=='Archived'&&x[k]);return f?f.name:''};
 
 /* ============ COACHES & USERS ============ */
-const UROLES=['Organization Admin','Owner','Head Coach','Staff Manager','Coach','Sport Scientist','Trainer','Assistant','Physio','Doctor','Viewer','Athlete','Parent'];
+const UROLES=['Organization Admin','Owner','Head Coach','Staff Manager','Coach','Sport Scientist','Trainer','Assistant','Physio','Doctor','Nutritionist','Viewer','Athlete','Parent'];
 const STAFF=r=>!['Athlete','Parent'].includes(r);
 const ADMINR=r=>['Organization Admin','Owner'].includes(r);
 let CU={invF:'Pending',coach:'',q:'',flt:'',sel:[],note:'',showArch:false,edit:''};
@@ -5644,7 +5644,7 @@ function renderAuth(){if(CLOUD)return renderCloudAuth();closeModal();document.bo
  <div class="row" style="justify-content:space-between;margin-top:14px;font-size:14px"><a href="javascript:void 0" style="color:var(--accent)" onclick="AU.view='signup';AU.msg='';renderAuth()">Create account</a><a href="javascript:void 0" style="color:var(--muted)" onclick="AU.view='forgot';AU.msg='';renderAuth()">Forgot password?</a></div>`;
  if(AU.view==='signup'){const inv=AU.inv&&db.invites.find(i=>i.token===AU.inv&&i.status==='Pending');h=`<h2 style="margin:16px 0 4px">Create account</h2><p class="muted" style="margin:0">${inv?`You were invited as <b>${esc(inv.role)}</b> — your account opens immediately.`:`New accounts open after ${esc(OWNER_ACC.name)} approves them.`}</p>
  ${af('asN','Full name','text',inv?[inv.first,inv.last].filter(Boolean).join(' '):'')}${af('asE','Email','email',inv?inv.email:'',inv?'readonly':'')}${af('asP','Mobile number','tel','','inputmode="numeric" placeholder="10-digit number"')}
- ${inv?'':`<div style="margin-top:12px"><label>I am a</label><select id="asR">${['Coach','Athlete','Parent','Staff Manager','Sport Scientist','Trainer','Physio','Doctor'].map(r=>`<option>${r}</option>`).join('')}</select></div>`}${af('asW','Password','password','','autocomplete="new-password"')}${af('asW2','Confirm password','password','','autocomplete="new-password"')}
+ ${inv?'':`<div style="margin-top:12px"><label>I am a</label><select id="asR">${['Coach','Athlete','Parent','Staff Manager','Sport Scientist','Trainer','Physio','Doctor','Nutritionist'].map(r=>`<option>${r}</option>`).join('')}</select></div>`}${af('asW','Password','password','','autocomplete="new-password"')}${af('asW2','Confirm password','password','','autocomplete="new-password"')}
  <label class="row" style="flex-wrap:nowrap;margin-top:10px;font-size:14px"><input id="asT" type="checkbox" style="width:auto"> I agree to the <a href="javascript:void 0" onclick="location.hash='legal-terms'" style="color:var(--accent)">Terms</a> and <a href="javascript:void 0" onclick="location.hash='legal-privacy'" style="color:var(--accent)">Privacy Policy</a></label>
  <button class="btn pri" style="width:100%;margin-top:14px;padding:12px" onclick="authSignup()">Create account</button><div style="text-align:center;margin-top:12px;font-size:14px"><a href="javascript:void 0" style="color:var(--accent)" onclick="AU.view='login';AU.msg='';renderAuth()">I already have an account</a></div>`}
  if(AU.view==='forgot')h=`<h2 style="margin:16px 0 4px">Forgot password</h2><p class="muted">Coaches, athletes and parents: ask ${esc(OWNER_ACC.name)} (${esc(OWNER_ACC.phone)}) to reset your password from <b>Coaches &amp; Users → Accounts</b>.</p><p class="muted">Owner: enter the recovery code you saved at setup.</p>${af('afC','Owner recovery code','text','','autocomplete="off"')}${af('afW','New password','password')}${af('afW2','Confirm new password','password')}<button class="btn pri" style="width:100%;margin-top:14px;padding:12px" onclick="authOwnerReset()">Reset owner password</button><div style="text-align:center;margin-top:12px;font-size:14px"><a href="javascript:void 0" style="color:var(--accent)" onclick="AU.view='login';AU.msg='';renderAuth()">Back to sign in</a></div>`;
@@ -5675,7 +5675,7 @@ async function authSignup(){authDb();const n=aval('asN').trim(),e=normEmail(aval
 /* owner controls — shown in Coaches & Users */
 var CPROF_OK=0;
 function accPanel(){const me=authUser();if(!isAdmin(me))return '';authDb();if(CLOUD&&!CPROF_OK){CPROF_OK=1;setTimeout(cloudProfiles,0)}const A=accs();const pend=A.filter(a=>a.status==='Pending');
- const R=['Organization Admin','Head Coach','Staff Manager','Coach','Sport Scientist','Trainer','Assistant','Physio','Doctor','Viewer','Athlete','Parent'];
+ const R=['Organization Admin','Head Coach','Staff Manager','Coach','Sport Scientist','Trainer','Assistant','Physio','Doctor','Nutritionist','Viewer','Athlete','Parent'];
  return `<div class="card" style="border:2px solid var(--accent)"><div class="eyebrow" style="letter-spacing:.15em;color:var(--accent)">Owner control</div><h3 style="margin:4px 0 6px;font-weight:500;font-size:24px">Accounts &amp; sign-in</h3><p class="muted" style="margin:0 0 12px">Everyone needs an account to open the platform. New sign-ups wait here until you approve them. Owner account (${esc(OWNER_ACC.name)}) cannot be removed or changed by anyone else.</p>${cloudCard()}
  ${pend.length?`<h4 style="margin:6px 0">Waiting for approval (${pend.length})</h4>${pend.map(a=>`<div class="item"><span><b>${esc(a.name)}</b> · ${esc(a.email)} · ${esc(a.phone)} <span class="muted">asked for ${esc(a.role)} · ${fmtDate(a.created)}</span></span><span class="row"><select id="ap_${a.id}" style="width:auto">${R.map(r=>`<option ${r===a.role?'selected':''}>${r}</option>`).join('')}</select><button class="btn sm pri" onclick="accApprove('${a.id}')">Approve</button><button class="btn sm ghost danger" onclick="accSet('${a.id}','Rejected')">Reject</button></span></div>`).join('')}`:'<p class="muted">No accounts waiting for approval.</p>'}
  <details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600">All accounts (${A.length})</summary><div class="tbl" style="overflow:auto;margin-top:8px"><table><tr><th>Name</th><th>Login</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr>${A.map(a=>`<tr><td><b>${esc(a.name)}</b>${a.owner?' <span class="pill p-ok">Owner</span>':''}</td><td style="font-size:13px">${esc(a.email)}<br>${esc(a.phone||'')}</td><td>${a.owner?'Owner':`<select style="width:auto" onchange="accRole('${a.id}',this.value)">${R.map(r=>`<option ${r===a.role?'selected':''}>${r}</option>`).join('')}</select>`}</td><td><span class="pill p-${a.status==='Active'?'ok':a.status==='Pending'?'warn':'bad'}">${a.status}</span></td><td style="font-size:13px">${a.lastLogin?new Date(a.lastLogin).toLocaleString('en-IN'):'—'}</td>
@@ -5750,7 +5750,7 @@ function renderCloudAuth(){closeModal();document.body.classList.add('tvmode');co
  else if(AU.view==='sent')h=`<h2 style="margin:16px 0 4px">Check your email 📩</h2><p>${AU.sent}</p><button class="btn pri" style="width:100%;padding:12px" onclick="AU.view='login';AU.msg='';renderAuth()">Back to sign in</button>`;
  else if(AU.view==='signup')h=`<h2 style="margin:16px 0 4px">Create account</h2>${cGoogleOk()?`<button class="btn" style="width:100%;margin-top:14px;padding:11px;display:flex;justify-content:center;align-items:center;gap:10px;background:#fff;color:#1f1f1f;border:1px solid #dadce0;font-weight:600" onclick="cAuthGoogle()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17z"/><path fill="#FBBC05" d="M10.6 28.6A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.9l-8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Continue with Google</button><div class="muted" style="text-align:center;font-size:12px;margin-top:10px">or use email</div>`:''}<p class="muted" style="margin:0">${AU.inv?'You have an invitation — your account opens as soon as you confirm your email and sign in.':`New accounts open after ${esc(OWNER_ACC.name)} approves them.`}</p>
  ${af('asN','Full name')}${af('asE','Email','email','','autocomplete="email"')}${af('asP','Mobile number','tel','','inputmode="numeric" placeholder="10-digit number"')}
- ${AU.inv?'':`<div style="margin-top:12px"><label>I am a</label><select id="asR">${['Coach','Athlete','Parent','Staff Manager','Sport Scientist','Trainer','Physio','Doctor'].map(r=>`<option>${r}</option>`).join('')}</select></div>`}${af('asW','Password','password','','autocomplete="new-password"')}${af('asW2','Confirm password','password','','autocomplete="new-password"')}
+ ${AU.inv?'':`<div style="margin-top:12px"><label>I am a</label><select id="asR">${['Coach','Athlete','Parent','Staff Manager','Sport Scientist','Trainer','Physio','Doctor','Nutritionist'].map(r=>`<option>${r}</option>`).join('')}</select></div>`}${af('asW','Password','password','','autocomplete="new-password"')}${af('asW2','Confirm password','password','','autocomplete="new-password"')}
  <label class="row" style="flex-wrap:nowrap;margin-top:10px;font-size:14px"><input id="asT" type="checkbox" style="width:auto"> I agree to the <a href="javascript:void 0" onclick="location.hash='legal-terms'" style="color:var(--accent)">Terms</a> and <a href="javascript:void 0" onclick="location.hash='legal-privacy'" style="color:var(--accent)">Privacy Policy</a></label>
  <button class="btn pri" style="width:100%;margin-top:14px;padding:12px" onclick="cAuthSignup()">Create account</button><div style="text-align:center;margin-top:12px;font-size:14px"><a href="javascript:void 0" style="color:var(--accent)" onclick="AU.view='login';AU.msg='';renderAuth()">I already have an account</a></div>`;
  else if(AU.view==='forgot')h=`<h2 style="margin:16px 0 4px">Forgot password</h2><p class="muted">Enter your account email. We will send you a link to set a new password.</p>${af('cfE','Email','email')}<button class="btn pri" style="width:100%;margin-top:14px;padding:12px" onclick="cAuthForgot()">Send reset link</button><div style="text-align:center;margin-top:12px;font-size:14px"><a href="javascript:void 0" style="color:var(--accent)" onclick="AU.view='login';AU.msg='';renderAuth()">Back to sign in</a></div>`;
@@ -6202,9 +6202,544 @@ function medReqReject(id){const c=byId('medCerts',id),me=authUser();if(!c||!c.re
 notifExtra=(function(f){return function(){const it=f.apply(this,arguments)||[];try{const me=authUser();medInit();
  if(isAdmin(me)){const n=db.medCerts.filter(c=>c.req&&c.req.status==='Pending').length;if(n)it.unshift({u:1,txt:`🩺 ${n} medical certificate change request(s) waiting for your approval`,go:'medical'})}
  if(medIsDoc(me)){const em=normEmail(me.email);db.medCerts.filter(c=>c.req&&c.req.by===em&&['Approved','Rejected'].includes(c.req.status)&&c.req.decidedAt>daysAgo(3)).forEach(c=>it.unshift({u:2,txt:`🩺 ${c.no}: change request ${c.req.status.toLowerCase()}${c.req.status==='Approved'?' ('+c.req.left+' left)':''}`,go:'medical'}))}}catch(e){}return it}})(notifExtra);
+/* ============ SPORT NUTRITION ============
+   Nutrition assessments (protocols + normative data with references), sport-specific macro / micronutrient norms,
+   nutrition program design, diet plans (Indian + international food database), athlete meal log and the Nutritionist role.
+   Staff data lives in org data (nutTests, nutPrograms, nutPlans, nutFoods, nutFeedback). Athletes and parents are
+   view-only in org data, so their meal log is kept in its own cloud table (meal_logs, own rows only). */
+const NUT_REF={
+ thomas:'Thomas DT, Erdman KA, Burke LM. American College of Sports Medicine / Academy of Nutrition and Dietetics / Dietitians of Canada joint position statement: Nutrition and athletic performance. Med Sci Sports Exerc. 2016;48(3):543–568.',
+ burke11:'Burke LM, Hawley JA, Wong SHS, Jeukendrup AE. Carbohydrates for training and competition. J Sports Sci. 2011;29(Suppl 1):S17–S27.',
+ jager:'Jäger R, Kerksick CM, Campbell BI, et al. International Society of Sports Nutrition position stand: protein and exercise. J Int Soc Sports Nutr. 2017;14:20.',
+ morton:'Morton RW, Murphy KT, McKellar SR, et al. A systematic review, meta-analysis and meta-regression of the effect of protein supplementation on resistance training-induced gains in muscle mass and strength. Br J Sports Med. 2018;52(6):376–384.',
+ hector:'Hector AJ, Phillips SM. Protein recommendations for weight loss in elite athletes: a focus on body composition and performance. Int J Sport Nutr Exerc Metab. 2018;28(2):170–177.',
+ kerksick:'Kerksick CM, Arent S, Schoenfeld BJ, et al. International Society of Sports Nutrition position stand: nutrient timing. J Int Soc Sports Nutr. 2017;14:33.',
+ ioc18:'Maughan RJ, Burke LM, Dvorak J, et al. IOC consensus statement: dietary supplements and the high-performance athlete. Br J Sports Med. 2018;52(7):439–455.',
+ holway:'Holway FE, Spriet LL. Sport-specific nutrition: practical strategies for team sports. J Sports Sci. 2011;29(Suppl 1):S115–S125.',
+ uefa:'Collins J, Maughan RJ, Gleeson M, et al. UEFA expert group statement on nutrition in elite football. Br J Sports Med. 2021;55(8):416.',
+ slater:'Slater G, Phillips SM. Nutrition guidelines for strength sports: sprinting, weightlifting, throwing events, and bodybuilding. J Sports Sci. 2011;29(Suppl 1):S67–S77.',
+ stelling:'Stellingwerff T, Maughan RJ, Burke LM. Nutrition for power sports: middle-distance running, track cycling, rowing, canoeing/kayaking, and swimming. J Sports Sci. 2011;29(Suppl 1):S79–S89.',
+ reale:'Reale R, Slater G, Burke LM. Acute-weight-loss strategies for combat sports and applications to Olympic success. Int J Sports Physiol Perform. 2017;12(2):142–151.',
+ icmr:'ICMR-NIN Expert Group on Nutrient Requirement for Indians. Recommended Dietary Allowances (RDA) and Estimated Average Requirements (EAR) – 2020. ICMR-National Institute of Nutrition, Hyderabad.',
+ ifct:'Longvah T, Ananthan R, Bhaskarachary K, Venkaiah K. Indian Food Composition Tables (IFCT) 2017. ICMR-National Institute of Nutrition, Hyderabad.',
+ usda:'U.S. Department of Agriculture, Agricultural Research Service. FoodData Central. fdc.nal.usda.gov.',
+ jeuk:'Jeukendrup A, Gleeson M. Sport Nutrition: An Introduction to Energy Production and Performance. 2nd ed. Human Kinetics; 2010 (Tables 13.1 and 13.2: body-fat ranges of athletes).',
+ isak:'International Society for the Advancement of Kinanthropometry (ISAK). International Standards for Anthropometric Assessment. ISAK; 2011.',
+ sawka:'Sawka MN, Burke LM, Eichner ER, et al. American College of Sports Medicine position stand: Exercise and fluid replacement. Med Sci Sports Exerc. 2007;39(2):377–390.',
+ casa:'Casa DJ, Armstrong LE, Hillman SK, et al. National Athletic Trainers’ Association position statement: fluid replacement for athletes. J Athl Train. 2000;35(2):212–224.',
+ armstrong:'Armstrong LE, Maresh CM, Castellani JW, et al. Urinary indices of hydration status. Int J Sport Nutr. 1994;4(3):265–279.',
+ baker:'Baker LB. Sweating rate and sweat sodium concentration in athletes: a review of methodology and intra/interindividual variability. Sports Med. 2017;47(Suppl 1):111–128.',
+ loucks:'Loucks AB, Kiens B, Wright HH. Energy availability in athletes. J Sports Sci. 2011;29(Suppl 1):S7–S15.',
+ reds:'Mountjoy M, Ackerman KE, Bailey DM, et al. 2023 International Olympic Committee’s (IOC) consensus statement on Relative Energy Deficiency in Sport (REDs). Br J Sports Med. 2023;57(17):1073–1097.',
+ staal:'Staal S, Sjödin A, Fahrenholtz I, et al. Low RMRratio as a surrogate marker for energy deficiency, the choice of predictive equation vital for correctly identifying male and female ballet dancers at risk. Int J Sport Nutr Exerc Metab. 2018;28(4):412–418.',
+ melin:'Melin A, Tornberg ÅB, Skouby S, et al. The LEAF questionnaire: a screening tool for the identification of female athletes at risk for the female athlete triad. Br J Sports Med. 2014;48(7):540–545.',
+ cunningham:'Cunningham JJ. Body composition as a determinant of energy expenditure: a synthetic review and a proposed general prediction equation. Am J Clin Nutr. 1991;54(6):963–969.',
+ mifflin:'Mifflin MD, St Jeor ST, Hill LA, et al. A new predictive equation for resting energy expenditure in healthy individuals. Am J Clin Nutr. 1990;51(2):241–247.',
+ kouri:'Kouri EM, Pope HG Jr, Katz DL, Oliva P. Fat-free mass index in users and nonusers of anabolic-androgenic steroids. Clin J Sport Med. 1995;5(4):223–228.',
+ sim:'Sim M, Garvican-Lewis LA, Cox GR, et al. Iron considerations for the athlete: a narrative review. Eur J Appl Physiol. 2019;119(7):1463–1478.',
+ mckay:'McKay AKA, Sim M, Peeling P, et al. Iron status classification and treatment approaches in athletes. Int J Sports Med. 2024;45(7):496–503. doi:10.1055/a-2211-0813.',
+ peeling23:'Peeling P, Sim M, McKay AKA. Considerations for the consumption of vitamin and mineral supplements in athlete populations. Sports Med. 2023;53(Suppl 1):15–24.',
+ who11:'World Health Organization. Haemoglobin concentrations for the diagnosis of anaemia and assessment of severity. WHO/NMH/NHD/MNM/11.1. Geneva: WHO; 2011.',
+ owens:'Owens DJ, Allison R, Close GL. Vitamin D and the athlete: current perspectives and new challenges. Sports Med. 2018;48(Suppl 1):3–16.',
+ devalia:'Devalia V, Hamilton MS, Molloy AM. Guidelines for the diagnosis and treatment of cobalamin and folate disorders. Br J Haematol. 2014;166(4):496–513.',
+ volpe:'Volpe SL. Magnesium and the athlete. Curr Sports Med Rep. 2015;14(4):279–283.',
+ ais:'Australian Institute of Sport. AIS Sports Supplement Framework. Australian Sports Commission; 2021.'};
+const NUT_LOAD={rest:'Rest / recovery day',light:'Light – low intensity or skill-based',mod:'Moderate – about 1 h/day',high:'High – 1–3 h/day moderate–high intensity',vhigh:'Very high – more than 4–5 h/day'};
+const NUT_LOADS=['rest','light','mod','high','vhigh'];
+const NUT_PAL={rest:1.5,light:1.7,mod:1.9,high:2.1,vhigh:2.4};
+// sport categories: carbohydrate g/kg/day by training load, protein g/kg/day, fat % energy, micronutrient focus, supplements, references
+const NUT_CAT={
+ team:{l:'Team / intermittent sports',cho:{rest:[3,5],light:[3,5],mod:[5,7],high:[6,8],vhigh:[8,10]},pro:[1.4,1.8],fat:[20,35],
+  micro:['Iron (especially female players)','Vitamin D and calcium (indoor sports, low sunlight)','Sodium – heavy sweaters in heat'],supp:['caf','cre','nit','cho'],
+  key:['Fuel for the work required: more carbohydrate on match and high-intensity days, less on light and rest days','30–60 g/h carbohydrate during matches and long sessions (sports drink, banana, dates)','0.3 g/kg protein every 3–4 h and after training'],refs:['thomas','burke11','holway','uefa','jager']},
+ endurance:{l:'Endurance sports',cho:{rest:[3,5],light:[3,5],mod:[5,7],high:[6,10],vhigh:[8,12]},pro:[1.2,1.8],fat:[20,35],
+  micro:['Iron (ferritin screening)','Calcium and vitamin D (bone health, low energy availability)','Sodium – long sessions in heat'],supp:['caf','nit','bal','bic','cho'],
+  key:['Periodise carbohydrate to the session: high for key sessions and races, lower on easy days','30–60 g/h carbohydrate in sessions >1 h; up to 90 g/h (glucose + fructose) in events >2.5 h','Carbohydrate loading 10–12 g/kg for 36–48 h before events >90 min'],refs:['thomas','burke11','stelling','jager']},
+ power:{l:'Strength / power / sprint sports',cho:{rest:[3,5],light:[3,5],mod:[4,7],high:[5,7],vhigh:[6,8]},pro:[1.6,2.2],fat:[20,35],
+  micro:['Vitamin D (muscle function)','Iron in female athletes','Calcium'],supp:['cre','caf','bic'],
+  key:['Protein 0.3–0.4 g/kg per meal over 4–5 meals, including pre-sleep (30–40 g casein / milk / paneer)','Carbohydrate 4–7 g/kg to support high-quality strength and sprint sessions','Energy surplus of ~300–500 kcal/day only when lean-mass gain is the goal'],refs:['slater','morton','jager','thomas']},
+ combat:{l:'Combat / weight-class sports',cho:{rest:[3,5],light:[3,5],mod:[4,6],high:[5,7],vhigh:[6,8]},pro:[1.6,2.4],fat:[20,35],
+  micro:['Iron','Calcium and vitamin D (energy restriction)','Electrolytes after weight cuts'],supp:['cre','caf','bic'],
+  key:['Keep within ~5–8% of competition weight in season; avoid rapid weight cuts >5% of body mass','Higher protein (1.6–2.4 g/kg) protects lean mass during energy restriction','After weigh-in: 1.25–1.5 L fluid per kg lost with sodium, plus carbohydrate'],refs:['reale','hector','thomas','reds']},
+ racket:{l:'Racket sports',cho:{rest:[3,5],light:[3,5],mod:[5,7],high:[6,8],vhigh:[8,10]},pro:[1.4,1.8],fat:[20,35],
+  micro:['Sodium and potassium (long matches in heat)','Iron','Vitamin D'],supp:['caf','cho'],
+  key:['Carbohydrate during long matches (30–60 g/h): sports drink, banana, dates between games','Hydration plan from a sweat test – heavy sweaters need sodium','Recovery meal with 1–1.2 g/kg carbohydrate and 0.3 g/kg protein between matches'],refs:['thomas','burke11','sawka','baker']},
+ aesthetic:{l:'Aesthetic sports',cho:{rest:[3,5],light:[3,5],mod:[4,6],high:[5,7],vhigh:[6,8]},pro:[1.6,2.0],fat:[20,30],
+  micro:['Calcium (1000–1500 mg) and vitamin D – high risk of low bone density','Iron','Overall energy – screen for REDs'],supp:['cre','caf'],
+  key:['Energy availability first: avoid long periods below 30 kcal/kg FFM/day','Spread protein evenly; dairy for calcium','Screen regularly (LEAF-Q, RMR ratio, menstrual history)'],refs:['reds','loucks','thomas','melin']},
+ skill:{l:'Precision / skill sports',cho:{rest:[3,5],light:[3,5],mod:[3,5],high:[4,6],vhigh:[5,7]},pro:[1.2,1.6],fat:[20,35],
+  micro:['Vitamin D','Iron','Omega-3 fats (fish, walnuts, flax)'],supp:['caf'],
+  key:['Stable blood glucose: regular small meals and snacks across long competition days','Hydration – even mild dehydration affects concentration','Caffeine only in small tested doses (tremor risk in shooting / archery)'],refs:['thomas','ioc18']}};
+// sport → category + body-fat reference (Jeukendrup & Gleeson Table 13.2B); null = no sport data → general table
+const NUT_SPORT={
+ cricket:{l:'Cricket',cat:'team',bf:['Baseball (nearest bat-and-ball sport)',[12,15],[12,18]]},
+ football:{l:'Football (soccer)',cat:'team',bf:['Soccer',[10,18],[13,18]]},
+ kabaddi:{l:'Kabaddi',cat:'team',bf:['Wrestlers (nearest contact sport)',[5,16],null]},
+ 'kho-kho':{l:'Kho-Kho',cat:'team',bf:['Soccer (nearest running team sport)',[10,18],[13,18]]},
+ hockey:{l:'Hockey',cat:'team',bf:['Ice / field hockey',[8,15],[12,18]]},
+ basketball:{l:'Basketball',cat:'team',bf:['Basketball',[6,12],[20,27]]},
+ volleyball:{l:'Volleyball',cat:'team',bf:['Volleyball',[11,14],[16,25]]},
+ sprint:{l:'Athletics – sprints / hurdles',cat:'power',bf:['Sprinters',[8,10],[12,20]]},
+ jump:{l:'Athletics – jumps',cat:'power',bf:['High / long jumpers',[7,12],[10,18]]},
+ throw:{l:'Athletics – throws',cat:'power',bf:['Shot putters',[16,20],[20,28]]},
+ distance:{l:'Athletics – middle / long distance',cat:'endurance',bf:['Marathon running',[5,11],[10,15]]},
+ swimming:{l:'Swimming',cat:'endurance',bf:['Swimming',[9,12],[14,24]]},
+ cycling:{l:'Cycling',cat:'endurance',bf:['Cycling',[5,15],[15,20]]},
+ triathlon:{l:'Triathlon',cat:'endurance',bf:['Triathlon',[5,12],[10,15]]},
+ rowing:{l:'Rowing / canoeing',cat:'endurance',bf:['Rowing',[6,14],[12,18]]},
+ tennis:{l:'Tennis',cat:'racket',bf:['Tennis',[12,16],[16,24]]},
+ badminton:{l:'Badminton',cat:'racket',bf:['Racquetball (nearest racket sport)',[8,13],[15,22]]},
+ 'table tennis':{l:'Table tennis',cat:'racket',bf:['Racquetball (nearest racket sport)',[8,13],[15,22]]},
+ weightlifting:{l:'Weightlifting / powerlifting',cat:'power',bf:['Weightlifters',[9,16],null]},
+ wrestling:{l:'Wrestling',cat:'combat',bf:['Wrestlers',[5,16],null]},
+ boxing:{l:'Boxing / judo / martial arts',cat:'combat',bf:['Wrestlers (nearest combat sport)',[5,16],null]},
+ gymnastics:{l:'Gymnastics',cat:'aesthetic',bf:['Gymnastics',[5,12],[10,16]]},
+ shooting:{l:'Shooting / archery',cat:'skill',bf:null},
+ general:{l:'General / other sport',cat:'team',bf:null}};
+const NUT_BF_GEN={M:[[5,'warn','Below essential fat'],[11,'ok','Athletic (5–10 %)'],[15,'ok','Good (11–14 %)'],[21,'info','Acceptable (15–20 %)'],[25,'warn','Overweight (21–24 %)'],[1e9,'bad','Obese (> 24 %)']],
+ F:[[12,'warn','Near / below essential fat'],[16,'ok','Athletic (8–15 %)'],[24,'ok','Good (16–23 %)'],[31,'info','Acceptable (24–30 %)'],[37,'warn','Overweight (31–36 %)'],[1e9,'bad','Obese (≥ 37 %)']]};
+function nutSportKey(a){const s=String(a&&a.sport||'').toLowerCase(),p=String(a&&a.position||'').toLowerCase();
+ if(/athlet|track|running|sprint/.test(s)||/athlet/.test(s)){if(/throw|shot|discus|javelin|hammer/.test(p))return 'throw';if(/jump|vault/.test(p))return 'jump';if(/800|1500|3000|5000|10000|marathon|distance|steeple|walk|cross/.test(p))return 'distance';return 'sprint'}
+ const al=[['soccer','football'],['football','football'],['cricket','cricket'],['kabaddi','kabaddi'],['kho','kho-kho'],['hockey','hockey'],['basket','basketball'],['volley','volleyball'],['swim','swimming'],['cycl','cycling'],['triath','triathlon'],['row','rowing'],['canoe','rowing'],['kayak','rowing'],['table tennis','table tennis'],['tt','table tennis'],['tennis','tennis'],['badminton','badminton'],['weight','weightlifting'],['power','weightlifting'],['wrestl','wrestling'],['box','boxing'],['judo','boxing'],['karate','boxing'],['taekwondo','boxing'],['mma','boxing'],['gymn','gymnastics'],['shoot','shooting'],['archer','shooting'],['marathon','distance']];
+ for(const [k,v] of al)if(s.includes(k))return v;return 'general'}
+const nutSex=a=>String(a&&a.gender||'').toLowerCase().startsWith('f')?'F':'M';
+// ICMR-NIN 2020 RDA, adult (19+ y) man / woman
+const NUT_RDA=[['Calcium','mg',1000,1000,'1500 mg/day advised for athletes with low energy availability or menstrual dysfunction (Thomas 2016)'],['Iron','mg',19,29,'Monitor ferritin; supplement only after a blood test'],['Zinc','mg',17,13.2,''],['Magnesium','mg',440,370,''],['Vitamin D','IU',600,600,'Athletes with 25(OH)D below 30 ng/mL usually need supplementation under medical advice'],['Vitamin C','mg',80,65,''],['Vitamin A','µg',1000,840,''],['Folate','µg',300,220,''],['Vitamin B12','µg',2.5,2.5,'Vegetarian athletes: dairy daily; check B12 levels'],['Sodium (upper)','mg',2000,2000,'Heavy / salty sweaters need extra sodium around training (sweat test)'],['Dietary fibre','g/day','25–40','25–40','Lower fibre before competition'],['Protein (general population)','g/kg',0.83,0.83,'Athletes need 1.2–2.0 g/kg (sport table)']];
+const NUT_SUPP={caf:['Caffeine','3–6 mg/kg, 30–60 min before (lower doses 1–3 mg/kg also effective)',w=>`${Math.round(3*w)}–${Math.round(6*w)} mg`],
+ cre:['Creatine monohydrate','3–5 g/day (optional loading 20 g/day in 4 doses for 5–7 days)',()=>'3–5 g/day'],
+ nit:['Dietary nitrate (beetroot juice)','~6–8 mmol nitrate (≈350–500 mg) 2–3 h before',()=>'6–8 mmol'],
+ bal:['Beta-alanine','~65 mg/kg/day in split doses (3.2–6.4 g/day) for 10–12 weeks',w=>`${(0.065*w).toFixed(1)} g/day`],
+ bic:['Sodium bicarbonate','0.2–0.4 g/kg, 60–150 min before (test in training – GI upset)',w=>`${(0.2*w).toFixed(0)}–${(0.3*w).toFixed(0)} g`],
+ cho:['Sports drinks / gels','30–60 g carbohydrate per hour in sessions >1 h',()=>'30–60 g/h'],
+ vitd:['Vitamin D3','Only when 25(OH)D is low – dose per doctor',()=>'per doctor'],
+ iron:['Iron','Only when ferritin is low – dose per doctor (alternate-day morning dosing)',()=>'per doctor']};
+const NUT_GOALS={perf:['Performance / maintenance',0],gain:['Lean mass gain',400],loss:['Fat loss',-400],make:['Make weight (weight class)',-500],inj:['Injury / rehab',0]};
+const NUT_PHASES=['Off-season','Pre-season','In-season','Competition','Taper / peaking','Transition'];
+const NUT_MEALS=['Early morning','Breakfast','Mid-morning','Lunch','Pre-training','During training','Post-training','Evening snack','Dinner','Bedtime'];
+/* ---------- food database: per serving [id,name,serving,kcal,P,C,F,fibre,iron mg,calcium mg,group,type v/e/n] ---------- */
+const NUT_FOODS=[
+ ['roti','Chapati / roti (whole wheat)','1 medium (40 g)',102,3.6,21,0.5,3.3,1.2,10,'Cereals','v'],['phulka-ghee','Phulka with ghee','1 (40 g + 1 tsp ghee)',147,3.6,21,5.5,3.3,1.2,10,'Cereals','v'],
+ ['paratha','Plain paratha','1 (60 g)',180,4,25,7,3,1.5,15,'Cereals','v'],['aloo-paratha','Aloo paratha','1 (100 g)',250,5,35,10,3.5,1.6,20,'Cereals','v'],
+ ['rice','Rice, white, cooked','1 katori (150 g)',195,4,43,0.4,0.6,0.3,15,'Cereals','v'],['brown-rice','Rice, brown, cooked','1 katori (150 g)',165,3.8,34,1.3,2.7,0.6,15,'Cereals','v'],
+ ['jeera-rice','Jeera rice','1 katori (150 g)',230,4,42,5,0.8,0.5,20,'Cereals','v'],['khichdi','Dal khichdi','1 bowl (200 g)',240,9,40,5,4,1.8,40,'Cereals','v'],
+ ['poha','Poha','1 plate (150 g)',250,5,42,7,2,2.5,20,'Cereals','v'],['upma','Upma','1 plate (150 g)',220,5,32,8,2.5,1.2,25,'Cereals','v'],
+ ['idli','Idli','1 piece (40 g)',58,2,12,0.2,0.5,0.3,8,'Cereals','v'],['dosa','Dosa, plain','1 (80 g)',160,3.5,25,5,1,0.8,15,'Cereals','v'],
+ ['masala-dosa','Masala dosa','1 (180 g)',300,6,40,12,3,1.5,30,'Cereals','v'],['bhakri-jowar','Jowar bhakri','1 (40 g flour)',135,4,27,0.7,3.9,1.6,11,'Cereals','v'],
+ ['bhakri-bajra','Bajra bhakri','1 (40 g flour)',145,4.4,25,2,4.5,2.6,11,'Cereals','v'],['bhakri-ragi','Ragi (nachni) bhakri','1 (40 g flour)',130,2.9,27,0.8,4.5,1.8,145,'Cereals','v'],
+ ['ragi-malt','Ragi porridge with milk','1 glass (250 ml)',190,7,30,4,2.5,1.5,300,'Cereals','v'],['sabudana','Sabudana khichdi','1 plate (150 g)',300,3,50,10,1,0.8,15,'Cereals','v'],
+ ['thepla','Methi thepla','1 (50 g)',150,4,20,6,3,1.6,40,'Cereals','v'],['dhokla','Dhokla','2 pieces (80 g)',130,5,18,4,1.5,1,20,'Cereals','v'],
+ ['murmura','Murmura (puffed rice)','1 cup (25 g)',100,1.8,22,0.3,0.4,1,5,'Cereals','v'],['makhana','Makhana, roasted','1 cup (25 g)',90,2.4,19,0.1,3.6,0.4,15,'Snacks','v'],
+ ['biryani','Chicken biryani','1 plate (250 g)',450,22,50,17,2,2,40,'Mixed dishes','n'],['pav-bhaji','Pav bhaji','1 plate (2 pav)',450,10,60,18,7,3,80,'Mixed dishes','v'],
+ ['vada-pav','Vada pav','1 piece',290,6,40,12,3,1.8,40,'Snacks','v'],['samosa','Samosa','1 piece (70 g)',260,4,30,14,2,1,20,'Snacks','v'],
+ ['dal-toor','Toor dal (cooked, tadka)','1 katori (150 g)',150,8,20,4,4,1.8,30,'Pulses','v'],['dal-moong','Moong dal (cooked)','1 katori (150 g)',140,9,20,3,4,1.6,30,'Pulses','v'],
+ ['sambar','Sambar','1 katori (150 g)',130,6,18,4,4,1.5,45,'Pulses','v'],['rajma','Rajma curry','1 katori (150 g)',190,9,27,5,7,2.5,60,'Pulses','v'],
+ ['chole','Chole curry','1 katori (150 g)',220,9,30,7,8,3,60,'Pulses','v'],['sprouts','Moong sprouts','1 cup (100 g)',100,7,17,0.5,4,1,25,'Pulses','v'],
+ ['chilla','Besan chilla','1 (60 g batter)',150,7,16,6,3,1.5,25,'Pulses','v'],['sattu','Sattu drink','1 glass (30 g sattu)',120,7,19,1.5,5,1.5,25,'Pulses','v'],
+ ['soya','Soya chunks (dry weight)','30 g',104,15.6,10,0.2,4,3,100,'Pulses','v'],['tofu','Tofu','100 g',76,8,2,4.8,0.3,2.7,200,'Pulses','v'],
+ ['paneer','Paneer','100 g',265,18,1.2,20.8,0,0.2,480,'Dairy','v'],['paneer-bhurji','Paneer bhurji','1 katori (150 g)',330,20,6,25,1,0.8,500,'Dairy','v'],
+ ['palak-paneer','Palak paneer','1 katori (150 g)',250,12,8,19,2.5,2.5,300,'Dairy','v'],['curd','Curd / dahi (toned)','1 katori (150 g)',90,5,7,4.5,0,0.2,180,'Dairy','v'],
+ ['greek-yog','Greek yogurt, plain low-fat','150 g',100,15,6,0.5,0,0.1,165,'Dairy','v'],['milk-toned','Milk, toned','1 glass (250 ml)',145,8,11.5,7.5,0,0.5,300,'Dairy','v'],
+ ['milk-dt','Milk, double toned','1 glass (250 ml)',115,8,12,3.8,0,0.5,300,'Dairy','v'],['chaas','Buttermilk (chaas)','1 glass (250 ml)',40,2,3,1,0,0.1,100,'Dairy','v'],
+ ['lassi','Lassi, sweet','1 glass (250 ml)',200,7,30,6,0,0.2,220,'Dairy','v'],['choc-milk','Chocolate milk (recovery)','300 ml',250,10,38,6,1,0.8,330,'Dairy','v'],
+ ['cheese','Cheese slice','1 slice (20 g)',62,4,1,5,0,0.1,140,'Dairy','v'],['tea','Tea with milk and sugar','1 cup (150 ml)',60,1.5,8,2,0,0.1,50,'Beverages','v'],
+ ['egg','Egg, whole, boiled','1 large (50 g)',72,6.3,0.4,4.8,0,0.9,28,'Eggs, fish, meat','e'],['egg-white','Egg white','1 large',17,3.6,0.2,0,0,0,2,'Eggs, fish, meat','e'],
+ ['omelette','Omelette','2 eggs',190,13,1,15,0.3,1.8,60,'Eggs, fish, meat','e'],['egg-bhurji','Egg bhurji','2 eggs',200,13,3,15,0.8,1.9,60,'Eggs, fish, meat','e'],
+ ['chicken-breast','Chicken breast, grilled','100 g',165,31,0,3.6,0,1,15,'Eggs, fish, meat','n'],['chicken-curry','Chicken curry','1 katori (150 g)',240,22,6,14,1,1.5,30,'Eggs, fish, meat','n'],
+ ['tandoori','Tandoori chicken','150 g',260,35,4,11,0.5,1.8,40,'Eggs, fish, meat','n'],['fish-curry','Fish curry','1 katori (150 g)',200,20,5,11,1,1.2,60,'Eggs, fish, meat','n'],
+ ['fish-grill','Fish, grilled (surmai / rawas)','100 g',140,24,0,4,0,0.8,30,'Eggs, fish, meat','n'],['mutton','Mutton curry','1 katori (150 g)',320,24,5,22,1,3,30,'Eggs, fish, meat','n'],
+ ['salmon','Salmon, cooked','100 g',206,22,0,12,0,0.3,15,'Eggs, fish, meat','n'],['tuna','Tuna, canned in water','100 g',116,26,0,1,0,1.3,15,'Eggs, fish, meat','n'],
+ ['banana','Banana','1 medium (118 g)',105,1.3,27,0.4,3.1,0.3,6,'Fruits','v'],['apple','Apple','1 medium (180 g)',95,0.5,25,0.3,4.4,0.2,11,'Fruits','v'],
+ ['orange','Orange','1 medium (130 g)',62,1.2,15,0.2,3.1,0.1,52,'Fruits','v'],['guava','Guava','1 medium (100 g)',68,2.6,14,1,5.4,0.3,18,'Fruits','v'],
+ ['papaya','Papaya','1 cup (145 g)',62,0.7,16,0.4,2.5,0.4,29,'Fruits','v'],['mango','Mango','1 cup (165 g)',99,1.4,25,0.6,2.6,0.3,18,'Fruits','v'],
+ ['watermelon','Watermelon','1 cup (150 g)',45,0.9,11,0.2,0.6,0.4,10,'Fruits','v'],['chikoo','Chikoo (sapota)','1 medium (100 g)',83,0.4,20,1.1,5.3,0.8,21,'Fruits','v'],
+ ['dates','Dates (khajur)','2 pieces (16 g)',45,0.4,12,0,1.3,0.2,6,'Fruits','v'],['raisins','Raisins','30 g',90,0.9,24,0.1,1.1,0.6,15,'Fruits','v'],
+ ['berries','Berries, mixed','1 cup (150 g)',85,1,21,0.5,4,0.4,15,'Fruits','v'],['coconut-water','Coconut water','1 glass (250 ml)',48,1.8,9,0.5,2.8,0.7,60,'Beverages','v'],
+ ['nimbu-pani','Nimbu pani (sugar + salt)','1 glass (250 ml)',50,0.1,12,0,0,0,5,'Beverages','v'],['ors','ORS','1 glass (250 ml)',17,0,3.4,0,0,0,0,'Beverages','v'],
+ ['sports-drink','Sports drink (6 %)','500 ml',120,0,30,0,0,0,0,'Sports foods','v'],['gel','Energy gel','1 sachet (35 g)',100,0,25,0,0,0,0,'Sports foods','v'],
+ ['whey','Whey protein','1 scoop (30 g)',120,24,3,1.5,0,0.3,120,'Sports foods','v'],['casein','Casein protein','1 scoop (33 g)',120,24,3,1,0,0.3,200,'Sports foods','v'],
+ ['plant-protein','Plant protein (pea / soy)','1 scoop (30 g)',115,21,4,2,1,4,50,'Sports foods','v'],['protein-bar','Protein bar','1 bar (60 g)',220,20,22,7,3,1.5,100,'Sports foods','v'],
+ ['granola-bar','Granola / cereal bar','1 bar (25 g)',110,2,17,4,1.5,0.6,10,'Sports foods','v'],['chikki','Peanut chikki','1 piece (25 g)',120,3,14,6,1,0.9,15,'Snacks','v'],
+ ['oats','Oats, dry','40 g',150,5.3,27,2.6,4,1.7,21,'Cereals','v'],['oats-milk','Oats porridge with milk','40 g oats + 200 ml milk',266,11.7,36,8.6,4,1.8,260,'Cereals','v'],
+ ['muesli','Muesli','50 g',190,5,33,4,4,2,30,'Cereals','v'],['cornflakes','Cornflakes','30 g',110,2,25,0.2,0.9,2.4,1,'Cereals','v'],
+ ['bread-ww','Bread, whole wheat','1 slice (30 g)',75,3.6,13,1,2,0.8,30,'Cereals','v'],['bread-white','Bread, white','1 slice (25 g)',66,2,12.6,0.8,0.6,0.9,35,'Cereals','v'],
+ ['bagel','Bagel','1 (100 g)',260,10,50,1.5,2,3,20,'Cereals','v'],['pasta','Pasta, cooked','1 cup (150 g)',235,8.7,46,1.4,2.7,1.2,10,'Cereals','v'],
+ ['quinoa','Quinoa, cooked','1 cup (150 g)',180,6.6,32,2.9,4.2,2.2,25,'Cereals','v'],['rice-cakes','Rice cakes','2 (18 g)',70,1.5,15,0.5,0.6,0.2,2,'Snacks','v'],
+ ['sweet-potato','Sweet potato, boiled','150 g',130,2.4,30,0.2,4,1,40,'Vegetables','v'],['potato','Potato, boiled','150 g',130,3,30,0.2,2.7,0.5,8,'Vegetables','v'],
+ ['mix-veg','Mixed vegetable sabzi','1 katori (150 g)',120,3,12,7,4,1,50,'Vegetables','v'],['palak','Palak (spinach) sabzi','1 katori (150 g)',110,4,8,7,3.5,3,150,'Vegetables','v'],
+ ['bhindi','Bhindi sabzi','1 katori (150 g)',130,3,12,8,4.5,0.8,100,'Vegetables','v'],['salad','Salad (cucumber, tomato, onion)','1 plate (100 g)',25,1,5,0.2,1.5,0.4,20,'Vegetables','v'],
+ ['broccoli','Broccoli, steamed','1 cup (90 g)',31,2.5,6,0.3,2.4,0.7,42,'Vegetables','v'],['chickpeas','Chickpeas, boiled','1 cup (160 g)',270,14.5,45,4,12,4.7,80,'Pulses','v'],
+ ['lentils','Lentils (masoor), boiled','1 cup (200 g)',230,18,40,0.8,15,6.6,38,'Pulses','v'],['baked-beans','Baked beans','1/2 cup (130 g)',120,6,22,0.5,5,1.4,50,'Pulses','v'],
+ ['hummus','Hummus','2 tbsp (30 g)',50,2,4,3,1.8,0.7,12,'Pulses','v'],['avocado','Avocado','1/2 (100 g)',160,2,9,15,7,0.6,12,'Fruits','v'],
+ ['peanuts','Peanuts, roasted','30 g',170,7.5,5,14,2.5,0.7,25,'Nuts and seeds','v'],['peanut-butter','Peanut butter','1 tbsp (16 g)',95,3.5,3,8,1,0.3,7,'Nuts and seeds','v'],
+ ['almonds','Almonds','10 pieces (14 g)',81,3,3,7,1.7,0.5,37,'Nuts and seeds','v'],['walnuts','Walnuts','4 halves (14 g)',92,2,2,9,1,0.4,14,'Nuts and seeds','v'],
+ ['mixed-nuts','Mixed nuts','30 g',180,5,6,16,2,1,30,'Nuts and seeds','v'],['chia','Chia seeds','1 tbsp (12 g)',58,2,5,3.7,4,0.9,76,'Nuts and seeds','v'],
+ ['flax','Flax seeds','1 tbsp (10 g)',53,1.8,3,4.2,2.7,0.6,26,'Nuts and seeds','v'],['pumpkin-seeds','Pumpkin seeds','15 g',85,4.5,1.6,7,0.9,1.2,7,'Nuts and seeds','v'],
+ ['ghee','Ghee','1 tsp (5 g)',45,0,0,5,0,0,0,'Fats and sugars','v'],['oil','Cooking oil','1 tsp (5 g)',45,0,0,5,0,0,0,'Fats and sugars','v'],
+ ['olive-oil','Olive oil','1 tsp (4.5 g)',40,0,0,4.5,0,0,0,'Fats and sugars','v'],['jaggery','Jaggery (gur)','10 g',38,0,9.7,0,0,0.4,8,'Fats and sugars','v'],
+ ['honey','Honey','1 tbsp (21 g)',64,0,17,0,0,0.1,1,'Fats and sugars','v'],['sugar','Sugar','1 tsp (5 g)',20,0,5,0,0,0,0,'Fats and sugars','v']];
+const NUT_INTL=new Set(['greek-yog','choc-milk','salmon','tuna','berries','sports-drink','gel','whey','casein','plant-protein','protein-bar','granola-bar','oats','oats-milk','muesli','cornflakes','bread-ww','bread-white','bagel','pasta','quinoa','rice-cakes','broccoli','baked-beans','hummus','avocado','olive-oil','peanut-butter','mixed-nuts','chia','cheese']);
+function nutFoods(){const c=(db.nutFoods||[]).map(f=>[f.id,f.name,f.serv||'1 serving',+f.kcal||0,+f.p||0,+f.c||0,+f.f||0,+f.fib||0,+f.fe||0,+f.ca||0,f.grp||'Custom','v',1]);return NUT_FOODS.concat(c)}
+function nutFood(id){return nutFoods().find(f=>f[0]===id)}
+const NUT_K=['kcal','p','c','f','fib','fe','ca'];
+function nutSum(items){const t={kcal:0,p:0,c:0,f:0,fib:0,fe:0,ca:0};(items||[]).forEach(it=>{const f=nutFood(it.f);const q=+it.q||0;
+ if(f)NUT_K.forEach((k,i)=>t[k]+=(+f[3+i]||0)*q);else if(it.txt){t.kcal+=+it.kcal||0;t.p+=+it.p||0;t.c+=+it.c||0;t.f+=+it.fat||0}});return t}
+/* ---------- assessments: protocols + normative bands ---------- */
+const nutBand=(v,B)=>{for(const x of B)if(v<x[0])return {b:x[1],l:x[2]};const z=B[B.length-1];return {b:z[1],l:z[2]}};
+const NUT_TESTS=[
+ {id:'bm',cat:'Body composition',n:'Body mass',u:'kg',dp:1,f:[['v','Body mass (kg)']],
+  how:['Measure in the morning after voiding, before food or drink','Minimal clothing; calibrated digital scale (0.1 kg)','Repeat under the same conditions every time – compare with the athlete’s own trend'],
+  norm:'No population norm – compared with the athlete’s previous value. A change of more than 1–2 % within a week usually reflects fluid, not tissue.',refs:['isak','sawka']},
+ {id:'bf',cat:'Body composition',n:'Body fat %',u:'%',dp:1,f:[['v','Body fat (%)'],['m','Method (skinfold / BIA / DXA)','text']],
+  how:['Use the same method every time (ISAK skinfolds, BIA after fasting and voiding, or DXA)','Skinfolds: ISAK sites, right side, 2–3 measures per site, median value','BIA: no exercise for 12 h, no food or drink for 2–4 h, normal hydration'],
+  norm:'Compared with the sport range of elite athletes (Jeukendrup & Gleeson, Table 13.2B). Ranges are observations, not targets; values differ between methods.',refs:['jeuk','isak','reds']},
+ {id:'sum7',cat:'Body composition',n:'Sum of 7 skinfolds',u:'mm',dp:1,f:[['v','Sum of 7 skinfolds (mm)']],
+  how:['ISAK sites: triceps, subscapular, biceps, supraspinale, abdominal, front thigh, medial calf','Measured by an ISAK-trained practitioner; technical error (TEM) below 5 %','Report the sum, not a % fat equation – track change over time'],
+  norm:'No universal norm – compared with the athlete’s previous value. A change larger than about 5 % is beyond measurement error.',refs:['isak']},
+ {id:'ffmi',cat:'Body composition',n:'Fat-free mass index (FFMI)',u:'kg/m²',dp:1,f:[['wt','Body mass (kg)'],['bf','Body fat (%)'],['ht','Height (cm)']],
+  calc:x=>{const h=(+x.ht)/100;return h&&x.wt?(+x.wt*(1-(+x.bf||0)/100))/(h*h):NaN},
+  how:['FFM = body mass × (1 − body fat %/100)','FFMI = FFM ÷ height² (m)','Use the same body-fat method as previous tests'],
+  bandsM:[[17,'info','Below average (< 17)'],[20,'info','Average (17–19.9)'],[22,'ok','Above average (20–21.9)'],[25,'ok','High (22–24.9)'],[1e9,'warn','Very high (≥ 25)']],
+  norm:'Male bands approximate, based on Kouri et al. (resistance-trained non-users averaged ~20.8, upper natural range ~25). No validated female bands – track the trend.',refs:['kouri']},
+ {id:'usg',cat:'Hydration',n:'Urine specific gravity (USG)',u:'',dp:3,f:[['v','USG (refractometer)']],
+  how:['First urine of the morning, mid-stream sample','Measure with a calibrated refractometer','Repeat on 2–3 mornings for a reliable picture'],
+  bands:[[1.010,'ok','Well hydrated (< 1.010)'],[1.021,'warn','Minimal dehydration (1.010–1.020)'],[1.031,'bad','Significant dehydration (1.021–1.030)'],[9,'bad','Serious dehydration (> 1.030)']],refs:['casa','sawka','armstrong']},
+ {id:'ucol',cat:'Hydration',n:'Urine colour (1–8 chart)',u:'',dp:0,f:[['v','Colour score (1–8)']],
+  how:['First morning urine against the 8-point Armstrong colour chart','Good light, white background','Some vitamins (B2) and foods (beetroot) change colour'],
+  bands:[[4,'ok','Well hydrated (1–3)'],[7,'warn','Dehydrated – drink more (4–6)'],[99,'bad','Severely dehydrated (7–8)']],refs:['armstrong','casa']},
+ {id:'sweat',cat:'Hydration',n:'Sweat rate and body-mass loss',u:'L/h',dp:2,f:[['pre','Pre-session body mass (kg)'],['post','Post-session body mass (kg)'],['fl','Fluid drunk (L)'],['ur','Urine passed (L)'],['min','Session duration (min)']],
+  calc:x=>((+x.pre-+x.post)+(+x.fl||0)-(+x.ur||0))/((+x.min||0)/60),
+  how:['Weigh nude or in dry minimal clothing before the session, after voiding','Record all fluid drunk and any urine passed','Towel dry and weigh again right after; sweat rate = (mass loss + fluid − urine) ÷ hours','Test in the conditions of competition (heat, intensity)'],
+  bands:[[0.8,'info','Low (< 0.8 L/h)'],[1.5,'info','Moderate (0.8–1.5 L/h)'],[2.0,'warn','High (1.5–2.0 L/h)'],[99,'warn','Very high (> 2.0 L/h)']],
+  norm:'Body-mass loss above 2 % impairs performance (ACSM). Typical athlete sweat rates are about 0.5–2.0 L/h (Baker 2017); bands are descriptive.',refs:['sawka','baker','thomas']},
+ {id:'na',cat:'Hydration',n:'Sweat sodium concentration',u:'mmol/L',dp:0,f:[['v','Sweat sodium (mmol/L)']],
+  how:['Regional sweat patch (forearm) or whole-body wash-down during exercise','Clean skin with distilled water; collect after sweating starts','Analyse with an ion-selective electrode'],
+  bands:[[30,'info','Low (< 30)'],[60,'info','Moderate (30–60)'],[999,'warn','High – “salty sweater” (> 60)']],norm:'Athlete range about 10–90 mmol/L (Baker 2017); bands are descriptive.',refs:['baker','sawka']},
+ {id:'ea',cat:'Energy',n:'Energy availability (EA)',u:'kcal/kg FFM/day',dp:0,f:[['ei','Energy intake (kcal/day)'],['eee','Exercise energy expenditure (kcal/day)'],['ffm','Fat-free mass (kg)']],
+  calc:x=>(+x.ei-(+x.eee||0))/(+x.ffm),
+  how:['Energy intake from a 3–7 day weighed food record','Exercise energy from heart-rate / GPS / METs, minus resting energy for that time','EA = (intake − exercise energy) ÷ fat-free mass'],
+  bands:[[30,'bad','Low energy availability (< 30)'],[45,'warn','Reduced (30–44)'],[1e9,'ok','Optimal (≥ 45)']],norm:'Thresholds from Loucks et al.; REDs consensus 2023 – low EA is a risk, not a diagnosis.',refs:['loucks','reds']},
+ {id:'rmr',cat:'Energy',n:'RMR ratio (measured ÷ predicted)',u:'',dp:2,f:[['rmr','Measured RMR (kcal/day, indirect calorimetry)'],['ffm','Fat-free mass (kg)']],
+  calc:x=>(+x.rmr)/(500+22*(+x.ffm)),
+  how:['Fasted, rested, early morning; 30 min lying quietly before the measurement','Measured RMR by indirect calorimetry','Predicted RMR with Cunningham: 500 + 22 × FFM'],
+  bands:[[0.90,'bad','Suggests energy deficiency (< 0.90)'],[99,'ok','Normal (≥ 0.90)']],refs:['staal','cunningham','reds']},
+ {id:'leaf',cat:'Energy',n:'LEAF-Q score (female athletes)',u:'points',dp:0,f:[['v','LEAF-Q total score']],
+  how:['25-item Low Energy Availability in Females Questionnaire','Covers injuries, gastrointestinal and menstrual function','Score of 8 or more → full REDs assessment with doctor'],
+  bands:[[8,'ok','Not at risk (0–7)'],[99,'bad','At risk of low energy availability (≥ 8)']],refs:['melin','reds']},
+ {id:'diet',cat:'Dietary intake',n:'Dietary intake (3-day food record)',u:'kcal/day',dp:0,f:[['kcal','Energy (kcal/day)'],['cho','Carbohydrate (g/day)'],['pro','Protein (g/day)'],['fat','Fat (g/day)'],['wt','Body mass (kg)']],
+  calc:x=>+x.kcal,
+  how:['3 days (2 training days + 1 rest day), weighed or household measures','Include drinks, supplements and cooking oil','Analyse with IFCT 2017 / USDA values'],
+  norm:'Compared with the sport targets in g/kg body mass (moderate training load) and fat 20–35 % of energy.',refs:['thomas','burke11','jager','ifct']},
+ {id:'ferr',cat:'Blood markers',n:'Serum ferritin',u:'µg/L',dp:0,f:[['v','Ferritin (µg/L = ng/mL)']],
+  how:['Morning, fasted, rested blood sample (no hard training in the previous 24 h)','Not during illness or inflammation (ferritin rises)','Test with haemoglobin and transferrin saturation'],
+  bands:[[15,'bad','Very low – check Hb, refer to doctor (< 15)'],[35,'bad','Iron depletion (15–34)'],[50,'warn','Sub-optimal stores (35–49)'],[1e9,'ok','Healthy (≥ 50)']],refs:['mckay','sim','peeling23']},
+ {id:'hb',cat:'Blood markers',n:'Haemoglobin',u:'g/dL',dp:1,f:[['v','Haemoglobin (g/dL)']],how:['Morning blood sample, rested','Altitude and plasma volume changes affect values'],
+  bandsM:[[8,'bad','Severe anaemia (< 8)'],[11,'bad','Moderate anaemia (8–10.9)'],[13,'bad','Mild anaemia (11–12.9)'],[99,'ok','Normal (≥ 13)']],
+  bandsF:[[8,'bad','Severe anaemia (< 8)'],[11,'bad','Moderate anaemia (8–10.9)'],[12,'bad','Mild anaemia (11–11.9)'],[99,'ok','Normal (≥ 12)']],refs:['who11','mckay']},
+ {id:'tsat',cat:'Blood markers',n:'Transferrin saturation',u:'%',dp:0,f:[['v','Transferrin saturation (%)']],how:['Same sample as ferritin, fasted morning'],
+  bands:[[16,'bad','Low – iron-deficient (< 16 %)'],[999,'ok','Normal (≥ 16 %)']],refs:['mckay','sim']},
+ {id:'vitd',cat:'Blood markers',n:'Vitamin D – 25(OH)D',u:'ng/mL',dp:0,f:[['v','25(OH)D (ng/mL; nmol/L ÷ 2.5)']],how:['Serum 25(OH)D, any time of day','Test at the end of winter / after indoor seasons'],
+  bands:[[12,'bad','Deficient (< 12 ng/mL)'],[20,'warn','Insufficient (12–19)'],[30,'warn','Adequate for general health (20–29)'],[100,'ok','Optimal for athletes (30–100)'],[1e9,'warn','High – review supplements (> 100)']],refs:['owens','peeling23']},
+ {id:'b12',cat:'Blood markers',n:'Vitamin B12',u:'pg/mL',dp:0,f:[['v','Vitamin B12 (pg/mL)']],how:['Fasted morning sample','Vegetarian athletes: test yearly'],
+  bands:[[200,'bad','Deficient (< 200)'],[300,'warn','Borderline (200–300)'],[1e9,'ok','Normal (> 300)']],refs:['devalia','peeling23']},
+ {id:'mg',cat:'Blood markers',n:'Serum magnesium',u:'mg/dL',dp:2,f:[['v','Magnesium (mg/dL)']],how:['Fasted morning sample','Serum Mg reflects only ~1 % of body magnesium – combine with diet record'],
+  bands:[[1.8,'bad','Low (< 1.8)'],[2.4,'ok','Normal (1.8–2.3)'],[99,'warn','High (> 2.3)']],refs:['volpe']}];
+const nutTest=id=>NUT_TESTS.find(t=>t.id===id);
+function nutVal(r){const t=nutTest(r.test);if(!t)return NaN;const x=r.vals||{};return t.calc?t.calc(x):+x.v}
+function nutEval(r,a){const t=nutTest(r.test);const v=nutVal(r);a=a||byId('athletes',r.athlete);const sx=nutSex(a);if(!t||!isFinite(v))return {b:'info',l:'—',r:''};
+ if(t.id==='bf'){const sp=NUT_SPORT[nutSportKey(a)]||NUT_SPORT.general;const rg=sp.bf&&sp.bf[sx==='F'?2:1];const ess=sx==='F'?12:5;
+  if(v<ess)return {b:'warn',l:'Near / below essential fat – screen for REDs',r:sx==='F'?'Essential fat ~12 %':'Essential fat ~3–5 %'};
+  if(rg)return {b:v<rg[0]?'warn':v>rg[1]?'warn':'ok',l:v<rg[0]?'Below sport range':v>rg[1]?'Above sport range':'Within sport range',r:`${sp.bf[0]}, ${sx==='F'?'female':'male'}: ${rg[0]}–${rg[1]} %`};
+  const g=nutBand(v,NUT_BF_GEN[sx]);return {b:g.b,l:g.l,r:'General athlete rating (no sport-specific data)'}}
+ if(t.id==='bm'||t.id==='sum7'){const prev=nutHist(r.athlete,t.id).filter(x=>x.date<r.date||(x.date===r.date&&x.id!==r.id&&x.at<r.at)).pop();if(!prev)return {b:'info',l:'Baseline',r:t.norm};
+  const pv=nutVal(prev),d=v-pv,pc=pv?d/pv*100:0;return {b:t.id==='sum7'&&Math.abs(pc)>5?(d<0?'ok':'warn'):'info',l:`${d>=0?'+':''}${d.toFixed(1)} ${t.u} (${pc>=0?'+':''}${pc.toFixed(1)} %) since ${fmtDate(prev.date)}`,r:t.norm}}
+ if(t.id==='sweat'){const x=r.vals||{};const loss=(+x.pre-+x.post)/(+x.pre)*100;const s=nutBand(v,t.bands);const lb=loss>2?{b:'bad',t:`body-mass loss ${loss.toFixed(1)} % – above 2 %`}:loss<0?{b:'warn',t:`body-mass GAIN ${(-loss).toFixed(1)} % – drinking more than sweat loss`}:{b:'ok',t:`body-mass loss ${loss.toFixed(1)} % (≤ 2 %)`};
+  return {b:lb.b==='ok'?s.b:lb.b,l:`${s.l}; ${lb.t}`,r:t.norm}}
+ if(t.id==='diet'){const x=r.vals||{};const w=+x.wt||bw(r.athlete)||0;if(!w)return {b:'info',l:'Add body mass',r:t.norm};const C=NUT_CAT[(NUT_SPORT[nutSportKey(a)]||NUT_SPORT.general).cat];
+  const ch=x.cho/w,pr=x.pro/w,fp=x.kcal?x.fat*9/x.kcal*100:0;const chk=(v,[lo,hi])=>v<lo?'↓':v>hi?'↑':'✓';
+  const s=[`CHO ${ch.toFixed(1)} g/kg ${chk(ch,C.cho.mod)}`,`protein ${pr.toFixed(1)} g/kg ${chk(pr,C.pro)}`,`fat ${fp.toFixed(0)} % ${chk(fp,C.fat)}`];
+  return {b:s.some(z=>/[↓↑]/.test(z))?'warn':'ok',l:s.join(' · '),r:`${C.l}: CHO ${C.cho.mod.join('–')} g/kg, protein ${C.pro.join('–')} g/kg, fat ${C.fat.join('–')} %`}}
+ const B=t.bands||(sx==='F'?t.bandsF:t.bandsM);if(!B)return {b:'info',l:'Tracked',r:t.norm||''};const g=nutBand(v,B);return {b:g.b,l:g.l,r:t.norm||''}}
+function nutHist(aid,tid){return (db.nutTests||[]).filter(r=>r.athlete===aid&&(!tid||r.test===tid)).sort((x,y)=>String(x.date).localeCompare(String(y.date))||String(x.at||'').localeCompare(String(y.at||'')))}
+const nutFmt=(t,v)=>isFinite(v)?(+v).toFixed(t.dp??1)+(t.u&&!/points/.test(t.u)?' '+t.u:t.u?' '+t.u:''):'—';
+/* ---------- program targets ---------- */
+function nutAthBase(a,p){const sx=nutSex(a);const wt=+(p&&p.wt)||bw(a.id)||0,ht=+(p&&p.ht)||+a.height||0,age=+ageOf(a.dob)||20;
+ const bfT=nutHist(a.id,'bf').pop();const bf=p&&p.bf!==undefined&&p.bf!==''?+p.bf:bfT?nutVal(bfT):NaN;const ffm=isFinite(bf)&&wt?wt*(1-bf/100):NaN;
+ const rmr=isFinite(ffm)?500+22*ffm:wt&&ht?10*wt+6.25*ht-5*age+(sx==='F'?-161:5):NaN;return {sx,wt,ht,age,bf,ffm,rmr,rmrM:isFinite(ffm)?'Cunningham (fat-free mass)':'Mifflin-St Jeor'}}
+function nutTargets(p,a){a=a||byId('athletes',p.athlete);if(!a)return {};const B=nutAthBase(a,p);const C=NUT_CAT[p.cat||(NUT_SPORT[p.sport||nutSportKey(a)]||NUT_SPORT.general).cat];
+ const adj=(NUT_GOALS[p.goal]||NUT_GOALS.perf)[1],hiP=['gain','loss','make','inj'].includes(p.goal);const out={};
+ NUT_LOADS.forEach(L=>{const o=(p.ovr||{})[L]||{};const pal=L==='rest'&&p.goal==='inj'?1.4:NUT_PAL[L];let kcal=isFinite(B.rmr)?B.rmr*pal+adj:NaN;
+  const cr=C.cho[L],pr=B.wt*(hiP?C.pro[1]:(C.pro[0]+C.pro[1])/2);let c=B.wt*(cr[0]+cr[1])/2,f=(kcal-4*c-4*pr)/9,note='';const fx=C.fat[1]/100,fn=C.fat[0]/100;
+  if(isFinite(kcal)){if(f*9<kcal*fn){f=kcal*fn/9;kcal=4*c+4*pr+9*f;note=`energy raised to keep fat ≥ ${C.fat[0]} %`}
+   else if(f*9>kcal*fx){c=Math.min(B.wt*cr[1],(kcal*(1-fx)-4*pr)/4);f=(kcal-4*c-4*pr)/9;note='carbohydrate raised within the sport range';
+    if(f*9>kcal*fx+1){kcal=(4*c+4*pr)/(1-fx);f=kcal*fx/9;note='energy trimmed to stay inside the sport carbohydrate and fat norms'}}
+   out[L]={kcal:+o.kcal||Math.round(kcal),c:+o.c||Math.round(c),p:+o.p||Math.round(pr),f:+o.f||Math.round(f),note,chr:cr,ea:isFinite(B.ffm)?((+o.kcal||kcal)-B.rmr*(pal-1.4))/B.ffm:NaN,ovr:!!(o.kcal||o.c||o.p||o.f)}}
+  else out[L]={kcal:+o.kcal||NaN,c:+o.c||Math.round(c),p:+o.p||Math.round(pr),f:+o.f||NaN,note:'add height or body fat to estimate energy',chr:cr,ea:NaN,ovr:!!(o.kcal||o.c||o.p||o.f)}});
+ return {B,C,T:out}}
+/* ---------- state, access, helpers ---------- */
+var NUT={tab:'overview',aid:'',prog:null,plan:null,q:'',logDate:'',logs:{},logErr:'',logBusy:false,mtab:'plan',norm:'tests',sport:''};
+function nutInit(){['nutTests','nutPrograms','nutPlans','nutFoods','nutFeedback'].forEach(k=>{if(!Array.isArray(db[k]))db[k]=[]})}
+const nutIsNut=me=>!!me&&me.role==='Nutritionist';
+const nutEdit=me=>!!me&&!roUser(me)&&!portalUser(me)&&!(typeof medIsDoc==='function'&&medIsDoc(me));
+function nutMe(){const me=authUser();return {me,name:(me&&me.name)||'',em:normEmail(me&&me.email||'')}}
+const nutPillB=b=>b==='info'?'blue':b==='bad'?'bad':b==='warn'?'warn':'ok';
+const nutPill=e=>`<span class="pill p-${nutPillB(e.b)}">${esc(e.l)}</span>`;
+const nutRefs=keys=>`<ol style="margin:4px 0 0;padding-left:18px;font-size:12px" class="muted">${[...new Set(keys)].map(k=>`<li>${esc(NUT_REF[k]||k)}</li>`).join('')}</ol>`;
+function nutAthletes(){return (db.athletes||[]).filter(a=>a&&a.status!=='Inactive').sort((x,y)=>String(x.name).localeCompare(String(y.name)))}
+function nutCurAth(){const L=nutAthletes();if(!L.some(a=>a.id===NUT.aid))NUT.aid=L[0]?L[0].id:'';return byId('athletes',NUT.aid)}
+const nutActiveProg=aid=>(db.nutPrograms||[]).filter(p=>p.athlete===aid&&p.status!=='Archived').sort((x,y)=>String(y.at).localeCompare(String(x.at)))[0];
+function nutBar(v,t,l,u,min){const pc=t?Math.round(v/t*100):0;const col=!t?'var(--line)':pc<85?'var(--warn)':pc>115&&!min?'var(--bad)':'var(--ok)';
+ return `<div style="margin:4px 0"><div class="row" style="justify-content:space-between;font-size:13px"><span>${l}</span><span><b>${Math.round(v)}</b>${t?' / '+Math.round(t):''} ${u} ${t?`<span class="muted">(${pc}%)</span>`:''}</span></div><div style="height:7px;background:var(--card2);border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.min(100,pc)}%;background:${col}"></div></div></div>`}
+function nutFoodDL(){return `<datalist id="nutFoodDL">${nutFoods().map(f=>`<option value="${esc(f[1]+' — '+f[2])}"></option>`).join('')}</datalist>`}
+function nutFoodByLabel(s){s=String(s||'').trim();return nutFoods().find(f=>f[1]+' — '+f[2]===s)||nutFoods().find(f=>f[1].toLowerCase()===s.toLowerCase())}
+/* ---------- staff page ---------- */
+P.nutrition=()=>{nutInit();const me=authUser();const ed=nutEdit(me);const a=nutCurAth();
+ const tabs=[['overview','Overview'],['tests','Assessments'],['programs','Program design'],['plans','Diet plans'],['logs','Meal logs'],['norms','Norms & references'],['foods','Food database']];
+ const pick=`<select data-ro-ok style="width:auto;min-width:200px" onchange="NUT.aid=this.value;NUT.prog=null;NUT.plan=null;render()">${nutAthletes().map(x=>`<option value="${x.id}" ${x.id===NUT.aid?'selected':''}>${esc(x.name)}${x.sport?' · '+esc(x.sport):''}</option>`).join('')}</select>`;
+ const needA=['tests','programs','plans','logs'].includes(NUT.tab);
+ let body='';try{body=NUT.tab==='overview'?nutOverview(ed):NUT.tab==='norms'?nutNormsPage():NUT.tab==='foods'?nutFoodsPage(ed):!a?'<div class="card"><p class="muted">Add athletes first (Athletes page).</p></div>':NUT.tab==='tests'?nutTestsPage(a,ed):NUT.tab==='programs'?nutProgPage(a,ed):NUT.tab==='plans'?nutPlansPage(a,ed):nutLogsStaff(a,ed)}catch(e){console.error(e);body=`<div class="card"><p class="muted">Could not show this tab: ${esc(e.message||e)}</p></div>`}
+ return head('Nutrition','Sport Nutrition','Assessments with sport-specific normative data, nutrition program design, diet plans and athlete meal logs.',needA?pick:'')+
+ `<div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${NUT.tab===k?'on':''}" data-ro-ok onclick="NUT.tab='${k}';NUT.prog=null;NUT.plan=null;render()">${l}</button>`).join('')}</div>`+body};
+function nutOverview(ed){const L=nutAthletes();const t30=daysAgo(30);
+ const rows=L.map(a=>{const flags=[];NUT_TESTS.forEach(t=>{const r=nutHist(a.id,t.id).pop();if(r&&r.date>=daysAgo(365)){const e=nutEval(r,a);if(e.b==='bad')flags.push(t.n)}});
+  const bf=nutHist(a.id,'bf').pop(),pr=nutActiveProg(a.id),pl=(db.nutPlans||[]).filter(p=>p.athlete===a.id&&p.status==='Published').length;const tn=(db.nutTests||[]).filter(r=>r.athlete===a.id&&r.date>=t30).length;
+  return {a,flags,bf,pr,pl,tn}});
+ const k=(l,v,col)=>`<div class="card" style="margin:0"><div class="eyebrow">${l}</div><div style="font-size:28px;font-weight:800;color:var(--${col||'text'})">${v}</div></div>`;
+ return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px">${k('Athletes',L.length)}${k('With a program',rows.filter(r=>r.pr).length,'ok')}${k('Published diet plans',rows.filter(r=>r.pl).length,'ok')}${k('Red flags',rows.filter(r=>r.flags.length).length,'bad')}${k('Tests (30 days)',rows.reduce((s,r)=>s+r.tn,0))}</div>
+ <div class="card"><h3 style="margin-top:0">Athletes</h3>${L.length?`<div class="tbl" style="overflow:auto"><table><tr><th>Athlete</th><th>Sport group</th><th>Body fat</th><th>Program</th><th>Diet plan</th><th>Red flags</th><th></th></tr>${rows.map(r=>{const sp=NUT_SPORT[nutSportKey(r.a)];const e=r.bf?nutEval(r.bf,r.a):null;
+  return `<tr><td><b>${esc(r.a.name)}</b><div class="muted" style="font-size:12px">${esc([r.a.sport,r.a.position].filter(Boolean).join(' · '))}</div></td><td>${esc(sp.l)}</td><td>${r.bf?`${nutFmt(nutTest('bf'),nutVal(r.bf))} ${nutPill(e)}`:'<span class="muted">—</span>'}</td><td>${r.pr?`<span class="pill p-ok">${esc(NUT_GOALS[r.pr.goal]?NUT_GOALS[r.pr.goal][0]:'Active')}</span>`:'<span class="muted">—</span>'}</td><td>${r.pl?`<span class="pill p-ok">${r.pl} published</span>`:'<span class="muted">—</span>'}</td><td>${r.flags.length?r.flags.map(f=>`<span class="pill p-bad">${esc(f)}</span>`).join(' '):'<span class="muted">none</span>'}</td><td><button class="btn sm" data-ro-ok onclick="NUT.aid='${r.a.id}';NUT.tab='tests';render()">Open</button></td></tr>`}).join('')}</table></div>`:'<p class="muted">No athletes yet.</p>'}</div>`}
+/* assessments */
+function nutTestsPage(a,ed){const H=(db.nutTests||[]).filter(r=>r.athlete===a.id);const cats=[...new Set(NUT_TESTS.map(t=>t.cat))];const sp=NUT_SPORT[nutSportKey(a)];
+ return `<div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><div><h3 style="margin:0">${esc(a.name)}</h3><div class="muted">${esc(sp.l)} · ${esc(NUT_CAT[sp.cat].l)} · ${nutSex(a)==='F'?'Female':'Male'}${a.dob?' · '+ageOf(a.dob)+' y':''}${bw(a.id)?' · '+bw(a.id)+' kg':''}</div></div>${ed?`<button class="btn pri" onclick="nutTestNew()">+ Add test result</button>`:''}</div></div>`+
+ cats.map(c=>{const T=NUT_TESTS.filter(t=>t.cat===c);return `<div class="card"><h3 style="margin-top:0">${esc(c)}</h3>${T.map(t=>{const R=nutHist(a.id,t.id);const r=R[R.length-1];const e=r?nutEval(r,a):null;
+  return `<div class="item" style="align-items:flex-start;flex-wrap:wrap;gap:6px"><span style="flex:1;min-width:220px"><b>${esc(t.n)}</b>${r?`<br><span style="font-size:18px;font-weight:800">${nutFmt(t,nutVal(r))}</span> ${nutPill(e)}<span class="muted" style="font-size:12px"> · ${fmtDate(r.date)}${R.length>1?' · '+R.length+' results':''}</span>${e.r?`<div class="muted" style="font-size:12px">Norm: ${esc(e.r)}</div>`:''}`:'<br><span class="muted" style="font-size:13px">Not tested</span>'}</span>
+  <span class="row" style="gap:6px">${R.length?`<button class="btn sm" data-ro-ok onclick="nutTestHist('${t.id}')">History</button>`:''}${ed?`<button class="btn sm" onclick="nutTestNew('${t.id}')">+ Result</button>`:''}</span></div>`}).join('')}</div>`}).join('')}
+function nutTestFields(tid){const t=nutTest(tid);const a=byId('athletes',NUT.aid)||{};const B=a.id?nutAthBase(a,{}):{};const def={wt:B.wt||'',ht:a.height||'',bf:isFinite(B.bf)?B.bf:'',ffm:isFinite(B.ffm)?B.ffm.toFixed(1):'',pre:B.wt||''};
+ return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">${t.f.map(([k,l,ty])=>`<div><label>${esc(l)}</label><input id="nutF_${k}" ${ty==='text'?'':'type="number" step="any" inputmode="decimal"'} value="${esc(def[k]??'')}"></div>`).join('')}</div>
+ <details style="margin-top:10px"><summary style="cursor:pointer"><b>Protocol</b></summary><ol style="margin:6px 0;padding-left:18px;font-size:13px">${t.how.map(h=>`<li>${esc(h)}</li>`).join('')}</ol></details>`}
+function nutTestNew(tid){tid=tid||'bf';modal(`<h3 style="margin-top:0">Add test result</h3><label>Test</label><select id="nutTid" onchange="document.getElementById('nutTF').innerHTML=nutTestFields(this.value)">${[...new Set(NUT_TESTS.map(t=>t.cat))].map(c=>`<optgroup label="${esc(c)}">${NUT_TESTS.filter(t=>t.cat===c).map(t=>`<option value="${t.id}" ${t.id===tid?'selected':''}>${esc(t.n)}</option>`).join('')}</optgroup>`).join('')}</select>
+ <div style="margin-top:10px"><label>Date</label><input type="date" id="nutTD" value="${today()}"></div><div id="nutTF" style="margin-top:10px">${nutTestFields(tid)}</div><div style="margin-top:10px"><label>Notes</label><input id="nutTN"></div>
+ <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn pri" onclick="nutTestSave()">Save result</button></div>`)}
+function nutTestSave(){const tid=document.getElementById('nutTid').value,t=nutTest(tid);const vals={};let bad=false;
+ t.f.forEach(([k,l,ty])=>{const v=document.getElementById('nutF_'+k).value.trim();if(ty==='text'){vals[k]=v;return}if(v===''&&!['ur','fl','eee','m'].includes(k))bad=true;vals[k]=v===''?'':+v});
+ if(bad)return toast('Fill in all values');const r={id:uid('nt'),athlete:NUT.aid,test:tid,date:document.getElementById('nutTD').value||today(),vals,note:document.getElementById('nutTN').value.trim(),by:nutMe().name,at:new Date().toISOString()};
+ if(!isFinite(nutVal(r)))return toast('Check the values');nutInit();db.nutTests.push(r);if(tid==='bm'&&r.athlete){db.weighins.push({id:uid('w'),athlete:r.athlete,date:r.date,weight:+vals.v,notes:'Nutrition assessment'})}save();closeModal();render();toast('✓ Result saved')}
+function nutTestHist(tid){const t=nutTest(tid),a=byId('athletes',NUT.aid);const R=nutHist(NUT.aid,tid).slice().reverse();const ed=nutEdit(authUser());
+ modal(`<h3 style="margin-top:0">${esc(t.n)} · ${esc(a&&a.name||'')}</h3>${R.map(r=>{const e=nutEval(r,a);return `<div class="item"><span><b>${nutFmt(t,nutVal(r))}</b> ${nutPill(e)}<br><span class="muted" style="font-size:12px">${fmtDate(r.date)}${r.by?' · '+esc(r.by):''}${r.vals&&r.vals.m?' · '+esc(r.vals.m):''}${r.note?' · '+esc(r.note):''}</span></span>${ed?`<button class="btn sm ghost" onclick="nutTestDel('${r.id}')">✕</button>`:''}</div>`}).join('')}
+ <div class="st-ref" style="margin-top:10px">References:${nutRefs(t.refs)}</div><div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" data-ro-ok onclick="closeModal()">Close</button></div>`)}
+function nutTestDel(id){confirmBox('Delete this result?',()=>{db.nutTests=db.nutTests.filter(r=>r.id!==id);save();closeModal();render()})}
+/* norms & references */
+function nutNormsPage(){const sub=[['tests','Test protocols & norms'],['sport','Sport macro & micronutrient norms'],['bf','Body-fat norms by sport'],['rda','Micronutrients (ICMR-NIN 2020)'],['supp','Supplements & timing'],['refs','All references']];
+ const sk=NUT.sport||'football';let h='';
+ if(NUT.norm==='tests')h=[...new Set(NUT_TESTS.map(t=>t.cat))].map(c=>`<div class="card"><h3 style="margin-top:0">${esc(c)}</h3>${NUT_TESTS.filter(t=>t.cat===c).map(t=>{const B=t.bands?[['All',t.bands]]:t.bandsM?[['Male',t.bandsM]].concat(t.bandsF?[['Female',t.bandsF]]:[]):[];
+  return `<details style="border-top:1px solid var(--line);padding:8px 0"><summary style="cursor:pointer"><b>${esc(t.n)}</b> <span class="muted">${esc(t.u)}</span></summary><div style="padding:6px 0 0 4px"><div class="eyebrow">Protocol</div><ol style="margin:4px 0 8px;padding-left:18px;font-size:13px">${t.how.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>
+  ${B.length?`<div class="eyebrow">Normative bands</div>${B.map(([g,b])=>`<div style="font-size:13px;margin:4px 0">${B.length>1?`<b>${g}:</b> `:''}${b.map(x=>`<span class="pill p-${nutPillB(x[1])}" style="margin:2px">${esc(x[2])}</span>`).join(' ')}</div>`).join('')}`:''}
+  ${t.id==='bf'?'<p style="font-size:13px;margin:4px 0">Sport ranges: see <b>Body-fat norms by sport</b>.</p>':''}${t.norm?`<p class="muted" style="font-size:13px;margin:4px 0">${esc(t.norm)}</p>`:''}<div class="eyebrow">References</div>${nutRefs(t.refs)}</div></details>`}).join('')}</div>`).join('');
+ if(NUT.norm==='sport'){const sp=NUT_SPORT[sk],C=NUT_CAT[sp.cat];
+  h=`<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b>Sport</b><select data-ro-ok style="width:auto" onchange="NUT.sport=this.value;render()">${Object.entries(NUT_SPORT).map(([k,v])=>`<option value="${k}" ${k===sk?'selected':''}>${esc(v.l)}</option>`).join('')}</select><span class="pill p-blue">${esc(C.l)}</span></div>
+  <h3>Macronutrients (per kg body mass per day)</h3><div class="tbl" style="overflow:auto"><table><tr><th>Training load</th><th>Carbohydrate</th><th>Protein</th><th>Fat</th></tr>${NUT_LOADS.map(L=>`<tr><td>${esc(NUT_LOAD[L])}</td><td><b>${C.cho[L][0]}–${C.cho[L][1]}</b> g/kg</td><td>${C.pro[0]}–${C.pro[1]} g/kg</td><td>${C.fat[0]}–${C.fat[1]} % of energy</td></tr>`).join('')}</table></div>
+  <p class="muted" style="font-size:13px">Protein: 0.25–0.4 g/kg per meal every 3–4 h; 30–40 g slow protein before sleep. Higher protein (up to 2.4 g/kg) during energy restriction.</p>
+  <h3>Key practices</h3><ul style="margin:0;padding-left:18px">${C.key.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+  <h3>Micronutrients of concern</h3><ul style="margin:0;padding-left:18px">${C.micro.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><p class="muted" style="font-size:13px">Daily targets: ICMR-NIN 2020 RDA (tab “Micronutrients”).</p>
+  <h3>Evidence-based supplements for this sport</h3><ul style="margin:0;padding-left:18px">${C.supp.map(s=>`<li><b>${esc(NUT_SUPP[s][0])}</b> – ${esc(NUT_SUPP[s][1])}</li>`).join('')}</ul><p class="muted" style="font-size:13px">Use only batch-tested products (Informed Sport / NSF) – anti-doping rules (NADA India / WADA) apply.</p>
+  <div class="eyebrow" style="margin-top:12px">References</div>${nutRefs(C.refs.concat(['ioc18','icmr']))}</div>`}
+ if(NUT.norm==='bf')h=`<div class="card"><h3 style="margin-top:0">Body fat % of elite athletes by sport</h3><div class="tbl" style="overflow:auto"><table><tr><th>Sport (platform)</th><th>Reference group</th><th>Male</th><th>Female</th></tr>${Object.values(NUT_SPORT).map(s=>`<tr><td>${esc(s.l)}</td><td>${s.bf?esc(s.bf[0]):'<span class="muted">no sport data – general rating</span>'}</td><td>${s.bf&&s.bf[1]?s.bf[1].join('–')+' %':'—'}</td><td>${s.bf&&s.bf[2]?s.bf[2].join('–')+' %':'—'}</td></tr>`).join('')}</table></div>
+  <h3>General rating</h3><div class="tbl" style="overflow:auto"><table><tr><th>Rating</th><th>Male</th><th>Female</th></tr><tr><td>Athletic</td><td>5–10 %</td><td>8–15 %</td></tr><tr><td>Good</td><td>11–14 %</td><td>16–23 %</td></tr><tr><td>Acceptable</td><td>15–20 %</td><td>24–30 %</td></tr><tr><td>Overweight</td><td>21–24 %</td><td>31–36 %</td></tr><tr><td>Obese</td><td>&gt; 24 %</td><td>≥ 37 %</td></tr></table></div>
+  <p class="muted" style="font-size:13px">These are observations of elite adult athletes, not targets, and should not be applied to adolescents. Essential fat is ~3–5 % (men) and ~12 % (women); values below this need a REDs screen. “Nearest sport” rows are proxies where no data exist for that sport.</p><div class="eyebrow">References</div>${nutRefs(['jeuk','isak','reds'])}</div>`;
+ if(NUT.norm==='rda')h=`<div class="card"><h3 style="margin-top:0">Daily micronutrient targets – ICMR-NIN 2020 (adults 19 y +)</h3><div class="tbl" style="overflow:auto"><table><tr><th>Nutrient</th><th>Men</th><th>Women</th><th>Athlete note</th></tr>${NUT_RDA.map(r=>`<tr><td><b>${esc(r[0])}</b></td><td>${r[2]} ${esc(r[1])}</td><td>${r[3]} ${esc(r[1])}</td><td class="muted" style="font-size:13px">${esc(r[4])}</td></tr>`).join('')}</table></div>
+  <p class="muted" style="font-size:13px">Adolescents: use the ICMR-NIN 2020 age tables. Athletes rarely need more than the RDA from supplements unless a blood test shows a deficiency; energy intake and food variety matter most.</p><div class="eyebrow">References</div>${nutRefs(['icmr','thomas','peeling23'])}</div>`;
+ if(NUT.norm==='supp')h=`<div class="card"><h3 style="margin-top:0">Fuel timing</h3><div class="tbl" style="overflow:auto"><table><tr><th>When</th><th>Guideline</th></tr>
+  <tr><td>Carbohydrate loading</td><td>10–12 g/kg/day for 36–48 h before events &gt; 90 min</td></tr><tr><td>Pre-event meal</td><td>1–4 g/kg carbohydrate 1–4 h before; low fat and fibre</td></tr>
+  <tr><td>During (&lt; 45 min)</td><td>Not needed</td></tr><tr><td>During (45–75 min)</td><td>Small amounts / mouth rinse</td></tr><tr><td>During (1–2.5 h)</td><td>30–60 g/h</td></tr><tr><td>During (&gt; 2.5 h)</td><td>Up to 90 g/h (glucose + fructose)</td></tr>
+  <tr><td>Recovery (&lt; 8 h to next session)</td><td>1.0–1.2 g/kg/h carbohydrate for 4 h + 0.3 g/kg protein</td></tr><tr><td>Fluid before</td><td>5–7 mL/kg 4 h before (+3–5 mL/kg 2 h before if urine is dark)</td></tr>
+  <tr><td>Fluid during</td><td>Drink to keep body-mass loss below 2 % (often 0.4–0.8 L/h); sodium for heavy / salty sweaters</td></tr><tr><td>Fluid after</td><td>1.25–1.5 L per kg body mass lost, with sodium</td></tr></table></div>
+  <h3>Supplements with good evidence (IOC 2018)</h3><div class="tbl" style="overflow:auto"><table><tr><th>Supplement</th><th>Protocol</th></tr>${Object.values(NUT_SUPP).map(s=>`<tr><td><b>${esc(s[0])}</b></td><td>${esc(s[1])}</td></tr>`).join('')}</table></div>
+  <p class="muted" style="font-size:13px">Medical supplements (iron, vitamin D) only after a blood test and on a doctor’s advice. Batch-tested products only.</p><div class="eyebrow">References</div>${nutRefs(['thomas','burke11','kerksick','sawka','ioc18','ais'])}</div>`;
+ if(NUT.norm==='refs')h=`<div class="card"><h3 style="margin-top:0">References</h3><ol style="padding-left:18px;font-size:13px">${Object.values(NUT_REF).map(r=>`<li style="margin:4px 0">${esc(r)}</li>`).join('')}</ol></div>`;
+ return `<div class="tabs" style="margin-bottom:12px">${sub.map(([k,l])=>`<button class="tab ${NUT.norm===k?'on':''}" data-ro-ok onclick="NUT.norm='${k}';render()">${l}</button>`).join('')}</div>`+h}
+/* foods */
+function nutFoodsPage(ed){const q=NUT.q.toLowerCase();const F=nutFoods().filter(f=>!q||(f[1]+' '+f[10]).toLowerCase().includes(q));
+ return `<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap;justify-content:space-between"><input data-ro-ok placeholder="Search food" value="${esc(NUT.q)}" oninput="NUT.q=this.value;clearTimeout(NUT.t);NUT.t=setTimeout(render,300)" style="flex:1;min-width:200px">${ed?`<button class="btn pri" onclick="nutFoodNew()">+ Add custom food</button>`:''}</div>
+ <p class="muted" style="font-size:12px">${NUT_FOODS.length} built-in foods (Indian + international) and ${(db.nutFoods||[]).length} custom. Values per serving, approximate – IFCT 2017 (Indian foods) and USDA FoodData Central.</p>
+ <div class="tbl" style="overflow:auto;max-height:65vh"><table><tr><th>Food</th><th>Serving</th><th>kcal</th><th>Protein</th><th>Carb</th><th>Fat</th><th>Fibre</th><th>Iron</th><th>Calcium</th><th></th></tr>${F.map(f=>`<tr><td><b>${esc(f[1])}</b> ${f[11]==='n'?'🍗':f[11]==='e'?'🥚':'🟢'}<div class="muted" style="font-size:11px">${esc(f[10])}${f[12]?' · custom':NUT_INTL.has(f[0])?' · international':' · Indian'}</div></td><td>${esc(f[2])}</td><td>${f[3]}</td><td>${f[4]} g</td><td>${f[5]} g</td><td>${f[6]} g</td><td>${f[7]} g</td><td>${f[8]} mg</td><td>${f[9]} mg</td><td>${f[12]&&ed?`<button class="btn sm ghost" onclick="nutFoodDel('${f[0]}')">✕</button>`:''}</td></tr>`).join('')}</table></div>
+ <div class="eyebrow" style="margin-top:10px">Sources</div>${nutRefs(['ifct','usda'])}</div>`}
+function nutFoodNew(){const f=(k,l,t='number')=>`<div><label>${l}</label><input id="nutNF_${k}" ${t==='number'?'type="number" step="any"':''}></div>`;
+ modal(`<h3 style="margin-top:0">Add custom food</h3><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">${f('name','Food name','text')}${f('serv','Serving (e.g. 1 bowl 200 g)','text')}${f('kcal','Energy (kcal)')}${f('p','Protein (g)')}${f('c','Carbohydrate (g)')}${f('f','Fat (g)')}${f('fib','Fibre (g)')}${f('fe','Iron (mg)')}${f('ca','Calcium (mg)')}</div>
+ <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn pri" onclick="nutFoodSave()">Save food</button></div>`)}
+function nutFoodSave(){const g=k=>document.getElementById('nutNF_'+k).value.trim();if(!g('name')||g('kcal')==='')return toast('Name and energy are needed');nutInit();
+ db.nutFoods.push({id:uid('nf'),name:g('name'),serv:g('serv')||'1 serving',kcal:+g('kcal')||0,p:+g('p')||0,c:+g('c')||0,f:+g('f')||0,fib:+g('fib')||0,fe:+g('fe')||0,ca:+g('ca')||0,grp:'Custom'});save();closeModal();render();toast('✓ Food added')}
+function nutFoodDel(id){confirmBox('Delete this custom food?',()=>{db.nutFoods=db.nutFoods.filter(f=>f.id!==id);save();render()})}
+/* programs */
+function nutProgPage(a,ed){const L=(db.nutPrograms||[]).filter(p=>p.athlete===a.id).sort((x,y)=>String(y.at).localeCompare(String(x.at)));
+ const cur=NUT.prog?byId('nutPrograms',NUT.prog):null;if(cur)return nutProgEditor(cur,a,ed);
+ return `<div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Nutrition programs · ${esc(a.name)}</h3>${ed?`<button class="btn pri" onclick="nutProgNew()">+ New program</button>`:''}</div>
+ ${L.length?L.map(p=>`<div class="item"><span><b>${esc(p.name||'Program')}</b> <span class="pill ${p.status==='Archived'?'':'p-ok'}">${esc(p.status||'Active')}</span><br><span class="muted" style="font-size:13px">${esc((NUT_GOALS[p.goal]||[''])[0])} · ${esc(p.phase||'')} · ${fmtDate(p.start)}${p.end?' – '+fmtDate(p.end):''}</span></span><button class="btn sm" data-ro-ok onclick="NUT.prog='${p.id}';render()">Open</button></div>`).join(''):'<p class="muted">No program yet. A program sets energy, macro, hydration, timing and supplement targets from the athlete’s sport, goal and training load.</p>'}</div>`}
+function nutProgNew(){const a=byId('athletes',NUT.aid);if(!a)return;nutInit();const old=nutActiveProg(a.id);const B=nutAthBase(a,{});
+ const p={id:uid('np'),athlete:a.id,name:'Nutrition program '+(new Date().getFullYear()),sport:nutSportKey(a),goal:'perf',phase:'In-season',start:today(),end:addD(today(),84),wt:B.wt||'',ht:+a.height||'',bf:isFinite(B.bf)?+B.bf.toFixed(1):'',
+  week:['high','mod','high','light','high','mod','rest'],supp:NUT_CAT[(NUT_SPORT[nutSportKey(a)]||NUT_SPORT.general).cat].supp.filter(s=>s!=='cho').slice(0,2),hyd:'',notes:'',status:'Active',by:nutMe().name,at:new Date().toISOString(),ovr:{}};
+ if(old)old.status='Archived';db.nutPrograms.push(p);save();NUT.prog=p.id;render();toast('Program created'+(old?' – previous program archived':''))}
+function nutProgSet(id,k,v){const p=byId('nutPrograms',id);if(!p)return;if(['wt','ht','bf'].includes(k))v=v===''?'':+v;p[k]=v;p.at=p.at||new Date().toISOString();save();render()}
+function nutProgOvr(id,L,k,v){const p=byId('nutPrograms',id);if(!p)return;p.ovr=p.ovr||{};p.ovr[L]=p.ovr[L]||{};p.ovr[L][k]=v===''?'':+v;save();render()}
+function nutProgWeek(id,i,v){const p=byId('nutPrograms',id);if(!p)return;p.week=p.week||[];p.week[i]=v;save();render()}
+function nutProgSupp(id,s,on){const p=byId('nutPrograms',id);if(!p)return;p.supp=(p.supp||[]).filter(x=>x!==s);if(on)p.supp.push(s);save();render()}
+function nutProgEditor(p,a,ed){const {B,C,T}=nutTargets(p,a);const dis=ed?'':'disabled';const sw=nutHist(a.id,'sweat').pop(),na=nutHist(a.id,'na').pop();const swr=sw?nutVal(sw):NaN;
+ const inp=(k,l,ty='text',extra='')=>`<div><label>${l}</label><input ${dis} ${ty==='number'?'type="number" step="any"':ty==='date'?'type="date"':''} value="${esc(p[k]??'')}" onchange="nutProgSet('${p.id}','${k}',this.value)" ${extra}></div>`;
+ const sel=(k,l,opts)=>`<div><label>${l}</label><select ${dis} onchange="nutProgSet('${p.id}','${k}',this.value)">${opts.map(([v,t])=>`<option value="${esc(v)}" ${String(p[k])===String(v)?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`;
+ const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];const w=B.wt||0;
+ const cell=(L,k,u)=>{const v=T[L][k];return ed?`<input type="number" step="1" style="width:84px" value="${isFinite(v)?v:''}" onchange="nutProgOvr('${p.id}','${L}','${k}',this.value)"> ${u}`:`${isFinite(v)?v:'—'} ${u}`};
+ return `<div class="row" style="margin-bottom:10px"><button class="btn sm" data-ro-ok onclick="NUT.prog=null;render()">← All programs</button>${ed?`<button class="btn sm" onclick="NUT.tab='plans';NUT.plan=null;render()">Diet plans →</button><button class="btn sm ghost danger" onclick="nutProgDel('${p.id}')">Delete</button>`:''}</div>
+ <div class="card"><h3 style="margin-top:0">${esc(p.name)} <span class="pill ${p.status==='Archived'?'':'p-ok'}">${esc(p.status||'Active')}</span></h3>
+ <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">${inp('name','Program name')}${sel('sport','Sport',Object.entries(NUT_SPORT).map(([k,v])=>[k,v.l]))}${sel('goal','Goal',Object.entries(NUT_GOALS).map(([k,v])=>[k,v[0]]))}${sel('phase','Season phase',NUT_PHASES.map(x=>[x,x]))}${inp('start','Start','date')}${inp('end','End','date')}${inp('wt','Body mass (kg)','number')}${inp('ht','Height (cm)','number')}${inp('bf','Body fat (%)','number')}${sel('status','Status',[['Active','Active'],['Archived','Archived']])}</div>
+ <p class="muted" style="font-size:13px;margin:10px 0 0">${esc(NUT_CAT[(NUT_SPORT[p.sport]||NUT_SPORT.general).cat].l)} · RMR ${isFinite(B.rmr)?Math.round(B.rmr)+' kcal ('+B.rmrM+')':'— add height or body fat'}${isFinite(B.ffm)?' · FFM '+B.ffm.toFixed(1)+' kg':''}</p></div>
+ <div class="card"><h3 style="margin-top:0">Daily targets by training load</h3><div class="tbl" style="overflow:auto"><table><tr><th>Day type</th><th>Energy</th><th>Carbohydrate</th><th>Protein</th><th>Fat</th><th>EA estimate</th></tr>${NUT_LOADS.map(L=>{const t=T[L];return `<tr><td><b>${esc(NUT_LOAD[L].split(' – ')[0])}</b><div class="muted" style="font-size:11px">${esc(NUT_LOAD[L].split(' – ')[1]||'')}</div></td><td>${cell(L,'kcal','kcal')}</td><td>${cell(L,'c','g')}<div class="muted" style="font-size:11px">${w?(t.c/w).toFixed(1)+' g/kg · ':''}norm ${t.chr[0]}–${t.chr[1]}</div></td><td>${cell(L,'p','g')}<div class="muted" style="font-size:11px">${w?(t.p/w).toFixed(1)+' g/kg · ':''}norm ${C.pro[0]}–${C.pro[1]}</div></td><td>${cell(L,'f','g')}<div class="muted" style="font-size:11px">${isFinite(t.kcal)&&t.kcal?Math.round(t.f*9/t.kcal*100)+' %':''}</div></td><td>${isFinite(t.ea)?`<span class="pill p-${t.ea<30?'bad':t.ea<45?'warn':'ok'}">${Math.round(t.ea)}</span>`:'—'}${t.note?`<div class="muted" style="font-size:11px">${esc(t.note)}</div>`:''}</td></tr>`}).join('')}</table></div>
+ <p class="muted" style="font-size:12px">Energy = RMR × activity factor (${NUT_LOADS.map(L=>NUT_PAL[L]).join(' / ')}) ${(NUT_GOALS[p.goal]||NUT_GOALS.perf)[1]?((NUT_GOALS[p.goal][1]>0?'+':'')+NUT_GOALS[p.goal][1]+' kcal for the goal'):''}. Carbohydrate and protein from the sport norms (g/kg), fat fills the rest within ${C.fat.join('–')} %. Type in any box to set your own value. EA = (energy − exercise energy) ÷ FFM, an estimate – keep ≥ 30, ideally ≥ 45.</p></div>
+ <div class="card"><h3 style="margin-top:0">Weekly pattern</h3><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">${days.map((d,i)=>`<div><label>${d}</label><select ${dis} onchange="nutProgWeek('${p.id}',${i},this.value)">${NUT_LOADS.map(L=>`<option value="${L}" ${(p.week||[])[i]===L?'selected':''}>${esc(NUT_LOAD[L].split(' – ')[0])}</option>`).join('')}</select><div class="muted" style="font-size:11px">${isFinite(T[(p.week||[])[i]||'mod'].kcal)?T[(p.week||[])[i]||'mod'].kcal+' kcal':''}</div></div>`).join('')}</div></div>
+ <div class="card"><h3 style="margin-top:0">Hydration plan</h3>${w?`<ul style="margin:0;padding-left:18px"><li><b>Before:</b> ${Math.round(5*w)}–${Math.round(7*w)} mL about 4 h before training (+${Math.round(3*w)}–${Math.round(5*w)} mL 2 h before if urine is dark)</li>
+ <li><b>During:</b> ${isFinite(swr)?`sweat rate ${swr.toFixed(2)} L/h (test ${fmtDate(sw.date)}) → drink about ${Math.max(0.3,swr-0.02*w/((+(sw.vals||{}).min||60)/60)).toFixed(1)}–${swr.toFixed(1)} L/h so body-mass loss stays below 2 % (${(0.02*w).toFixed(1)} kg)`:'0.4–0.8 L/h; do a sweat test for a personal plan'}</li>
+ <li><b>Sodium:</b> ${na?`sweat sodium ${nutVal(na)} mmol/L – ${nutVal(na)>60?'salty sweater: add sodium (ORS, salted nimbu pani, sports drink) in long or hot sessions':'normal sodium needs'}`:'standard sports drink in long or hot sessions; sweat sodium test to personalise'}</li>
+ <li><b>After:</b> 1.25–1.5 L for every kg of body mass lost, with salt / sodium</li></ul>`:'<p class="muted">Add body mass.</p>'}<label style="margin-top:8px">Extra hydration notes</label><textarea ${dis} onchange="nutProgSet('${p.id}','hyd',this.value)">${esc(p.hyd||'')}</textarea></div>
+ <div class="card"><h3 style="margin-top:0">Fuel timing</h3>${w?`<ul style="margin:0;padding-left:18px"><li><b>Pre-training / match meal (1–4 h before):</b> ${Math.round(1*w)}–${Math.round(4*w)} g carbohydrate, low fat and fibre</li><li><b>During sessions &gt; 1 h:</b> 30–60 g carbohydrate per hour (up to 90 g/h &gt; 2.5 h)</li><li><b>Recovery (within 1 h):</b> ${Math.round(1*w)}–${Math.round(1.2*w)} g carbohydrate + ${Math.round(0.3*w)} g protein</li><li><b>Protein spread:</b> ${Math.round(0.3*w)}–${Math.round(0.4*w)} g per meal, 4–5 meals, ${Math.round(0.4*w)<30?'30':Math.round(0.4*w)}–40 g before sleep</li>${(NUT_SPORT[p.sport]||{}).cat==='endurance'?`<li><b>Carbohydrate loading:</b> ${Math.round(10*w)}–${Math.round(12*w)} g/day for 36–48 h before events &gt; 90 min</li>`:''}</ul>`:''}</div>
+ <div class="card"><h3 style="margin-top:0">Supplements</h3>${Object.entries(NUT_SUPP).map(([k,s])=>`<label class="row" style="flex-wrap:nowrap;gap:8px;align-items:flex-start;margin:6px 0"><input type="checkbox" style="width:auto;margin-top:3px" ${dis} ${(p.supp||[]).includes(k)?'checked':''} onchange="nutProgSupp('${p.id}','${k}',this.checked)"><span><b>${esc(s[0])}</b>${w&&(p.supp||[]).includes(k)?` – <b>${esc(s[2](w))}</b>`:''}<br><span class="muted" style="font-size:12px">${esc(s[1])}</span></span></label>`).join('')}<p class="muted" style="font-size:12px">Batch-tested products only (anti-doping). Iron and vitamin D only after a blood test.</p></div>
+ <div class="card"><h3 style="margin-top:0">Micronutrient focus</h3><ul style="margin:0 0 8px;padding-left:18px">${C.micro.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><div class="row" style="gap:6px;flex-wrap:wrap">${NUT_RDA.slice(0,9).map(r=>`<span class="pill p-blue">${esc(r[0])}: ${B.sx==='F'?r[3]:r[2]} ${esc(r[1])}</span>`).join('')}</div><p class="muted" style="font-size:12px">ICMR-NIN 2020 RDA (adults).</p>
+ <label>Program notes</label><textarea ${dis} style="min-height:90px" onchange="nutProgSet('${p.id}','notes',this.value)">${esc(p.notes||'')}</textarea><div class="eyebrow" style="margin-top:10px">References</div>${nutRefs(C.refs.concat(['cunningham','mifflin','sawka','ioc18','icmr','reds']))}</div>`}
+function nutProgDel(id){confirmBox('Delete this program? Diet plans stay.',()=>{db.nutPrograms=db.nutPrograms.filter(p=>p.id!==id);NUT.prog=null;save();render()})}
+/* diet plans */
+function nutPlanTarget(pl){const p=pl.program?byId('nutPrograms',pl.program):nutActiveProg(pl.athlete);if(!p)return null;const t=nutTargets(p).T;return t&&t[pl.day||'mod']}
+function nutPlansPage(a,ed){const cur=NUT.plan?byId('nutPlans',NUT.plan):null;if(cur)return nutPlanEditor(cur,a,ed);
+ const L=(db.nutPlans||[]).filter(p=>p.athlete===a.id).sort((x,y)=>String(y.at).localeCompare(String(x.at)));
+ return `<div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Diet plans · ${esc(a.name)}</h3>${ed?`<button class="btn pri" onclick="nutPlanNew()">+ New diet plan</button>`:''}</div>
+ ${nutActiveProg(a.id)?'':'<p class="muted" style="font-size:13px">Tip: create a nutrition program first – the plan then shows energy and macro targets.</p>'}
+ ${L.length?L.map(p=>{const t=nutSum(p.meals.flatMap(m=>m.items));return `<div class="item"><span><b>${esc(p.title)}</b> <span class="pill ${p.status==='Published'?'p-ok':'p-blue'}">${esc(p.status)}</span><br><span class="muted" style="font-size:13px">${esc(NUT_LOAD[p.day||'mod'].split(' – ')[0])} day · ${Math.round(t.kcal)} kcal · P ${Math.round(t.p)} g · C ${Math.round(t.c)} g · F ${Math.round(t.f)} g</span></span><span class="row" style="gap:6px"><button class="btn sm" data-ro-ok onclick="NUT.plan='${p.id}';render()">Open</button><button class="btn sm" data-ro-ok onclick="nutPdf('${p.id}')">PDF</button></span></div>`}).join(''):'<p class="muted">No diet plans yet.</p>'}</div>`}
+function nutPlanNew(day){const a=byId('athletes',NUT.aid);if(!a)return;nutInit();const pr=nutActiveProg(a.id);const veg=/veg/i.test(a.notes||a.medical||'');
+ const base=[['Breakfast','07:30',[['poha',1],['milk-toned',1],['banana',1]]],['Mid-morning','10:30',[['sprouts',1],['orange',1]]],['Lunch','13:00',[['roti',3],['dal-toor',1],['rice',1],['mix-veg',1],['curd',1],['salad',1]]],['Pre-training','16:00',[['banana',1],['dates',2],['peanut-butter',1],['bread-ww',2]]],['Post-training','19:00',[['milk-toned',1],['whey',1],['banana',1]]],['Dinner','20:30',[['roti',3],[veg?'paneer-bhurji':'chicken-curry',1],['palak',1],['salad',1]]],['Bedtime','22:15',[['milk-dt',1]]]];
+ const p={id:uid('dp'),athlete:a.id,program:pr?pr.id:'',title:'Training day plan',day:day||'high',status:'Draft',meals:base.map(([n,t,it])=>({name:n,time:t,note:'',items:it.map(([f,q])=>({f,q}))})),notes:'Drink water through the day. Adjust portions to hunger and training.',by:nutMe().name,at:new Date().toISOString()};
+ db.nutPlans.push(p);save();NUT.plan=p.id;render();toast('Plan started from a template – edit the foods')}
+const nutPl=id=>byId('nutPlans',id);
+function nutPlanSet(id,k,v){const p=nutPl(id);if(!p)return;p[k]=v;p.at=new Date().toISOString();save();render()}
+function nutMealSet(id,i,k,v){const p=nutPl(id);if(!p||!p.meals[i])return;p.meals[i][k]=v;save();render()}
+function nutMealAdd(id){const p=nutPl(id);if(!p)return;p.meals.push({name:'Snack',time:'',note:'',items:[]});save();render()}
+function nutMealDel(id,i){const p=nutPl(id);if(!p)return;p.meals.splice(i,1);save();render()}
+function nutMealMove(id,i,d){const p=nutPl(id);if(!p)return;const j=i+d;if(j<0||j>=p.meals.length)return;[p.meals[i],p.meals[j]]=[p.meals[j],p.meals[i]];save();render()}
+function nutItemAdd(id,i,el){const f=nutFoodByLabel(el.value);if(!f){toast('Pick a food from the list');return}const p=nutPl(id);if(!p)return;p.meals[i].items.push({f:f[0],q:1});save();render()}
+function nutItemQty(id,i,j,v){const p=nutPl(id);if(!p)return;const q=Math.max(0,+v||0);if(!q)p.meals[i].items.splice(j,1);else p.meals[i].items[j].q=q;save();render()}
+function nutPlanDup(id){const p=nutPl(id);if(!p)return;const c=JSON.parse(JSON.stringify(p));c.id=uid('dp');c.title=p.title+' (copy)';c.status='Draft';c.at=new Date().toISOString();delete c.pubAt;db.nutPlans.push(c);save();NUT.plan=c.id;render();toast('Copied')}
+function nutPlanDel(id){confirmBox('Delete this diet plan?',()=>{db.nutPlans=db.nutPlans.filter(p=>p.id!==id);NUT.plan=null;save();render()})}
+function nutPlanPub(id,on){const p=nutPl(id);if(!p)return;p.status=on?'Published':'Draft';if(on)p.pubAt=new Date().toISOString();save();render();toast(on?'✓ Published – the athlete can see it now':'Moved back to draft')}
+function nutPlanEditor(p,a,ed){const T=nutPlanTarget(p);const tot=nutSum(p.meals.flatMap(m=>m.items));const dis=ed?'':'disabled';const sx=nutSex(a);const rda=n=>{const r=NUT_RDA.find(x=>x[0]===n);return r?(sx==='F'?r[3]:r[2]):0};
+ const progs=(db.nutPrograms||[]).filter(x=>x.athlete===a.id);
+ return `<div class="row" style="margin-bottom:10px;flex-wrap:wrap;gap:6px"><button class="btn sm" data-ro-ok onclick="NUT.plan=null;render()">← All plans</button><button class="btn sm" data-ro-ok onclick="nutPdf('${p.id}')">⬇ PDF</button>${ed?`<button class="btn sm" onclick="nutPlanDup('${p.id}')">Duplicate</button>${p.status==='Published'?`<button class="btn sm" onclick="nutPlanPub('${p.id}',0)">Unpublish</button>`:`<button class="btn sm pri" onclick="nutPlanPub('${p.id}',1)">✓ Publish to athlete</button>`}<button class="btn sm ghost danger" onclick="nutPlanDel('${p.id}')">Delete</button>`:''}</div>
+ <div class="card"><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px"><div><label>Plan title</label><input ${dis} value="${esc(p.title)}" onchange="nutPlanSet('${p.id}','title',this.value)"></div>
+ <div><label>Day type (targets)</label><select ${dis} onchange="nutPlanSet('${p.id}','day',this.value)">${NUT_LOADS.map(L=>`<option value="${L}" ${p.day===L?'selected':''}>${esc(NUT_LOAD[L].split(' – ')[0])}</option>`).join('')}</select></div>
+ <div><label>Program</label><select ${dis} onchange="nutPlanSet('${p.id}','program',this.value)"><option value="">Active program</option>${progs.map(x=>`<option value="${x.id}" ${p.program===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div><div><label>Status</label><div style="padding-top:8px"><span class="pill ${p.status==='Published'?'p-ok':'p-blue'}">${esc(p.status)}</span></div></div></div></div>
+ <div class="card" style="position:sticky;top:0;z-index:2"><h3 style="margin:0 0 6px">Day total ${T?'vs target':''}</h3><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 16px">${nutBar(tot.kcal,T&&T.kcal,'Energy','kcal')}${nutBar(tot.c,T&&T.c,'Carbohydrate','g')}${nutBar(tot.p,T&&T.p,'Protein','g')}${nutBar(tot.f,T&&T.f,'Fat','g')}${nutBar(tot.fe,rda('Iron'),'Iron','mg',1)}${nutBar(tot.ca,rda('Calcium'),'Calcium','mg',1)}${nutBar(tot.fib,25,'Fibre','g',1)}</div>${T?'':'<p class="muted" style="font-size:12px;margin:4px 0 0">No program – energy and macro targets not set.</p>'}</div>
+ ${nutFoodDL()}${p.meals.map((m,i)=>{const s=nutSum(m.items);return `<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end"><div style="flex:1;min-width:150px"><label>Meal</label><input ${dis} list="nutMealDL" value="${esc(m.name)}" onchange="nutMealSet('${p.id}',${i},'name',this.value)"></div><div style="width:110px"><label>Time</label><input ${dis} type="time" value="${esc(m.time||'')}" onchange="nutMealSet('${p.id}',${i},'time',this.value)"></div>
+ ${ed?`<span class="row" style="gap:4px"><button class="btn sm ghost" title="Up" onclick="nutMealMove('${p.id}',${i},-1)">↑</button><button class="btn sm ghost" title="Down" onclick="nutMealMove('${p.id}',${i},1)">↓</button><button class="btn sm ghost danger" title="Remove meal" onclick="nutMealDel('${p.id}',${i})">✕</button></span>`:''}</div>
+ <div style="margin-top:8px">${m.items.map((it,j)=>{const f=nutFood(it.f);if(!f)return '';return `<div class="item" style="gap:8px"><span style="flex:1"><b>${esc(f[1])}</b> <span class="muted" style="font-size:12px">${esc(f[2])}</span><br><span class="muted" style="font-size:12px">${Math.round(f[3]*it.q)} kcal · P ${(f[4]*it.q).toFixed(1)} · C ${(f[5]*it.q).toFixed(1)} · F ${(f[6]*it.q).toFixed(1)} g</span></span><span class="row" style="gap:4px;flex-wrap:nowrap">× <input ${dis} type="number" min="0" step="0.5" style="width:70px" value="${it.q}" onchange="nutItemQty('${p.id}',${i},${j},this.value)"></span></div>`}).join('')||'<p class="muted" style="font-size:13px">No foods yet.</p>'}</div>
+ ${ed?`<input list="nutFoodDL" placeholder="+ Add food (type to search: roti, paneer, oats…)" onchange="nutItemAdd('${p.id}',${i},this)" style="margin-top:6px">`:''}
+ <div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-top:6px;font-size:13px"><span class="muted">${Math.round(s.kcal)} kcal · P ${Math.round(s.p)} g · C ${Math.round(s.c)} g · F ${Math.round(s.f)} g</span></div><input ${dis} placeholder="Note for this meal (optional)" value="${esc(m.note||'')}" onchange="nutMealSet('${p.id}',${i},'note',this.value)" style="margin-top:6px"></div>`}).join('')}
+ <datalist id="nutMealDL">${NUT_MEALS.map(x=>`<option value="${x}"></option>`).join('')}</datalist>${ed?`<button class="btn" onclick="nutMealAdd('${p.id}')">+ Add meal</button>`:''}
+ <div class="card" style="margin-top:12px"><label>Notes for the athlete</label><textarea ${dis} style="min-height:90px" onchange="nutPlanSet('${p.id}','notes',this.value)">${esc(p.notes||'')}</textarea><p class="muted" style="font-size:12px;margin:6px 0 0">Food values approximate (IFCT 2017 / USDA). Prepared by ${esc(p.by||'')}.</p></div>`}
+/* ---------- meal logs (cloud table meal_logs; local fallback) ---------- */
+const NUT_SQL=`-- BIOMOTOR Sport Nutrition: athlete meal log (run once in Supabase → SQL Editor)
+create table if not exists public.meal_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  email text not null default '',
+  athlete_id text not null,
+  log_date date not null default current_date,
+  meal text not null default '',
+  data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists meal_logs_ath on public.meal_logs (athlete_id, log_date);
+alter table public.meal_logs enable row level security;
+drop policy if exists ml_read on public.meal_logs;
+drop policy if exists ml_insert on public.meal_logs;
+drop policy if exists ml_delete on public.meal_logs;
+create policy ml_read on public.meal_logs for select to authenticated using (user_id = auth.uid() or is_editor());
+create policy ml_insert on public.meal_logs for insert to authenticated with check (user_id = auth.uid() and is_member());
+create policy ml_delete on public.meal_logs for delete to authenticated using (user_id = auth.uid() or is_admin());`;
+const nutLocalLogs=()=>{try{return JSON.parse(localStorage.getItem('bm_meal_logs')||'[]')}catch(e){return []}};
+async function nutLogsLoad(aid,force){if(!aid)return;const c=NUT.logs[aid];if(c&&!force&&Date.now()-c.t<60000)return;NUT.logs[aid]={t:Date.now(),rows:c?c.rows:[],busy:true};
+ try{let rows;if(CLOUD&&SB){const {data,error}=await SB.from('meal_logs').select('*').eq('athlete_id',aid).gte('log_date',daysAgo(60)).order('log_date',{ascending:false}).order('created_at');if(error)throw error;rows=data||[]}
+  else rows=nutLocalLogs().filter(r=>r.athlete_id===aid&&r.log_date>=daysAgo(60));NUT.logErr='';NUT.logs[aid]={t:Date.now(),rows,busy:false}}
+ catch(e){NUT.logs[aid]={t:Date.now(),rows:[],busy:false};NUT.logErr=/meal_logs|42P01|PGRST20/.test((e.message||'')+(e.code||''))?'setup':(e.message||String(e))}
+ if(['#nutrition','#my-nutrition'].includes(location.hash))render()}
+async function nutLogAdd(aid,row){const me=authUser();row=Object.assign({athlete_id:aid,email:normEmail(me&&me.email||''),log_date:NUT.logDate||today()},row);
+ try{if(CLOUD&&SB){const {error}=await SB.from('meal_logs').insert(row);if(error)throw error}else{const L=nutLocalLogs();L.push(Object.assign({id:uid('ml'),created_at:new Date().toISOString()},row));localStorage.setItem('bm_meal_logs',JSON.stringify(L))}
+  toast('✓ Saved');await nutLogsLoad(aid,true)}catch(e){toast('Could not save: '+(/meal_logs|42P01|PGRST20/.test((e.message||'')+(e.code||''))?'meal log is not set up yet – ask the owner':e.message||e))}}
+async function nutLogDel(aid,id){try{if(CLOUD&&SB){const {error}=await SB.from('meal_logs').delete().eq('id',id);if(error)throw error}else localStorage.setItem('bm_meal_logs',JSON.stringify(nutLocalLogs().filter(r=>r.id!==id)));await nutLogsLoad(aid,true)}catch(e){toast('Could not delete: '+(e.message||e))}}
+function nutLogSetupCard(){const me=authUser();if(NUT.logErr!=='setup')return NUT.logErr?`<div class="card"><p class="muted">Meal log: ${esc(NUT.logErr)}</p></div>`:'';
+ return `<div class="card" style="border:2px solid var(--warn)"><h3 style="margin-top:0">Meal log needs a one-time setup</h3>${isAdmin(me)?`<p>Open <b>Supabase → SQL Editor → New query</b>, paste this and press <b>Run</b>. Athletes can then log meals.</p><textarea readonly data-ro-ok style="min-height:140px;font:12px monospace">${esc(NUT_SQL)}</textarea><button class="btn sm" data-ro-ok onclick="navigator.clipboard&&navigator.clipboard.writeText(NUT_SQL).then(()=>toast('SQL copied'))">Copy SQL</button>`:'<p class="muted">Ask the owner to finish the meal-log setup.</p>'}</div>`}
+function nutDayGroups(rows){const g={};rows.forEach(r=>{(g[r.log_date]=g[r.log_date]||[]).push(r)});return Object.entries(g).sort((x,y)=>y[0].localeCompare(x[0]))}
+const nutRowItems=r=>(r.data&&r.data.items)||[];
+function nutDayTarget(aid,date){const p=nutActiveProg(aid);if(!p)return null;const T=nutTargets(p).T;const wd=(new Date(date+'T00:00').getDay()+6)%7;return T[(p.week||[])[wd]||'mod']}
+function nutLogsStaff(a,ed){nutLogsLoad(a.id);const c=NUT.logs[a.id]||{rows:[],busy:true};const G=nutDayGroups(c.rows);const fb=(db.nutFeedback||[]).filter(f=>f.athlete===a.id);
+ return nutLogSetupCard()+`<div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Meal log · ${esc(a.name)} <span class="muted" style="font-size:13px">last 60 days</span></h3><button class="btn sm" data-ro-ok onclick="nutLogsLoad('${a.id}',true)">↻ Refresh</button></div>
+ ${c.busy&&!c.rows.length?'<p class="muted">Loading…</p>':G.length?`<p class="muted" style="font-size:13px">${G.length} day(s) logged in 60 days · ${G.filter(([d])=>d>=daysAgo(7)).length} in the last 7 days</p>`:'<p class="muted">The athlete has not logged any meals yet (Athlete → My Nutrition → Log meals).</p>'}</div>`+
+ G.map(([d,R])=>{const tot=nutSum(R.flatMap(nutRowItems).concat(R.filter(r=>r.data&&r.data.txt).map(r=>({txt:1,kcal:r.data.kcal}))));const T=nutDayTarget(a.id,d);const F=fb.filter(f=>f.date===d);
+  return `<div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><b>${fmtDate(d)}</b><span class="muted" style="font-size:13px">${R.length} entr${R.length===1?'y':'ies'}</span></div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:2px 14px">${nutBar(tot.kcal,T&&T.kcal,'Energy','kcal')}${nutBar(tot.c,T&&T.c,'Carb','g')}${nutBar(tot.p,T&&T.p,'Protein','g')}${nutBar(tot.f,T&&T.f,'Fat','g')}</div>
+  ${R.map(r=>`<div class="item" style="font-size:13px"><span><b>${esc(r.meal)}</b>: ${esc(nutRowItems(r).map(it=>{const f=nutFood(it.f);return f?`${it.q!==1?it.q+' × ':''}${f[1]}`:''}).filter(Boolean).concat(r.data&&r.data.txt?[r.data.txt+(r.data.kcal?' (~'+r.data.kcal+' kcal)':'')]:[]).join(', '))}${r.data&&r.data.note?` <span class="muted">· ${esc(r.data.note)}</span>`:''}</span></div>`).join('')}
+  ${F.map(f=>`<div class="item" style="background:var(--card2);border-radius:8px;padding:6px 8px;font-size:13px"><span>💬 <b>${esc(f.by)}</b>: ${esc(f.txt)}</span>${ed?`<button class="btn sm ghost" onclick="nutFbDel('${f.id}')">✕</button>`:''}</div>`).join('')}
+  ${ed?`<div class="row" style="gap:6px;margin-top:6px;flex-wrap:nowrap"><input id="nutFb_${d}" placeholder="Feedback for the athlete on this day"><button class="btn sm pri" onclick="nutFbAdd('${a.id}','${d}')">Send</button></div>`:''}</div>`}).join('')}
+function nutFbAdd(aid,d){const el=document.getElementById('nutFb_'+d);const t=String(el&&el.value||'').trim();if(!t)return;nutInit();db.nutFeedback.push({id:uid('nfb'),athlete:aid,date:d,txt:t,by:nutMe().name,at:new Date().toISOString()});save();render();toast('✓ Feedback sent')}
+function nutFbDel(id){db.nutFeedback=db.nutFeedback.filter(f=>f.id!==id);save();render()}
+/* ---------- PDF (diet plan) ---------- */
+async function nutPdf(id){const p=nutPl(id);if(!p)return;toast('Preparing PDF…');
+ try{const Lb=await fcLib();const {PDFDocument,StandardFonts,rgb}=Lb;const a=byId('athletes',p.athlete)||{};const doc=await PDFDocument.create();const F=await doc.embedFont(StandardFonts.Helvetica),B=await doc.embedFont(StandardFonts.HelveticaBold);const logo=await fcImg(doc);
+  doc.setTitle(fcTx('Diet plan - '+(a.name||'')));doc.setCreator('BIOMOTOR Sport and Fitness');const W=595.28,M=42;let pg=doc.addPage([W,841.89]),y=800;const red=rgb(.71,.07,.11),grey=rgb(.38,.38,.38),blk=rgb(.07,.07,.07);
+  const np=()=>{pg=doc.addPage([W,841.89]);y=800};const tx=(t,x,s=10,f=F,col=blk)=>{if(y<60)np();pg.drawText(fcTx(t).slice(0,110),{x,y,size:s,font:f,color:col});y-=s+4};
+  if(logo){const d=logo.scale(Math.min(110/logo.width,46/logo.height));pg.drawImage(logo,{x:M,y:y-30,width:d.width,height:d.height})}
+  pg.drawText(fcTx(db.org&&db.org.name||'BIOMOTOR'),{x:M+125,y:y-6,size:13,font:B,color:blk});pg.drawText(fcTx('Sport Nutrition'),{x:M+125,y:y-22,size:9,font:F,color:grey});y-=44;pg.drawRectangle({x:M,y,width:W-2*M,height:2.5,color:red});y-=28;
+  tx('DIET PLAN',M,17,B,red);tx(p.title,M,12,B);tx([a.name,a.sport,a.position].filter(Boolean).join('  |  '),M,10,F,grey);tx(`${NUT_LOAD[p.day||'mod'].split(' – ')[0]} day  |  ${fmtDate(today())}  |  Prepared by ${p.by||''}`,M,9,F,grey);y-=6;
+  const T=nutPlanTarget(p),tot=nutSum(p.meals.flatMap(m=>m.items));tx(`Day total: ${Math.round(tot.kcal)} kcal  |  Protein ${Math.round(tot.p)} g  |  Carbohydrate ${Math.round(tot.c)} g  |  Fat ${Math.round(tot.f)} g  |  Iron ${tot.fe.toFixed(1)} mg  |  Calcium ${Math.round(tot.ca)} mg`,M,9.5,B);
+  if(T)tx(`Target: ${T.kcal} kcal  |  Protein ${T.p} g  |  Carbohydrate ${T.c} g  |  Fat ${T.f} g`,M,9.5,F,grey);y-=8;
+  for(const m of p.meals){if(y<120)np();pg.drawRectangle({x:M,y:y-4,width:W-2*M,height:18,color:rgb(.95,.95,.96)});pg.drawText(fcTx(`${m.time?m.time+'  ':''}${m.name}`),{x:M+6,y:y+1,size:11,font:B,color:blk});const s=nutSum(m.items);pg.drawText(fcTx(`${Math.round(s.kcal)} kcal  P ${Math.round(s.p)}  C ${Math.round(s.c)}  F ${Math.round(s.f)}`),{x:W-M-170,y:y+1,size:9,font:F,color:grey});y-=22;
+   for(const it of m.items){const f=nutFood(it.f);if(!f)continue;tx(`-  ${it.q!==1?it.q+' x ':''}${f[1]} (${f[2]})  -  ${Math.round(f[3]*it.q)} kcal, P ${(f[4]*it.q).toFixed(0)} g`,M+10,9.5)}if(m.note)tx('Note: '+m.note,M+10,9,F,grey);y-=4}
+  if(p.notes){y-=4;tx('Notes',M,11,B);String(p.notes).split('\n').forEach(l=>{let line='';l.split(/\s+/).forEach(w=>{const t=line?line+' '+w:w;if(F.widthOfTextAtSize(fcTx(t),9.5)>W-2*M-10){tx(line,M+6,9.5);line=w}else line=t});if(line)tx(line,M+6,9.5)})}
+  pg.drawText(fcTx('Food values are approximate (IFCT 2017, USDA FoodData Central). Follow your nutritionist’s advice.'),{x:M,y:36,size:7.5,font:F,color:grey});
+  const bytes=await doc.save();const name=('Diet-plan_'+(a.name||'athlete')+'_'+(p.title||'')).replace(/[^\w.-]+/g,'_')+'.pdf';await fcDownload(bytes,name);toast('PDF ready')}catch(e){console.error(e);toast('PDF failed: '+(e.message||e))}}
+/* ---------- athlete / parent portal ---------- */
+P['my-nutrition']=()=>{nutInit();const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'My Nutrition','')+axNone(me);
+ const tabs=[['plan','My diet plan'],['log','Log meals'],['tests','Test results']];
+ const h=axHead(me,'My Nutrition','Your diet plan, meal log and nutrition test results.')+`<div class="tabs" data-ro-ok>${tabs.map(([k,l])=>`<button class="tab ${NUT.mtab===k?'on':''}" data-ro-ok onclick="NUT.mtab='${k}';render()">${l}</button>`).join('')}</div>`;
+ if(NUT.mtab==='tests'){const L=NUT_TESTS.map(t=>[t,nutHist(a.id,t.id).pop()]).filter(x=>x[1]);
+  return h+`<div class="card">${L.length?L.map(([t,r])=>{const e=nutEval(r,a);return `<div class="item" style="flex-wrap:wrap"><span><b>${esc(t.n)}</b><br><span style="font-size:18px;font-weight:800">${nutFmt(t,nutVal(r))}</span> ${nutPill(e)} <span class="muted" style="font-size:12px">${fmtDate(r.date)}</span>${e.r?`<div class="muted" style="font-size:12px">Norm: ${esc(e.r)}</div>`:''}</span></div>`}).join(''):'<p class="muted">No nutrition tests yet.</p>'}</div>`}
+ const plans=(db.nutPlans||[]).filter(p=>p.athlete===a.id&&p.status==='Published').sort((x,y)=>String(y.pubAt||y.at).localeCompare(String(x.pubAt||x.at)));
+ if(NUT.mtab==='plan'){if(!plans.length)return h+'<div class="card"><p class="muted" style="margin:0">Your nutritionist has not published a diet plan yet.</p></div>';
+  const cur=plans.find(p=>p.id===NUT.plan)||plans[0];const T=nutPlanTarget(cur),tot=nutSum(cur.meals.flatMap(m=>m.items));
+  return h+(plans.length>1?`<div class="row" data-ro-ok style="gap:6px;flex-wrap:wrap;margin-bottom:10px">${plans.map(p=>`<button class="btn sm ${p.id===cur.id?'pri':''}" data-ro-ok onclick="NUT.plan='${p.id}';render()">${esc(p.title)}</button>`).join('')}</div>`:'')+
+  `<div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><div><h3 style="margin:0">${esc(cur.title)}</h3><div class="muted" style="font-size:13px">${esc(NUT_LOAD[cur.day||'mod'].split(' – ')[0])} day · by ${esc(cur.by||'')}</div></div><button class="btn sm" data-ro-ok onclick="nutPdf('${cur.id}')">⬇ PDF</button></div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px">${[['Energy',tot.kcal,'kcal'],['Protein',tot.p,'g'],['Carbohydrate',tot.c,'g'],['Fat',tot.f,'g']].map(([l,v,u])=>`<div class="card" style="margin:0;background:var(--card2)"><div class="eyebrow">${l}</div><div style="font-size:22px;font-weight:800">${Math.round(v)} <span style="font-size:13px">${u}</span></div></div>`).join('')}</div></div>`+
+  cur.meals.map(m=>`<div class="card"><div class="row" style="justify-content:space-between"><b>${esc(m.name)}</b><span class="muted">${esc(m.time||'')}</span></div>${m.items.map(it=>{const f=nutFood(it.f);return f?`<div class="item" style="font-size:14px"><span>${it.q!==1?`<b>${it.q} ×</b> `:''}${esc(f[1])} <span class="muted" style="font-size:12px">${esc(f[2])}</span></span><span class="muted" style="font-size:12px">${Math.round(f[3]*it.q)} kcal</span></div>`:''}).join('')}${m.note?`<p class="muted" style="font-size:13px;margin:6px 0 0">${esc(m.note)}</p>`:''}</div>`).join('')+
+  (cur.notes?`<div class="card"><b>Notes</b><p style="white-space:pre-wrap;margin:6px 0 0">${esc(cur.notes)}</p></div>`:'')}
+ // log
+ if(!NUT.logDate)NUT.logDate=today();nutLogsLoad(a.id);const c=NUT.logs[a.id]||{rows:[]};const R=c.rows.filter(r=>r.log_date===NUT.logDate);const T=nutDayTarget(a.id,NUT.logDate);
+ const tot=nutSum(R.flatMap(nutRowItems).concat(R.filter(r=>r.data&&r.data.txt).map(r=>({txt:1,kcal:r.data.kcal}))));const em=normEmail(me.email);const fb=(db.nutFeedback||[]).filter(f=>f.athlete===a.id&&f.date===NUT.logDate);
+ const plan=plans[0];const pm=plan?plan.meals.map(m=>m.name):NUT_MEALS.filter(x=>x!=='During training');
+ return h+nutLogSetupCard()+`<div class="card" data-ro-ok><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><button class="btn sm" data-ro-ok onclick="NUT.logDate=addD(NUT.logDate,-1);render()">‹</button><input type="date" data-ro-ok style="width:auto" value="${NUT.logDate}" max="${today()}" onchange="NUT.logDate=this.value||today();render()"><button class="btn sm" data-ro-ok onclick="NUT.logDate=NUT.logDate<today()?addD(NUT.logDate,1):today();render()">›</button></div>
+ <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:2px 14px;margin-top:8px">${nutBar(tot.kcal,T&&T.kcal,'Energy','kcal')}${nutBar(tot.c,T&&T.c,'Carbohydrate','g')}${nutBar(tot.p,T&&T.p,'Protein','g')}${nutBar(tot.f,T&&T.f,'Fat','g')}</div></div>
+ ${fb.map(f=>`<div class="card" style="border:2px solid var(--accent)">💬 <b>${esc(f.by)}</b>: ${esc(f.txt)}</div>`).join('')}
+ <div class="card" data-ro-ok><h3 style="margin-top:0">Add what you ate</h3>${nutFoodDL()}<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px"><div><label>Meal</label><select id="nutLM" data-ro-ok>${pm.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div><div style="grid-column:span 2;min-width:200px"><label>Food</label><input id="nutLF" data-ro-ok list="nutFoodDL" placeholder="Type: roti, dal, banana, paneer…"></div><div><label>Servings</label><input id="nutLQ" data-ro-ok type="number" min="0.5" step="0.5" value="1"></div></div>
+ <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn pri" data-ro-ok onclick="nutLogFood('${a.id}')">+ Add food</button>${plan?`<button class="btn" data-ro-ok onclick="nutLogPlanMeal('${a.id}')">✓ Ate this meal as planned</button>`:''}</div>
+ <details style="margin-top:10px"><summary style="cursor:pointer">Food not in the list?</summary><div class="grid" style="grid-template-columns:2fr 1fr;gap:8px;margin-top:6px"><input id="nutLT" data-ro-ok placeholder="e.g. 2 pieces homemade halwa"><input id="nutLK" data-ro-ok type="number" placeholder="kcal (if known)"></div><button class="btn sm" data-ro-ok style="margin-top:6px" onclick="nutLogText('${a.id}')">+ Add</button></details></div>
+ <div class="card" data-ro-ok><h3 style="margin-top:0">${fmtDate(NUT.logDate)}</h3>${R.length?R.map(r=>`<div class="item"><span><b>${esc(r.meal)}</b>: ${esc(nutRowItems(r).map(it=>{const f=nutFood(it.f);return f?`${it.q!==1?it.q+' × ':''}${f[1]}`:''}).filter(Boolean).concat(r.data&&r.data.txt?[r.data.txt]:[]).join(', '))}</span>${r.email===em||!CLOUD?`<button class="btn sm ghost" data-ro-ok onclick="nutLogDel('${a.id}','${r.id}')">✕</button>`:''}</div>`).join(''):'<p class="muted">Nothing logged for this day.</p>'}</div>`};
+function nutLogFood(aid){const f=nutFoodByLabel(document.getElementById('nutLF').value);if(!f)return toast('Pick a food from the list');const q=Math.max(0.25,+document.getElementById('nutLQ').value||1);nutLogAdd(aid,{meal:document.getElementById('nutLM').value,data:{items:[{f:f[0],q}]}})}
+function nutLogText(aid){const t=document.getElementById('nutLT').value.trim();if(!t)return toast('Write what you ate');nutLogAdd(aid,{meal:document.getElementById('nutLM').value,data:{txt:t,kcal:+document.getElementById('nutLK').value||0}})}
+function nutLogPlanMeal(aid){const me=authUser();const plan=(db.nutPlans||[]).filter(p=>p.athlete===aid&&p.status==='Published').sort((x,y)=>String(y.pubAt||y.at).localeCompare(String(x.pubAt||x.at)))[0];const mn=document.getElementById('nutLM').value;const m=plan&&plan.meals.find(x=>x.name===mn);if(!m)return toast('This meal is not in your plan');nutLogAdd(aid,{meal:mn,data:{items:m.items.map(i=>({f:i.f,q:i.q})),plan:plan.id}})}
+/* ---------- navigation, Nutritionist role ---------- */
+(function(){nutInit();try{SKI.apple='<path d="M12 7c-1.5-1.5-5-1.6-6.3 1.4-1.4 3.2.3 8.3 2.8 10.6 1.3 1.2 2.4.8 3.5.3 1.1.5 2.2.9 3.5-.3 2.5-2.3 4.2-7.4 2.8-10.6C17 5.4 13.5 5.5 12 7z"/><path d="M12 7c0-2 1-3.5 3-4"/>'}catch(e){}
+ const i=NAV.findIndex(g=>g[0]==='MEDICAL');const j=i>=0?i+1:NAV.findIndex(g=>g[0]==='INSIGHTS');NAV.splice(j>=0?j:NAV.length-1,0,['NUTRITION',[['nutrition','Sport Nutrition']]]);TITLES.nutrition='Sport Nutrition';TITLES['my-nutrition']='My Nutrition';
+ try{SKMAP.nutrition='apple';SKMAP['my-nutrition']='apple';SKGRP.NUTRITION='Nutrition'}catch(e){}
+ try{const g=ATH_NAV.find(x=>x[0]==='MY TRAINING');if(g&&!g[1].some(x=>x[0]==='my-nutrition'))g[1].push(['my-nutrition','My Nutrition']);if(!PORTAL_PAGES.includes('my-nutrition'))PORTAL_PAGES.push('my-nutrition')}catch(e){}
+})();
+const NUT_PAGES=['nutrition','my-profile'];
+axNav=(function(f){return function(me){if(nutIsNut(me))return [['NUTRITION',[['nutrition','Sport Nutrition']]],['ACCOUNT',[['my-profile','Profile']]]];return f(me)}})(axNav);
+{const _r=render;render=function(){try{const me=authUser();if(nutIsNut(me)){const h=(location.hash||'').replace('#','');if(!NUT_PAGES.includes(h)&&!/^(login-|inv-|ev-|legal-)/.test(h)){history.replaceState(null,'',location.pathname+location.search+'#nutrition')}}}catch(e){}
+ const x=_r.apply(this,arguments);try{if(nutIsNut(authUser()))['gSearch','aiBtn'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none'})}catch(e){}return x}}
 /* ============ AUTO UPDATE (a new version was published → the app reloads itself when nobody is typing) ============ */
 /* BM_APP_VER must equal VERSION in sw.js – both change with every release. */
-const BM_APP_VER='biomotor-v43-2026-11-27';
+const BM_APP_VER='biomotor-v44-2026-11-27';
 var UPD={shown:false,t:null};
 function updCheck(){if(UPD.shown||!/^https?:$/.test(location.protocol)||globalThis.BIOMOTOR_NATIVE)return;
  fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=String(t).match(/VERSION\s*=\s*'([^']+)'/);if(!m||m[1]===BM_APP_VER)return;
