@@ -159,7 +159,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
 <body>
 <header>
   <div class="logo" title="Biomotor Sport &amp; Fitness · VBT"><img class="lgF" alt="Biomotor Sport &amp; Fitness"><img class="lgI" alt="Biomotor"></div>
-  <select id="langSel" title="Language" style="width:auto;margin-left:auto;margin-right:4px;padding:4px;background:transparent;color:#fff;border-color:rgba(255,255,255,.3)"><option value="en">EN</option><option value="mr">मरा</option><option value="hi">हि</option></select><button class="btn sm ghost" id="themeBtn" title="Theme: dark / light / auto" style="color:#fff;margin-right:6px">🌙</button><button class="btn sm ghost coachOnly" id="athPrev" style="color:#fff;padding:4px 6px">‹</button><div class="ath-chip" id="athChip"><span class="av" id="athAv">?</span><span id="athName">Select athlete</span><span class="chev">▾</span></div><button class="btn sm ghost coachOnly" id="athNext" style="color:#fff;padding:4px 6px">›</button>
+  <select id="langSel" hidden style="display:none"><option value="en">EN</option></select><button class="btn sm ghost" id="themeBtn" title="Theme: dark / light / auto" style="color:#fff;margin-left:auto;margin-right:6px">🌙</button><button class="btn sm ghost coachOnly" id="athPrev" style="color:#fff;padding:4px 6px">‹</button><div class="ath-chip" id="athChip"><span class="av" id="athAv">?</span><span id="athName">Select athlete</span><span class="chev">▾</span></div><button class="btn sm ghost coachOnly" id="athNext" style="color:#fff;padding:4px 6px">›</button>
 </header>
 <nav id="nav">
   <button data-tab="home">Home</button>
@@ -417,13 +417,13 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
   </div>
   <div class="card">
     <details>
-      <summary>कैसे इस्तेमाल करें / How to use</summary>
+      <summary>How to use</summary>
       <ol>
-        <li><b>Athletes</b> में athlete चुनें, <b>Workout</b> में exercises, sets, load और target velocity डालें (या template से शुरू करें).</li>
-        <li>Phone/iPad को tripod पर plate की ऊँचाई पर, बगल से (side view), 2–3 मीटर दूर रखें. पूरी plate दिखनी चाहिए.</li>
-        <li><b>Live camera</b> शुरू करें. ऊपर दाईं ओर दो indicators हैं: <b>📱 Stable</b> (phone सीधा और स्थिर) और <b>◎ Plate</b>. पीला ring = app जिस plate को track करेगा. Bar हिलते ही सबसे बड़ी चलती plate अपने-आप lock हो जाती है. चाहें तो पहले ही plate के center और edge पर tap करके Lock करें – तब पहले rep से live feedback मिलेगा.</li>
-        <li><b>“Tap to record”</b> दबाएँ, set करें, फिर दोबारा दबाकर Stop. अगर plate set के बीच में मिली तो app recording को फिर से analyse करता है (“Processing…”). फिर <b>Set review</b> खुलता है: warnings, <b>Save / Discard</b>, और <b>Next</b> (अगले set का weight).</li>
-        <li>बिना workout के एक set: <b>⚡ Quick</b>. पुराना video: <b>Load video → Analyse video</b> – plate अपने-आप मिलती है.</li>
+        <li>Pick the athlete in <b>Athletes</b>, then add exercises, sets, load and target velocity in <b>Workout</b> (or start from a template).</li>
+        <li>Place the phone / iPad on a tripod at plate height, side-on (side view), 2–3 m away. The whole plate must be visible.</li>
+        <li>Start the <b>Live camera</b>. Two indicators sit at the top right: <b>📱 Stable</b> (phone upright and still) and <b>◎ Plate</b>. The yellow ring is the plate the app will track. As soon as the bar moves, the largest moving plate locks automatically. You can also tap the plate centre and edge first and Lock it – then live feedback starts from the first rep.</li>
+        <li>Tap <b>“Tap to record”</b>, do the set, then tap again to Stop. If the plate was found in the middle of the set, the app re-analyses the recording (“Processing…”). Then <b>Set review</b> opens: warnings, <b>Save / Discard</b> and <b>Next</b> (next set's weight).</li>
+        <li>A single set without a workout: <b>⚡ Quick</b>. An old video: <b>Load video → Analyse video</b> – the plate is found automatically.</li>
         <li>Left toolbar: plate size, feedback (Read / Target / Loss · M Vel / P Vel / ROM / Power), eccentric tempo, camera flip, zoom, recording on/off.</li>
       </ol>
     </details>
@@ -506,7 +506,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
 <section class="tab guide" id="tab-guide">
   <div class="card">
     <h2>Recording a set</h2>
-    <p class="muted" style="margin-top:0">Phone side-on to the bar, wait for two green indicators, record. / Phone को bar के बगल में रखें, दोनों indicators हरे होने दें, फिर record करें.</p>
+    <p class="muted" style="margin-top:0">Phone side-on to the bar, wait for two green indicators, record.</p>
     <h3>Quick set</h3>
     <ol><li>Track → <b>⚡ Quick set</b> → exercise and weight → <b>Add</b>.</li><li>Start the camera and aim at the bar from the side.</li><li>Wait for <b>📱 Stable</b> (phone upright and still) and <b>◎ Plate</b> (plate seen at a good size).</li><li>Tap <b>Tap to record</b>, do the set, tap again to stop. The <b>set review</b> opens: Save, Discard or Next.</li></ol>
     <h3>Inside a workout</h3>
@@ -747,9 +747,9 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
     </ul>
   </div>
   <div class="card">
-    <h2>Language, charts grid, set planning</h2>
+    <h2>Charts grid, set planning</h2>
     <ul>
-      <li><b>Language</b>: EN / मरा / हि in the header switches the main buttons, tabs and headings to Marathi or Hindi (it follows the phone's language the first time). Guide text and numbers stay as they are.</li>
+      
       <li><b>Home → Grid</b>: weight, 1RM, power and performance index charts side by side for the chosen exercise.</li>
       <li><b>Pre-set planning</b>: ☰ in a tracked exercise table → Planned RPE – plan target reps and RPE before you record; the rating sheet after Stop shows the plan.</li>
       <li>Free coach mode: switch Coach Mode on with no paid plan – team management and invites for up to 2 athletes (Athletes → Membership).</li>
@@ -2001,44 +2001,11 @@ async function wakeLock() { try { if (DB.settings.awake === false) { if (WL) { a
 function applyTextSize() { let st = $('#tsStyle'); if (!st) { st = document.createElement('style'); st.id = 'tsStyle'; document.head.appendChild(st); } const z = (DB.settings.textPct || 100) / 100; st.textContent = z === 1 ? '' : `section.tab:not(#tab-track):not(#tab-detail) > .card, #nav, .mbox { zoom: ${z} }`; }
 function applyTheme() { const L = DB.settings.theme === 'light' || (DB.settings.theme === 'auto' && matchMedia('(prefers-color-scheme: light)').matches);
   document.documentElement.classList.toggle('light', L); Object.assign(DARK, L ? LIGHTC : DARK0); $('#themeBtn').textContent = DB.settings.theme === 'light' ? '☀' : DB.settings.theme === 'auto' ? '◐' : '🌙'; }
-/* ================= language (English / मराठी / हिन्दी) – exact-text translation of the interface ================= */
-const I18N = {
-  'Home': ['होम', 'होम'], 'Athletes': ['खेळाडू', 'खिलाड़ी'], 'Workout': ['वर्कआउट', 'वर्कआउट'], 'Track': ['ट्रॅक', 'ट्रैक'], 'Progress': ['प्रगती', 'प्रगति'],
-  'Videos': ['व्हिडिओ', 'वीडियो'], 'Report': ['रिपोर्ट', 'रिपोर्ट'], 'Guide': ['मार्गदर्शक', 'गाइड'],
-  'Last 4 weeks': ['मागील ४ आठवडे', 'पिछले 4 हफ्ते'], 'All history ›': ['सर्व इतिहास ›', 'पूरा इतिहास ›'], 'All history': ['सर्व इतिहास', 'पूरा इतिहास'],
-  'Weight': ['वजन', 'वज़न'], 'Power': ['पॉवर', 'पावर'], 'Perf. index': ['परफॉर्मन्स इंडेक्स', 'परफॉर्मेंस इंडेक्स'],
-  'Single': ['एक', 'एक'], 'Grid': ['ग्रिड', 'ग्रिड'],
-  'Start a workout': ['वर्कआउट सुरू करा', 'वर्कआउट शुरू करें'], '＋ Start an empty workout': ['＋ रिकामा वर्कआउट सुरू करा', '＋ खाली वर्कआउट शुरू करें'],
-  '👥 Start a team workout': ['👥 टीम वर्कआउट सुरू करा', '👥 टीम वर्कआउट शुरू करें'], 'From a program': ['प्रोग्राममधून', 'प्रोग्राम से'],
-  'Repeat a past workout': ['मागील वर्कआउट पुन्हा करा', 'पिछला वर्कआउट दोहराएँ'], 'History': ['इतिहास', 'इतिहास'], 'Programs': ['प्रोग्राम्स', 'प्रोग्राम'],
-  '＋ Create a program': ['＋ प्रोग्राम बनवा', '＋ प्रोग्राम बनाएँ'], '📚 Program library': ['📚 प्रोग्राम लायब्ररी', '📚 प्रोग्राम लाइब्रेरी'], '📚 Library': ['📚 लायब्ररी', '📚 लाइब्रेरी'],
-  '🔗 Add from link': ['🔗 लिंकवरून जोडा', '🔗 लिंक से जोड़ें'], '🏁 Finish workout': ['🏁 वर्कआउट संपवा', '🏁 वर्कआउट पूरा करें'],
-  '＋ Add exercises': ['＋ व्यायाम जोडा', '＋ व्यायाम जोड़ें'], '＋ Add more exercises': ['＋ आणखी व्यायाम जोडा', '＋ और व्यायाम जोड़ें'], '＋ Add set': ['＋ सेट जोडा', '＋ सेट जोड़ें'],
-  'Save': ['सेव्ह', 'सेव'], 'Cancel': ['रद्द', 'रद्द करें'], 'Delete': ['डिलीट', 'हटाएँ'], 'Close': ['बंद', 'बंद करें'], 'Done': ['पूर्ण', 'पूरा'], 'Start': ['सुरू', 'शुरू'],
-  'Start workout': ['वर्कआउट सुरू', 'वर्कआउट शुरू'], '↻ Repeat': ['↻ पुन्हा', '↻ दोहराएँ'],
-  'Coach': ['कोच', 'कोच'], 'Coach Mode': ['कोच मोड', 'कोच मोड'], 'Roster': ['रोस्टर', 'रोस्टर'], 'Team leaderboard': ['टीम लीडरबोर्ड', 'टीम लीडरबोर्ड'],
-  '💳 Membership': ['💳 सदस्यत्व', '💳 सदस्यता'], 'Add an athlete': ['खेळाडू जोडा', 'खिलाड़ी जोड़ें'], '📋 Bulk import': ['📋 एकत्र इम्पोर्ट', '📋 एक साथ इम्पोर्ट'],
-  '👤 My training profile': ['👤 माझे ट्रेनिंग प्रोफाइल', '👤 मेरी ट्रेनिंग प्रोफ़ाइल'], 'Edit': ['बदला', 'बदलें'],
-  'Workout summary': ['वर्कआउट सारांश', 'वर्कआउट सारांश'], 'Save workout only': ['फक्त वर्कआउट सेव्ह करा', 'सिर्फ़ वर्कआउट सेव करें'],
-  'Save workout & create program': ['सेव्ह करा व प्रोग्राम बनवा', 'सेव करें और प्रोग्राम बनाएँ'], 'Save workout & update program': ['सेव्ह करा व प्रोग्राम अपडेट करा', 'सेव करें और प्रोग्राम अपडेट करें'],
-  'Exercise library': ['व्यायाम लायब्ररी', 'व्यायाम लाइब्रेरी'], 'Add exercises': ['व्यायाम जोडा', 'व्यायाम जोड़ें'], '＋ Create new exercise': ['＋ नवीन व्यायाम बनवा', '＋ नया व्यायाम बनाएँ'],
-  '⚙ Training preferences': ['⚙ ट्रेनिंग सेटिंग्ज', '⚙ ट्रेनिंग सेटिंग्स'], '▸ Show profile': ['▸ प्रोफाइल दाखवा', '▸ प्रोफ़ाइल दिखाएँ'], '▾ Hide profile': ['▾ प्रोफाइल लपवा', '▾ प्रोफ़ाइल छिपाएँ'],
-  'Apply zone…': ['झोन लावा…', 'ज़ोन लगाएँ…'], 'Target m/s': ['लक्ष्य m/s', 'लक्ष्य m/s'], 'Reps': ['रेप्स', 'रेप्स'], 'Sets': ['सेट्स', 'सेट'],
-  'Tonnage': ['टनेज', 'टनेज'], 'Workouts': ['वर्कआउट्स', 'वर्कआउट'], 'Training days': ['ट्रेनिंग दिवस', 'ट्रेनिंग दिन'], 'Week streak': ['आठवड्यांची साखळी', 'हफ़्तों की लय'],
-  'Record': ['रेकॉर्ड', 'रिकॉर्ड'], 'Stop': ['थांबवा', 'रोकें'], 'Feedback': ['फीडबॅक', 'फीडबैक'], 'Tempo': ['टेम्पो', 'टेम्पो'],
-  '☑ Select': ['☑ निवडा', '☑ चुनें'], '💾 Storage details': ['💾 स्टोरेज माहिती', '💾 स्टोरेज जानकारी'], '⚙ Video settings': ['⚙ व्हिडिओ सेटिंग्ज', '⚙ वीडियो सेटिंग्स'],
-  'Select all': ['सर्व निवडा', 'सब चुनें'], '📤 Share video': ['📤 व्हिडिओ शेअर करा', '📤 वीडियो शेयर करें'], '⬇ Export to camera roll': ['⬇ फोनमध्ये सेव्ह करा', '⬇ फ़ोन में सेव करें'], '⬇ Save original video': ['⬇ मूळ व्हिडिओ सेव्ह करा', '⬇ मूल वीडियो सेव करें'], '📤 Share overlay video': ['📤 ओव्हरले व्हिडिओ शेअर करा', '📤 ओवरले वीडियो शेयर करें'],
-  '🎬 Export with overlay': ['🎬 ओव्हरलेसह एक्सपोर्ट', '🎬 ओवरले के साथ एक्सपोर्ट'], 'Set review': ['सेट आढावा', 'सेट समीक्षा'],
-  '✓ Save': ['✓ सेव्ह', '✓ सेव'], 'Next ›': ['पुढे ›', 'आगे ›'], '🗑 Discard set data': ['🗑 सेट डेटा काढा', '🗑 सेट डेटा हटाएँ'],
-  '📄 Download PDF': ['📄 PDF डाउनलोड', '📄 PDF डाउनलोड'], '⬇ Export data (CSV)': ['⬇ डेटा एक्सपोर्ट (CSV)', '⬇ डेटा एक्सपोर्ट (CSV)'],
-  'Performance': ['परफॉर्मन्स', 'परफॉर्मेंस'], 'Recording a set': ['सेट रेकॉर्ड करणे', 'सेट रिकॉर्ड करना'], 'Training metrics': ['ट्रेनिंग मेट्रिक्स', 'ट्रेनिंग मेट्रिक्स'],
-  'This athlete': ['हा खेळाडू', 'यह खिलाड़ी'], 'All athletes': ['सर्व खेळाडू', 'सभी खिलाड़ी'], 'Last 7 days': ['मागील ७ दिवस', 'पिछले 7 दिन'], 'Last 30 days': ['मागील ३० दिवस', 'पिछले 30 दिन'],
-  'Everything': ['सर्व', 'सब कुछ'], 'This workout': ['हा वर्कआउट', 'यह वर्कआउट'], 'Rest': ['विश्रांती', 'आराम'] };
-const LANGS = [['en', 'EN'], ['mr', 'मरा'], ['hi', 'हि']];
-const I18N_PH = { 'Search athletes': ['खेळाडू शोधा', 'खिलाड़ी खोजें'], 'Search exercises': ['व्यायाम शोधा', 'व्यायाम खोजें'], 'Workout name': ['वर्कआउटचे नाव', 'वर्कआउट का नाम'],
-  'Type to add an exercise – e.g. back squat 3x5 @ 100': ['व्यायाम टाइप करा – उदा. back squat 3x5 @ 100', 'व्यायाम टाइप करें – जैसे back squat 3x5 @ 100'],
-  'Search exercise or workout name': ['व्यायाम किंवा वर्कआउटचे नाव शोधा', 'व्यायाम या वर्कआउट का नाम खोजें'], 'Search by exercise or athlete name': ['व्यायाम किंवा खेळाडूचे नाव शोधा', 'व्यायाम या खिलाड़ी का नाम खोजें'] };
-const langIdx = () => ({ mr: 0, hi: 1 })[DB.settings.lang];
+/* ================= language: English only (Marathi / Hindi removed) ================= */
+const I18N = {};
+const LANGS = [['en', 'EN']];
+const I18N_PH = {};
+const langIdx = () => undefined;
 const enOf = new WeakMap(), phOf = new WeakMap();
 function trNode(root) { const li = langIdx();
   const W = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentNode && /SCRIPT|STYLE|TEXTAREA/.test(n.parentNode.nodeName) ? 2 : 1 }); let n;
@@ -4770,8 +4737,8 @@ $('#demoBtn').onclick = () => { if (DB.athletes.some(a => a.name === 'Demo Athle
   window.showOnboarding = () => { obI = 0; obShow(); $('#obModal').classList.add('on'); };
   if (!DB.settings.onboarded && !location.hash && !navigator.webdriver) setTimeout(() => { if (!DB.settings.onboarded) window.showOnboarding(); }, 500);
   applyTheme(); applyTextSize(); wakeLock(); document.addEventListener('visibilitychange', wakeLock); document.addEventListener('click', () => { if (!WL) wakeLock(); }, { once: true }); swipeDel('#wHist', 'data-w', delWorkoutById); swipeDel('#hList', 'data-hopen', delWorkoutById);
-  if (!DB.settings.lang) { const nl = (navigator.language || '').slice(0, 2); if (nl === 'mr' || nl === 'hi') DB.settings.lang = nl; }
-  $('#langSel').value = DB.settings.lang || 'en'; $('#langSel').onchange = e => { DB.settings.lang = e.target.value; save(); applyLang(); };
+  DB.settings.lang = 'en';
+  $('#langSel').value = DB.settings.lang || 'en'; 
   trObs.observe(document.body, { childList: true, subtree: true, characterData: true }); if (DB.settings.lang && DB.settings.lang !== 'en') applyLang();
   if (location.hash.startsWith('#join=')) setTimeout(() => openCloudJoin(location.hash.slice(6)), 300);
   $('#cjX').onclick = () => $('#cjModal').classList.remove('on');
