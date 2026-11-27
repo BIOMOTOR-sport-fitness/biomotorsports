@@ -7172,7 +7172,7 @@ function lmCharts(m){const d42=Array.from({length:42},(_,i)=>addD(m.d,i-41));con
 /* ---------- staff page ---------- */
 P.load=()=>{lmInit();const me=authUser();const ed=lmEdit(me);const L=nutAthletes();if(!L.some(a=>a.id===LM.aid))LM.aid=L[0]?L[0].id:'';const a=byId('athletes',LM.aid);
  const tabs=[['team','Team dashboard'],['ath','Athlete'],['tpl','Formulas & templates'],['norms','Norms & references']];
- const pick=`<select data-ro-ok style="width:auto;min-width:200px" onchange="LM.aid=this.value;render()">${L.map(x=>`<option value="${x.id}" ${x.id===LM.aid?'selected':''}>${esc(x.name)}${x.sport?' · '+esc(x.sport):''}${lmYouth(x)?' · U18':''}</option>`).join('')}</select>`;
+ const pick=athPick(`<select data-ro-ok style="width:auto;min-width:200px" onchange="LM.aid=this.value;render()">${L.map(x=>`<option value="${x.id}" ${x.id===LM.aid?'selected':''}>${esc(x.name)}${x.sport?' · '+esc(x.sport):''}${lmYouth(x)?' · U18':''}</option>`).join('')}</select>`);
  let body='';try{body=LM.tab==='team'?lmTeam(ed):LM.tab==='tpl'?lmTplPage():LM.tab==='norms'?lmNormsPage():!a?'<div class="card"><p class="muted">Add athletes first.</p></div>':lmAthPage(a,ed)}catch(e){console.error(e);body=`<div class="card"><p class="muted">Could not show this tab: ${esc(e.message||e)}</p></div>`}
  return head('Load','Load Monitoring','Session-RPE load, ACWR, monotony, strain and wellness – early warning for overreaching and overtraining, sport-specific and age-specific.',(LM.tab==='ath'?pick:'')+(ed?` <button class="btn pri" onclick="lmTeamSession()">+ Log team session</button>`:''))+
  `<div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${LM.tab===k?'on':''}" data-ro-ok onclick="LM.tab='${k}';render()">${l}</button>`).join('')}</div>`+body};
@@ -7767,7 +7767,7 @@ function athPickK(e,inp){const r=inp.parentNode.querySelector('.apr');const bs=[
 function athPickGo(b){const box=b.closest('.athpick'),sel=box.querySelector('select');sel.value=b.dataset.v;sel.dispatchEvent(new Event('change',{bubbles:true}))}
 /* ============ AUTO UPDATE (a new version was published → the app reloads itself when nobody is typing) ============ */
 /* BM_APP_VER must equal VERSION in sw.js – both change with every release. */
-const BM_APP_VER='biomotor-v56-2026-11-27';
+const BM_APP_VER='biomotor-v57-2026-11-27';
 var UPD={shown:false,t:null};
 function updCheck(){if(UPD.shown||!/^https?:$/.test(location.protocol)||globalThis.BIOMOTOR_NATIVE)return;
  fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=String(t).match(/VERSION\s*=\s*'([^']+)'/);if(!m||m[1]===BM_APP_VER)return;
