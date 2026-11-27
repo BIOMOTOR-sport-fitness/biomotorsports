@@ -1322,6 +1322,7 @@ P['speed-log']=()=>{const aths=db.athletes.filter(a=>a.status!=='Inactive');cons
  const R=aths.map(a=>({a,r:RS().show?readiness(a.id):{st:'No data',sig:[]}}));
  return `<div class="muted"><span style="color:var(--accent)">Training</span> / Speed Log</div><h2 style="font-size:34px;margin:6px 0">Speed Log</h2>
  <p class="muted">Time sprints with a stopwatch or video, import timing-gate, Freelap or GPS files, and track bests. Times are compared only within the same drill, distance and kind of timing, so hand times are never mixed with electronic times. Targets are 95% of each athlete's best.</p>
+ ${sprCard()}
  <div class="card"><div class="form" style="grid-template-columns:2fr 1fr 1fr"><div><label>Drill</label><select onchange="sl.drill=this.value;const d=DRILLS.find(x=>x[0]===this.value);sl.dist=d&&d[1]!==''?dTo(d[1]):'';render()">${DRILLS.map(([d])=>`<option ${sl.drill===d?'selected':''}>${d}</option>`).join('')}</select></div>
  <div><label>Timed distance (${u})</label><input type="number" step="0.1" value="${isC?'':esc(sl.dist)}" ${isC?'disabled placeholder="course"':''} onchange="sl.dist=+this.value"></div>
  <div><label>Units</label><select onchange="const v=dFrom(+sl.dist);db.meta.spUnit=this.value;save();sl.dist=dTo(v);render()"><option ${u==='m'?'selected':''}>m</option><option ${u==='yd'?'selected':''}>yd</option></select></div></div>
@@ -7765,9 +7766,147 @@ function athPickK(e,inp){const r=inp.parentNode.querySelector('.apr');const bs=[
  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();i=(i+(e.key==='ArrowDown'?1:-1)+bs.length)%bs.length;bs.forEach((b,j)=>{b.dataset.on=j===i?'1':'';b.style.background=j===i?'var(--card2)':'none'});bs[i].scrollIntoView({block:'nearest'})}
  else if(e.key==='Enter'){e.preventDefault();athPickGo(bs[i])}else if(e.key==='Escape'){r.style.display='none'}}
 function athPickGo(b){const box=b.closest('.athpick'),sel=box.querySelector('select');sel.value=b.dataset.v;sel.dispatchEvent(new Event('change',{bubbles:true}))}
+/* ============ SPEED LOG – PDF SPEED REPORT (athlete version + coach version) ============
+   Per athlete: bests per drill / distance / timing kind, max velocity, momentum, trends, consistency (CV %),
+   high-speed exposures (>= 90 % Vmax), team ranking / percentile, interpretation, recommendations, coach notes, charts.
+   References: Haugen & Buchheit 2016; Hopkins 2000; Malone et al. 2017; Haugen, Seiler, Sandbakk & Tønnessen 2019. */
+var SPRP={aid:'',days:'365'};
+const SPR_REF=['Haugen T, Buchheit M. Sprint running performance monitoring: methodological and practical considerations. Sports Med 2016;46:641-656.',
+ 'Hopkins WG. Measures of reliability in sports medicine and science. Sports Med 2000;30:1-15 (smallest worthwhile change = 0.2 x between-athlete SD).',
+ 'Malone S, Roe M, Doran DA, Gabbett TJ, Collins KD. High chronic training loads and exposure to bouts of maximal velocity running reduce injury risk in elite Gaelic football. J Sci Med Sport 2017;20:250-254.',
+ 'Haugen T, Seiler S, Sandbakk O, Tonnessen E. The training and development of elite sprint performance: an integration of scientific and best practice literature. Sports Med Open 2019;5:44.'];
+const sprIsV=s=>spDrill(s)==='Flying Sprint'||tcls(s.method)==='gps'||/GPS|velocity/i.test(spDrill(s));
+const sprGps=k=>k.split('|')[2]==='gps';
+function sprMean(a){return a.length?a.reduce((s,x)=>s+x,0)/a.length:NaN}
+function sprSd(a){if(a.length<2)return NaN;const m=sprMean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1))}
+function sprData(aid,days){const a=byId('athletes',aid);if(!a)return null;const from=days&&days!=='all'?daysAgo(+days):'0000';
+ const all=(db.speed||[]).filter(s=>s.athlete===aid&&spSpeed(s)>0).sort((x,y)=>(x.date+(x.t||0)).localeCompare(y.date+(y.t||0)));const R=all.filter(s=>s.date>=from);
+ const keys=[...new Set(R.map(spKey))].sort((x,y)=>R.filter(s=>spKey(s)===y).length-R.filter(s=>spKey(s)===x).length);
+ const K=keys.map(k=>{const rs=R.filter(s=>spKey(s)===k);const gps=sprGps(k);const best=rs.reduce((b,s)=>spSpeed(s)>spSpeed(b)?s:b,rs[0]);const last=rs.at(-1);
+  const dates=[...new Set(rs.map(s=>s.date))];const ses=dates.map(d=>{const z=rs.filter(s=>s.date===d);const v=z.map(spSpeed);const b=z.reduce((p,s)=>spSpeed(s)>spSpeed(p)?s:p,z[0]);const m=sprMean(v),sd=sprSd(v);return {d,n:z.length,best:b,v:Math.max(...v),cv:z.length>1&&m?sd/m*100:NaN}});
+  const lastS=ses.at(-1),firstS=ses[0];const pctLast=lastS.v/spSpeed(best)*100;const chg=ses.length>1?(lastS.v-firstS.v)/firstS.v*100:NaN;
+  const cvs=ses.map(x=>x.cv).filter(isFinite);const cv=cvs.length?sprMean(cvs):NaN;
+  // trend: linear regression of session-best speed against days → % per 4 weeks
+  let slope=NaN;if(ses.length>=3){const t0=new Date(ses[0].d);const X=ses.map(x=>(new Date(x.d)-t0)/864e5),Y=ses.map(x=>x.v);const mx=sprMean(X),my=sprMean(Y);const den=X.reduce((s,x)=>s+(x-mx)**2,0);if(den>0)slope=X.reduce((s,x,i)=>s+(x-mx)*(Y[i]-my),0)/den*28/my*100}
+  // team comparison: each athlete's best on the same key in the same window
+  const team=[...new Set((db.speed||[]).filter(s=>spKey(s)===k&&s.date>=from&&spSpeed(s)>0&&byId('athletes',s.athlete)).map(s=>s.athlete))].map(id=>({id,v:Math.max(...db.speed.filter(s=>s.athlete===id&&spKey(s)===k&&s.date>=from).map(spSpeed))})).sort((x,y)=>y.v-x.v);
+  const rank=team.findIndex(t=>t.id===aid)+1;const pctile=team.length>1?Math.round((team.length-rank)/(team.length-1)*100):null;const tsd=team.length>=3?sprSd(team.map(t=>t.v)):NaN;
+  const swcPct=isFinite(tsd)?0.2*tsd/spSpeed(best)*100:1.0;
+  return {k,lbl:keyLbl(k),gps,rs,best,last,ses,pctLast,chg,cv,slope,team,rank,pctile,swcPct,tgt:gps?spSpeed(best)*.95:(+best.time/0.95)}});
+ const V=all.filter(sprIsV);const vmax=V.length?Math.max(...V.map(spSpeed)):0;const vmaxRec=V.find(s=>spSpeed(s)===vmax);const mass=bw(aid)||0;
+ // weekly exposures (last 12 weeks): reps, reps >= 90 % of Vmax (flying / GPS only)
+ const wk0=addD(wkStart(),-77);const weeks=[];for(let i=0;i<12;i++){const ws=addD(wk0,i*7),we=addD(ws,6);const z=all.filter(s=>s.date>=ws&&s.date<=we);weeks.push({ws,n:z.length,hi:vmax?z.filter(s=>sprIsV(s)&&spSpeed(s)>=vmax*.9).length:0})}
+ const notes=(db.spNotes||[]).filter(n=>n.athlete===aid).slice(-6);
+ return {a,R,all,K,vmax,vmaxRec,mass,mom:vmax&&mass?mass*vmax:0,weeks,notes,from,sessions:[...new Set(R.map(s=>s.date))].length}}
+function sprAdvice(D){const I=[],Rc=[];if(!D||!D.R.length)return {I:['No sprint data in this period.'],R:['Record at least one test session (e.g. 10 m, 20 m and a flying 20 m) with the same timing method each time.']};
+ D.K.slice(0,6).forEach(x=>{const nm=x.lbl;const p=x.pctLast;
+  I.push(`${nm}: best ${x.gps?spdTxt(spSpeed(x.best)):(+x.best.time).toFixed(2)+' s ('+spSpeed(x.best).toFixed(2)+' m/s)'} on ${fmtDate(x.best.date)}. Latest session ${Math.round(p)} % of best – ${p>=97?'at or near best':p>=93?'slightly below best':'well below best (check fatigue, readiness or test conditions)'}.`+
+   (isFinite(x.slope)?` Trend ${x.slope>=0?'+':''}${x.slope.toFixed(1)} % speed per 4 weeks (${Math.abs(x.slope)<x.swcPct?'stable – inside the smallest worthwhile change':x.slope>0?'improving':'declining'}).`:'')+
+   (isFinite(x.cv)?` Rep-to-rep variation ${x.cv.toFixed(1)} % (${x.cv<2?'consistent':x.cv<4?'moderate':'high – standardise start, warm-up and timing'}).`:'')+
+   (x.pctile!=null?` Team rank ${x.rank} of ${x.team.length} (percentile ${x.pctile}).`:''))});
+ const lowDrop=D.K.filter(x=>x.pctLast<93);const dec=D.K.filter(x=>isFinite(x.slope)&&x.slope<0&&Math.abs(x.slope)>=x.swcPct);const hiCv=D.K.filter(x=>isFinite(x.cv)&&x.cv>=4);
+ if(!D.vmax)Rc.push('Add a flying 10–20 m sprint (or GPS top speed) to measure maximal velocity – it is needed for high-speed exposure monitoring.');
+ else{const last2=D.weeks.slice(-2).reduce((s,w)=>s+w.hi,0);if(last2<2)Rc.push(`Only ${last2} exposure(s) at >= 90 % of max velocity (${spdTxt(D.vmax*.9)}) in the last 2 weeks – plan 1–2 short max-velocity exposures per week (e.g. 2–4 x flying 20–30 m with full recovery). Regular maximal-velocity exposure is associated with lower hamstring injury risk (Malone et al. 2017).`);
+  else Rc.push(`Good high-speed exposure in the last 2 weeks (${last2} reps >= 90 % Vmax). Keep 1–2 max-velocity exposures per week.`)}
+ if(dec.length||lowDrop.length)Rc.push(`Speed below the usual level in ${[...new Set([...dec,...lowDrop].map(x=>x.lbl))].join(', ')}: check load, sleep and soreness, keep sprints high-quality with full recovery (about 2–4 min between maximal efforts) and avoid sprinting when fatigued.`);
+ if(hiCv.length)Rc.push('High variation between reps: use the same warm-up (RAMP), start position, surface and timing method; take the best of 2–3 reps.');
+ const acc=D.K.find(x=>/10m|Acceleration|5 m|10 m/i.test(x.k)&&x.pctile!=null),mv=D.K.find(x=>(/Flying|GPS|Max Velocity/i.test(x.k))&&x.pctile!=null);
+ if(acc&&mv){if(acc.pctile+25<=mv.pctile)Rc.push('Acceleration is weaker than max velocity relative to the team: emphasise acceleration (resisted / sled sprints, 5–20 m starts, horizontal force strength).');else if(mv.pctile+25<=acc.pctile)Rc.push('Max velocity is weaker than acceleration relative to the team: add flying sprints, wicket runs and sprint-technique work at upright posture.')}
+ if(D.R.length&&D.R.every(s=>tcls(s.method)==='hand'))Rc.push('All times are hand-timed. Hand timing is less precise than timing gates (Haugen & Buchheit 2016) – use gates or video for test days.');
+ if(D.mom)I.push(`Sprint momentum (body mass x max velocity) = ${Math.round(D.mom)} kg·m/s (${D.mass} kg x ${D.vmax.toFixed(2)} m/s) – relevant for collision sports.`);
+ if(!Rc.length)Rc.push('Keep testing every 4–6 weeks under the same conditions to track progress.');
+ return {I,R:Rc}}
+/* ---------- on-page card ---------- */
+function sprCard(){const me=authUser();const po=typeof portalUser==='function'&&portalUser(me);const ro=typeof roUser==='function'&&roUser(me);
+ const L=(po&&typeof axMine==='function'?axMine(me):db.athletes.filter(a=>a.status!=='Inactive')).filter(Boolean);if(!L.some(a=>a.id===SPRP.aid))SPRP.aid=(L.find(a=>a.id===sl.ath)||L[0]||{}).id||'';
+ const sel=`<select data-ro-ok style="width:auto;min-width:200px" onchange="SPRP.aid=this.value;render()">${L.map(x=>`<option value="${x.id}" ${x.id===SPRP.aid?'selected':''}>${esc(x.name)}${x.sport?' · '+esc(x.sport):''}</option>`).join('')}</select>`;
+ const D=SPRP.aid?sprData(SPRP.aid,SPRP.days):null;
+ const tile=(l,v,s)=>`<div style="background:var(--card2);border-radius:12px;padding:10px 12px"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">${l}</div><div style="font-size:20px;font-weight:800">${v}</div>${s?`<div class="muted" style="font-size:11px">${s}</div>`:''}</div>`;
+ const N=(db.spNotes||[]).filter(n=>n.athlete===SPRP.aid).slice(-3);
+ return `<div class="card" data-ro-ok id="sprCard"><div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><h3 style="margin:0">📄 Speed report (PDF)</h3><div class="muted" style="font-size:13px">Charts, bests, max velocity, trends, high-speed exposures, team comparison, interpretation and recommendations.</div></div></div>
+ <div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0">${L.length>1?athPick(sel):sel}<select data-ro-ok style="width:auto" onchange="SPRP.days=this.value;render()">${[['30','Last 30 days'],['90','Last 90 days'],['365','Last 12 months'],['all','All data']].map(([v,l])=>`<option value="${v}" ${SPRP.days===v?'selected':''}>${l}</option>`).join('')}</select></div>
+ ${D?`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px">${tile('Sprint reps',D.R.length,D.sessions+' sessions')}${tile('Max velocity',D.vmax?D.vmax.toFixed(2)+' m/s':'—',D.vmax?(D.vmax*3.6).toFixed(1)+' km/h':'needs flying / GPS')}${tile('Drills',D.K.length,'')}${D.K[0]?tile('Main drill best',D.K[0].gps?spdTxt(spSpeed(D.K[0].best)):(+D.K[0].best.time).toFixed(2)+' s',esc(D.K[0].lbl)):''}${tile('Momentum',D.mom?Math.round(D.mom):'—',D.mom?'kg·m/s':'needs body mass')}</div>`:''}
+ <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn pri" data-ro-ok onclick="sprPdf(SPRP.aid,'athlete')">⬇ Athlete report</button>${ro?'':`<button class="btn" data-ro-ok onclick="sprPdf(SPRP.aid,'coach')">⬇ Coach report</button>`}</div>
+ ${ro?'':`<details style="margin-top:10px"><summary class="muted" style="cursor:pointer;font-size:13px">Coach note for this athlete (printed in both reports)${N.length?' · '+N.length+' saved':''}</summary>
+ ${N.map(n=>`<div style="font-size:13px;margin:6px 0;border-left:3px solid var(--accent);padding-left:8px"><b>${fmtDate(n.date)}</b> ${esc(n.by||'')}: ${esc(n.txt)} <a href="javascript:void 0" onclick="sprNoteDel('${n.id}')" class="muted">delete</a></div>`).join('')}
+ <textarea id="sprNote" rows="2" placeholder="e.g. Good acceleration mechanics; work on upright posture at max velocity." style="margin-top:6px"></textarea><button class="btn sm" style="margin-top:6px" onclick="sprNoteAdd()">Save note</button></details>`}</div>`}
+function sprNoteAdd(){const t=(document.getElementById('sprNote')||{}).value||'';if(!t.trim()||!SPRP.aid)return;db.spNotes=db.spNotes||[];const me=authUser()||{};db.spNotes.push({id:uid('spn'),athlete:SPRP.aid,date:today(),txt:t.trim(),by:me.name||''});save();render();toast('Note saved')}
+function sprNoteDel(id){db.spNotes=(db.spNotes||[]).filter(n=>n.id!==id);save();render()}
+/* ---------- PDF ---------- */
+async function sprPdf(aid,ver){const D=sprData(aid,SPRP.days);if(!D){toast('Pick an athlete');return}if(!D.R.length){toast('No sprint data for this athlete in this period');return}toast('Preparing speed report…');
+ try{const Lb=await fcLib();const bytes=await sprBuild(Lb,D,ver==='coach');await fcDownload(bytes,('Speed_report_'+D.a.name+'_'+(ver==='coach'?'coach':'athlete')+'_'+today()).replace(/[^\w.-]+/g,'_')+'.pdf');toast('Speed report ready')}
+ catch(e){console.error(e);toast('PDF failed: '+(e.message||e))}}
+async function sprBuild(Lb,D,coach){const {PDFDocument,StandardFonts,rgb}=Lb;const doc=await PDFDocument.create();const F=await doc.embedFont(StandardFonts.Helvetica),B=await doc.embedFont(StandardFonts.HelveticaBold);const logo=await fcImg(doc);
+ const W=595.28,H=841.89,M=40;let pg,y;const red=rgb(.71,.07,.11),grey=rgb(.4,.4,.4),lg=rgb(.88,.88,.88),blk=rgb(.08,.08,.08),blue=rgb(.13,.4,.75),ok=rgb(.12,.55,.3),warn=rgb(.85,.55,.05),bad=rgb(.8,.12,.12),soft=rgb(.96,.95,.95);
+ const PAL=[rgb(.71,.07,.11),rgb(.13,.4,.75),rgb(.12,.55,.3),rgb(.85,.55,.05),rgb(.45,.25,.65),rgb(.1,.55,.6)];
+ const a=D.a,org=fcTx(db.org&&db.org.name||'BIOMOTOR');
+ const T=(t,x,yy,o={})=>{pg.drawText(fcTx(t),{x,y:yy,size:o.z||9,font:o.f||F,color:o.c||blk})};const tw=(t,z,f)=>(f||F).widthOfTextAtSize(fcTx(t),z);
+ const wrap=(t,f,s,w)=>{const out=[];String(fcTx(t)).split('\n').forEach(par=>{let line='';par.split(/\s+/).forEach(wd=>{const tr=line?line+' '+wd:wd;if(f.widthOfTextAtSize(tr,s)>w&&line){out.push(line);line=wd}else line=tr});out.push(line)});return out};
+ const np=()=>{pg=doc.addPage([W,H]);y=H-40;T(org+'  ·  Speed report  ·  '+a.name,M,H-26,{z:7.5,c:grey});pg.drawRectangle({x:M,y:H-31,width:W-2*M,height:.6,color:lg});y=H-50};
+ const need=h=>{if(y-h<50)np()};
+ const para=(t,x=M,z=9,f=F,c=blk,gap=3)=>{wrap(t,f,z,W-M-x).forEach(l=>{need(z+gap);T(l,x,y,{z,f,c});y-=z+gap})};
+ const sec=t=>{need(40);y-=6;pg.drawRectangle({x:M,y:y-4,width:4,height:16,color:red});T(t,M+10,y,{z:12.5,f:B});y-=22};
+ // ---- page 1 header ----
+ pg=doc.addPage([W,H]);y=H-40;if(logo){const d=logo.scale(Math.min(110/logo.width,44/logo.height));pg.drawImage(logo,{x:M,y:y-30,width:d.width,height:d.height})}
+ T(org,M+125,y-6,{z:13,f:B});T('Sprint & speed performance report',M+125,y-21,{z:9,c:grey});const vt=coach?'COACH VERSION':'ATHLETE VERSION';T(vt,W-M-tw(vt,9,B),y-6,{z:9,f:B,c:red});T(fcTx(fmtDate(today())),W-M-tw(fmtDate(today()),8.5),y-21,{z:8.5,c:grey});
+ y-=42;pg.drawRectangle({x:M,y,width:W-2*M,height:2.5,color:red});y-=26;T('SPEED REPORT',M,y,{z:18,f:B,c:red});y-=20;
+ const age=lmAge(a);T([a.name,a.sport,a.position,isFinite(age)?age+' y':'',nutSex(a)==='F'?'Female':'Male',D.mass?D.mass+' kg':''].filter(Boolean).join('   |   '),M,y,{z:11,f:B});y-=14;
+ T(`Period: ${D.from==='0000'?'all data':fmtDate(D.from)+' – '+fmtDate(today())}   |   ${D.R.length} sprint reps in ${D.sessions} sessions   |   ${D.K.length} drill / distance / timing combinations`,M,y,{z:8.5,c:grey});y-=18;
+ // KPI tiles
+ const k0=D.K[0];const tiles=[['Sprint reps',String(D.R.length),D.sessions+' sessions'],['Max velocity',D.vmax?D.vmax.toFixed(2)+' m/s':'-',D.vmax?(D.vmax*3.6).toFixed(1)+' km/h':'needs flying / GPS'],
+  [k0?k0.lbl.split(' · ')[0]:'Main drill',k0?(k0.gps?spdTxt(spSpeed(k0.best)):(+k0.best.time).toFixed(2)+' s'):'-',k0?'best · '+spSpeed(k0.best).toFixed(2)+' m/s':''],['Latest vs best',k0?Math.round(k0.pctLast)+' %':'-',k0?k0.lbl.split(' · ')[0]:''],['Momentum',D.mom?String(Math.round(D.mom)):'-',D.mom?'kg·m/s':'needs body mass']];
+ const tW=(W-2*M-4*8)/5;tiles.forEach((t,i)=>{const x=M+i*(tW+8);pg.drawRectangle({x,y:y-50,width:tW,height:52,color:soft,borderColor:lg,borderWidth:.6});T(t[0].toUpperCase().slice(0,22),x+7,y-11,{z:6.8,f:B,c:grey});T(t[1],x+7,y-29,{z:15,f:B,c:i===3&&k0?(k0.pctLast>=97?ok:k0.pctLast>=93?warn:bad):blk});T(String(t[2]).slice(0,30),x+7,y-42,{z:6.8,c:grey})});y-=66;
+ // ---- bests table ----
+ sec('Best performances by drill');
+ const cols=[['Drill · distance · timing',170],['Best',52],['Avg speed',50],['km/h',36],['Latest',46],['% best',38],['95 % target',56],['Reps',30],['Rank',37]];
+ const row=(vals,yy,o={})=>{let x=M;vals.forEach((v,i)=>{T(String(v).slice(0,i?14:40),x+3,yy,{z:o.z||7.8,f:o.f||F,c:(o.cs&&o.cs[i])||o.c||blk});x+=cols[i][1]})};
+ need(20);pg.drawRectangle({x:M,y:y-4,width:W-2*M,height:15,color:red});row(cols.map(c=>c[0]),y,{f:B,c:rgb(1,1,1),z:7.4});y-=16;
+ D.K.forEach((x,i)=>{need(14);if(i%2)pg.drawRectangle({x:M,y:y-4,width:W-2*M,height:14,color:soft});const p=x.pctLast;
+  row([x.lbl,x.gps?spdTxt(spSpeed(x.best)):(+x.best.time).toFixed(2)+' s',spSpeed(x.best).toFixed(2),(spSpeed(x.best)*3.6).toFixed(1),x.gps?spdTxt(x.ses.at(-1).v):(+x.ses.at(-1).best.time).toFixed(2)+' s',Math.round(p)+' %',x.gps?spdTxt(x.tgt):'<= '+x.tgt.toFixed(2)+' s',x.rs.length,x.pctile!=null?x.rank+'/'+x.team.length:'-'],y,{cs:{5:p>=97?ok:p>=93?warn:bad}});y-=14});
+ y-=4;para('Times are compared only within the same drill, distance and timing kind (hand, video, electronic, GPS). Avg speed = distance / time. Target = 95 % of the athlete\'s best.',M,7.5,F,grey);
+ // ---- chart helpers ----
+ const axes=(x0,y0,w,h,ymin,ymax,fmt,ticks=4)=>{pg.drawRectangle({x:x0,y:y0,width:w,height:h,borderColor:lg,borderWidth:.6});for(let i=0;i<=ticks;i++){const v=ymin+(ymax-ymin)*i/ticks,yy=y0+h*i/ticks;if(i&&i<ticks)pg.drawLine({start:{x:x0,y:yy},end:{x:x0+w,y:yy},thickness:.4,color:lg});const s=fmt(v);T(s,x0-4-tw(s,6.5),yy-2,{z:6.5,c:grey})}};
+ const nice=(lo,hi)=>{if(!(hi>lo)){lo=lo*.95;hi=hi*1.05||1}const p=(hi-lo)*.12;return [lo-p,hi+p]};
+ // bar chart of best avg speed per drill
+ if(D.K.length){sec('Best average speed by drill (m/s)');const ks=D.K.slice(0,8);const bh=13,gap=6,h=ks.length*(bh+gap);need(h+20);const x0=M+150,w=W-M-x0-50;const mx=Math.max(...ks.map(x=>spSpeed(x.best)))*1.1;
+  ks.forEach((x,i)=>{const yy=y-i*(bh+gap)-bh;T(x.lbl.slice(0,34),M,yy+3,{z:7.4});const v=spSpeed(x.best);pg.drawRectangle({x:x0,y:yy,width:w,height:bh,color:soft});pg.drawRectangle({x:x0,y:yy,width:w*v/mx,height:bh,color:PAL[i%PAL.length]});T(v.toFixed(2)+' m/s',x0+w*v/mx+4,yy+3,{z:7.4,f:B})});y-=h+10}
+ // ---- trend per drill ----
+ sec('Trend charts (2D) – every rep and session best');
+ D.K.slice(0,coach?6:4).forEach((x,ix)=>{const ch=130;need(ch+70);const col=PAL[ix%PAL.length];T(x.lbl,M,y,{z:10,f:B,c:col});y-=17;
+  const gps=x.gps;const val=s=>gps?spSpeed(s)*3.6:+s.time;const ys=x.rs.map(val);const [lo,hi]=nice(Math.min(...ys,gps?x.tgt*3.6:x.tgt),Math.max(...ys,gps?x.tgt*3.6:x.tgt));
+  const x0=M+34,w=W-2*M-34,y0=y-ch;axes(x0,y0,w,ch,lo,hi,v=>v.toFixed(gps?1:2));T(gps?'km/h (higher is better)':'seconds (lower is better)',x0,y0+ch+3,{z:6.5,c:grey});
+  const d0=new Date(x.rs[0].date),d1=new Date(x.rs.at(-1).date);const span=Math.max(1,(d1-d0)/864e5);const px=d=>x0+8+(w-16)*(x.ses.length===1?.5:((new Date(d)-d0)/864e5)/span);const py=v=>y0+ch*(v-lo)/(hi-lo);
+  // target line + best line
+  const tv=gps?x.tgt*3.6:x.tgt,bv=val(x.best);pg.drawLine({start:{x:x0,y:py(tv)},end:{x:x0+w,y:py(tv)},thickness:.8,color:warn,dashArray:[4,3]});T('95 % target',x0+w-46,py(tv)+2,{z:6,c:warn});
+  pg.drawLine({start:{x:x0,y:py(bv)},end:{x:x0+w,y:py(bv)},thickness:.8,color:ok,dashArray:[2,2]});T('best',x0+w-18,py(bv)+2,{z:6,c:ok});
+  x.rs.forEach(s=>pg.drawCircle({x:px(s.date),y:py(val(s)),size:1.8,color:rgb(.6,.6,.6)}));
+  const sp=x.ses.map(z=>[px(z.d),py(val(z.best))]);for(let i=1;i<sp.length;i++)pg.drawLine({start:{x:sp[i-1][0],y:sp[i-1][1]},end:{x:sp[i][0],y:sp[i][1]},thickness:1.6,color:col});sp.forEach(p=>pg.drawCircle({x:p[0],y:p[1],size:2.8,color:col}));
+  const lbls=x.ses.length<=6?x.ses.map(z=>z.d):[x.ses[0].d,x.ses[Math.floor(x.ses.length/2)].d,x.ses.at(-1).d];lbls.forEach(d=>{const s=fmtDate(d);T(s,Math.min(x0+w-tw(s,6.3),Math.max(x0,px(d)-tw(s,6.3)/2)),y0-9,{z:6.3,c:grey})});
+  y=y0-22;const info=[`Best ${gps?spdTxt(spSpeed(x.best)):(+x.best.time).toFixed(2)+' s'} (${fmtDate(x.best.date)})`,`latest session ${Math.round(x.pctLast)} % of best`,isFinite(x.chg)?`first->latest session ${x.chg>=0?'+':''}${x.chg.toFixed(1)} % speed`:'',isFinite(x.slope)?`trend ${x.slope>=0?'+':''}${x.slope.toFixed(1)} %/4 wk`:'',isFinite(x.cv)?`rep CV ${x.cv.toFixed(1)} %`:'',`SWC ${x.swcPct.toFixed(1)} %`].filter(Boolean).join('  ·  ');para(info,M,7.6,F,grey);y-=6});
+ // ---- weekly exposure chart ----
+ need(170);sec('Weekly sprint volume and high-speed exposures (last 12 weeks)');{const ch=100;need(ch+40);const x0=M+24,w=W-2*M-24,y0=y-ch;const mx=Math.max(4,...D.weeks.map(z=>z.n));axes(x0,y0,w,ch,0,mx,v=>String(Math.round(v)));const bw2=w/12;
+  D.weeks.forEach((z,i)=>{const xx=x0+i*bw2+bw2*.18;const ww=bw2*.64;pg.drawRectangle({x:xx,y:y0,width:ww,height:ch*z.n/mx,color:rgb(.78,.8,.86)});if(z.hi)pg.drawRectangle({x:xx+ww*.25,y:y0,width:ww*.5,height:ch*z.hi/mx,color:red});if(i%2===0){const s=fmtDate(z.ws).slice(0,6);T(s,xx,y0-9,{z:6,c:grey})}});
+  y=y0-20;pg.drawRectangle({x:M,y:y-1,width:8,height:7,color:rgb(.78,.8,.86)});T('all sprint reps',M+11,y,{z:7});pg.drawRectangle({x:M+80,y:y-1,width:8,height:7,color:red});T(`reps >= 90 % of max velocity${D.vmax?' ('+spdTxt(D.vmax*.9)+')':' (needs flying / GPS data)'}`,M+91,y,{z:7});y-=16}
+ // ---- team comparison ----
+ const tk=D.K.find(x=>x.team.length>1);if(tk){need(Math.min(tk.team.length,coach?20:12)*14+80);sec(`Team comparison – ${tk.lbl}`);const tm=tk.team.slice(0,coach?20:12);const bh=10,gap=4,h=tm.length*(bh+gap);need(h+30);const x0=M+(coach?120:60),w=W-M-x0-60;const mx=tm[0].v*1.05,mn=tm.at(-1).v*.9;
+  tm.forEach((t,i)=>{const yy=y-i*(bh+gap)-bh;const me=t.id===a.id;const nm=coach?nameOf(byId('athletes',t.id)):(me?'You':'#'+(i+1));T(String(nm).slice(0,26),M,yy+2,{z:7,f:me?B:F,c:me?red:blk});const fr=(t.v-mn)/(mx-mn);pg.drawRectangle({x:x0,y:yy,width:Math.max(2,w*fr),height:bh,color:me?red:rgb(.7,.72,.78)});T(tk.gps?spdTxt(t.v):t.v.toFixed(2)+' m/s',x0+Math.max(2,w*fr)+4,yy+2,{z:6.8,f:me?B:F})});
+  y-=h+6;para(`Rank ${tk.rank} of ${tk.team.length}${tk.pctile!=null?' · percentile '+tk.pctile:''}. Bars show each athlete's best average speed on this test in the period (in-house group comparison).${coach?'':' Other athletes are not named in the athlete version.'}`,M,7.6,F,grey)}
+ // ---- interpretation & recommendations ----
+ const adv=sprAdvice(D);sec('Interpretation');adv.I.forEach(t=>{para('• '+t,M+4,8.6);y-=2});sec('Recommendations');adv.R.forEach(t=>{para('• '+t,M+4,8.6);y-=2});
+ if(D.notes.length){sec('Coach notes');D.notes.forEach(n=>{para(`${fmtDate(n.date)}${n.by?' – '+n.by:''}: ${n.txt}`,M+4,8.6);y-=2})}
+ // ---- coach extras ----
+ if(coach){if(typeof readiness==='function'&&typeof RS==='function'&&RS().show){try{const r=readiness(a.id);sec('Readiness today');para(`Status: ${r.st}`,M+4,9,B);(r.sig||[]).forEach(s=>para(`- ${s.k}: ${s.v}`,M+10,8.2))}catch(e){}}
+  sec('Full sprint log');const lc=[['Date',58],['Drill',120],['Dist',40],['Time',44],['Speed m/s',50],['km/h',40],['% best',40],['Method',72],['Steps',45]];
+  const lrow=(v,yy,o={})=>{let x=M;v.forEach((s,i)=>{T(String(s).slice(0,22),x+3,yy,{z:7.2,f:o.f||F,c:o.c||blk});x+=lc[i][1]})};const hd=()=>{pg.drawRectangle({x:M,y:y-4,width:W-2*M,height:14,color:red});lrow(lc.map(c=>c[0]),y,{f:B,c:rgb(1,1,1)});y-=15};need(30);hd();
+  [...D.R].reverse().forEach((s,i)=>{if(y<60){np();hd()}const kk=D.K.find(z=>z.k===spKey(s));if(i%2)pg.drawRectangle({x:M,y:y-4,width:W-2*M,height:12,color:soft});
+   lrow([fmtDate(s.date),spDrill(s),s.distance?dTo(+s.distance)+' '+SU():'-',+s.time>0?(+s.time).toFixed(2)+' s':'-',spSpeed(s).toFixed(2),(spSpeed(s)*3.6).toFixed(1),kk?Math.round(spSpeed(s)/spSpeed(kk.best)*100)+' %':'',s.method||'',s.steps||''],y);y-=12})}
+ sec('Method & references');para('Speed = distance / time (or GPS top speed). Max velocity = best flying sprint or GPS top speed. High-speed exposure = rep at >= 90 % of the athlete\'s max velocity. Rep-to-rep variation = coefficient of variation (CV %) of reps in a session. Smallest worthwhile change (SWC) = 0.2 x between-athlete SD of the group (1 % if fewer than 3 athletes). Percentile and rank are in-house comparisons within this organisation, not population norms. Guide only – interpret with the coach.',M,7.8,F,grey);y-=3;SPR_REF.forEach((r,i)=>para(`${i+1}. ${r}`,M+4,7.3,F,grey));
+ const pages=doc.getPages();pages.forEach((p,i)=>{p.drawText(fcTx(`${org} · BIOMOTOR speed report · ${coach?'coach':'athlete'} version`),{x:M,y:22,size:7,font:F,color:grey});const s=`Page ${i+1} of ${pages.length}`;p.drawText(s,{x:W-M-F.widthOfTextAtSize(s,7),y:22,size:7,font:F,color:grey})});
+ return await doc.save()}
+
 /* ============ AUTO UPDATE (a new version was published → the app reloads itself when nobody is typing) ============ */
 /* BM_APP_VER must equal VERSION in sw.js – both change with every release. */
-const BM_APP_VER='biomotor-v57-2026-11-27';
+const BM_APP_VER='biomotor-v58-2026-11-27';
 var UPD={shown:false,t:null};
 function updCheck(){if(UPD.shown||!/^https?:$/.test(location.protocol)||globalThis.BIOMOTOR_NATIVE)return;
  fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=String(t).match(/VERSION\s*=\s*'([^']+)'/);if(!m||m[1]===BM_APP_VER)return;
