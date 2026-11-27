@@ -395,7 +395,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
     <div class="row" id="tgtRow" style="margin-bottom:10px;gap:8px;flex-wrap:wrap;align-items:center"><b>What to track</b><div class="seg" id="tgtSeg"></div><select id="tgtJoint" style="width:auto;display:none"></select></div>
     <div class="row">
       <button class="btn sm" id="detBtn" disabled>🎯 Auto-detect</button>
-      <button class="btn sm" id="scaleBtn" style="display:none">📏 Scale</button>
+      <button class="btn sm pri" id="autoScaleBtn" style="display:none" title="Scale from the athlete's body and height (automatic)">⚡ Auto scale</button><button class="btn sm" id="scaleBtn" style="display:none" title="Tap two points a known distance apart and type the cm">📏 Manual scale</button>
       <label class="f" style="flex:1;min-width:130px">Circle size<input type="range" id="radSl" min="40" max="200" value="100" disabled></label>
       <button class="btn sm go" id="lockBtn" disabled>🔒 Lock</button>
       <button class="btn sm" id="resetBtn" disabled>↺ Reset</button>
@@ -3158,7 +3158,7 @@ $('#radSl').onchange = () => selGrab();
 $('#lockBtn').onclick = () => { if (!T.sel && T.preview) selectCand(refineVideoCircle(T.preview.x, T.preview.y, T.preview.r, 0.15) || T.preview); lockPlate(); };
 function lockPlate(auto) {
   const kind = tgtKind();
-  if (kind !== 'plate') { if (auto) return false; if (!T.scale) { toast('Set the scale first: tap 📏 Scale, then two points a known distance apart'); scaleStart(); return false; }
+  if (kind !== 'plate') { if (auto) return false; if (!T.scale) { autoScale(false).then(ok => { if (ok) toast('⚡ Auto scale set – tap 🔒 Lock again'); else scaleStart(); }); return false; }
     if (kind === 'joint') { if (!T.gray) return false; if (!POSE.lm) { toast(POSE.err ? 'Body tracking could not load: ' + POSE.err : 'Loading body tracking… try Lock again in a moment'); poseLoadV(); return false; } const r0 = 0.03 * Math.min(T.vw, T.vh); T.sel = T.sel || { x: T.vw / 2, y: T.vh / 2, r: r0, rv: r0, rh: r0, aspect: 1, contrast: null }; }
     else if (!T.sel) { toast(kind === 'db' ? 'Tap the dumbbell head first' : 'Tap the end of the bar (sleeve / collar) first'); return false; } }
   if (!T.sel || !T.gray) return false;
@@ -3218,19 +3218,21 @@ function poseTracker(getSrc, W, H, joint) {
 function tgtRender() { const S = ST_(), k = tgtKind();
   seg($('#tgtSeg'), Object.entries(TGT).map(([v, t]) => [v, t.icon + ' ' + t.label]), k, v => tgtSet(v));
   const j = $('#tgtJoint'); j.style.display = k === 'joint' ? '' : 'none'; if (!j.options.length) j.innerHTML = JOINTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); j.value = S.joint || 'R_WRIST';
-  $('#scaleBtn').style.display = k === 'plate' ? 'none' : ''; $('#detBtn').style.display = k === 'plate' ? '' : 'none';
+  $('#scaleBtn').style.display = k === 'plate' ? 'none' : ''; $('#autoScaleBtn').style.display = k === 'plate' ? 'none' : ''; $('#detBtn').style.display = k === 'plate' ? '' : 'none';
   seg($('#pnlTgt'), Object.entries(TGT).map(([v, t]) => [v, t.icon + ' ' + t.label]), k, v => tgtSet(v));
   const pj = $('#pnlJoint'); if (!pj.options.length) pj.innerHTML = JOINTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); pj.value = S.joint || 'R_WRIST'; $('#pnlJointRow').style.display = k === 'joint' ? 'flex' : 'none';
   $('#pnlPlateBox').style.display = k === 'plate' ? '' : 'none'; $('#plateInfo').style.display = k === 'plate' ? '' : 'none'; const sc = $('#pnlScale'); sc.style.display = k === 'plate' ? 'none' : 'block';
-  sc.innerHTML = `<div class="muted" style="margin-bottom:6px">${T.scale ? `Scale: <b>${fmt(T.scale.cm, 1)} cm = ${fmt(T.scale.px, 0)} px</b> (1 px = ${fmt(T.scale.cm * 10 / T.scale.px, 2)} mm)` : 'No scale yet – tap two points a known distance apart and enter the cm.'}</div><button class="btn sm pri" id="pnlScaleBtn">📏 ${T.scale ? 'Set scale again' : 'Set scale'}</button>`;
+  sc.innerHTML = `<div class="muted" style="margin-bottom:6px">${T.scale ? `Scale${T.scale.auto ? ' (⚡ auto, height ' + T.scale.auto.H + ' cm)' : ' (manual)'}: <b>${fmt(T.scale.cm, 1)} cm = ${fmt(T.scale.px, 0)} px</b> (1 px = ${fmt(T.scale.cm * 10 / T.scale.px, 2)} mm)` : 'No scale yet – ⚡ Auto scale uses the athlete\'s body and height; 📏 Manual: tap two points a known distance apart and enter the cm.'}</div><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm pri" id="pnlAutoBtn">⚡ Auto scale</button><button class="btn sm" id="pnlScaleBtn">📏 Manual scale</button><label class="row" style="gap:6px;cursor:pointer;font-size:13px"><input type="checkbox" id="pnlAutoOn" ${S.autoScale === false ? '' : 'checked'} style="width:18px;height:18px"> Auto scale when the video / camera starts</label></div>`;
+  $('#pnlAutoBtn').onclick = () => { closePanels(); if (T.tracker) { $('#resetBtn').onclick(); setTimeout(() => autoScale(false), 150); } else autoScale(false); };
+  $('#pnlAutoOn').onchange = e => { ST_().autoScale = e.target.checked; save(); };
   $('#pnlScaleBtn').onclick = () => { closePanels(); if (T.tracker) { $('#resetBtn').onclick(); setTimeout(scaleStart, 150); } else scaleStart(); };
   const tp = $('#tPlate'); if (tp) tp.textContent = k === 'plate' ? `${S.plateCm} cm` : k === 'joint' ? 'Joint' : k === 'db' ? 'Dumbbell' : 'Barbell';
   const tb = document.querySelector('[data-tool=plate]'); if (tb && tb.firstChild && tb.firstChild.nodeType === 3) tb.firstChild.nodeValue = TGT[k].icon; }
 function tgtSet(v) { if (T.set) return toast('Finish the set first'); const S = ST_(); S.target = v; if (!S.joint) S.joint = 'R_WRIST'; save(); resetCalib(); T.scale = null; scaleHide();
   if (T.mode) { T.phase = v === 'plate' ? 'auto' : 'manT'; $('#calStatus').textContent = tgtHelp(); } if (v === 'joint') poseLoadV().then(() => { if (tgtKind() === 'joint') toast('Body tracking ready'); }).catch(() => toast('Body tracking could not load – check the internet connection'));
-  tgtRender(); redraw(); updateCTA(); }
+  tgtRender(); redraw(); updateCTA(); autoScaleSoon(800); }
 function tgtHelp() { const k = tgtKind(); if (k === 'plate') return 'The ring follows the plate – or tap the plate centre, then its edge.';
-  const step2 = '2) 📏 Scale: tap two points a known distance apart (e.g. plate edge to edge, dumbbell end to end, athlete height) and enter the cm. 3) 🔒 Lock.';
+  const step2 = '2) Scale: ⚡ Auto scale (from the athlete\'s body and height – runs by itself when the athlete height is saved) or 📏 Manual scale (tap two points a known distance apart and enter the cm). 3) 🔒 Lock.';
   if (k === 'joint') return `Body joint: ${jointName()}. 1) Keep the whole body in the picture, side-on. ${step2}`;
   return `1) Tap the ${k === 'db' ? 'dumbbell head' : 'end of the bar (sleeve or collar)'} – drag / pinch the green circle to fit it. ${step2}`; }
 $('#pnlJoint').onchange = e => { $('#tgtJoint').value = e.target.value; $('#tgtJoint').onchange(e); };
@@ -3247,6 +3249,53 @@ $('#scaleSave').onclick = () => { const cm = parseFloat($('#scaleCm').value), P 
   $('#calStatus').textContent = `Scale set: ${fmt(cm, 1)} cm = ${fmt(px, 0)} px (1 px = ${fmt(cm * 10 / px, 2)} mm). ${tgtKind() === 'joint' ? 'Now tap 🔒 Lock.' : T.sel ? 'Now tap 🔒 Lock.' : 'Now tap the ' + tgtLabel().toLowerCase() + '.'}`; redraw(); updateCTA(); };
 $('#scaleCancel').onclick = () => { scaleHide(); T.scaleTap = []; T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); redraw(); };
 $('#scaleBtn').onclick = scaleStart;
+/* --- AUTO SCALE: athlete height + MediaPipe Pose (works for Barbell end, Dumbbell and Body joint) ---
+   Each visible body segment (joint centre to joint centre) has a known average length as a fraction of standing height
+   (Winter DA. Biomechanics and Motor Control of Human Movement, 4th ed. 2009, segment-length proportions after Drillis & Contini 1966):
+   upper arm 0.186 H, forearm 0.146 H, thigh 0.245 H, shank 0.246 H, shoulder–hip (trunk) 0.288 H.
+   Pixels per cm = segment pixels / (fraction × height). Several frames and segments are combined; segments pointing towards the camera
+   look shorter, so the upper part of each segment's values is used and the median across segments is taken. Typical error ± 5–10 %. */
+const AS_SEG = [[11, 13, 0.186, 'upper arm'], [12, 14, 0.186, 'upper arm'], [13, 15, 0.146, 'forearm'], [14, 16, 0.146, 'forearm'], [23, 25, 0.245, 'thigh'], [24, 26, 0.245, 'thigh'], [25, 27, 0.246, 'shank'], [26, 28, 0.246, 'shank'], [11, 23, 0.288, 'trunk'], [12, 24, 0.288, 'trunk']];
+const AS = { busy: false };
+const asH = () => { const a = athlete(); return a && +a.height > 100 && +a.height < 230 ? +a.height : 0; };
+const asQ = (A, q) => { const s = [...A].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(q * (s.length - 1) + 0.5))] : NaN; };
+function asDetect(cv, cx) { // one pose on the current video frame, in crop coordinates (T.vw × T.vh)
+  const c = T.crop && T.crop.w ? T.crop : { x: 0, y: 0, w: video.videoWidth, h: video.videoHeight };
+  cx.drawImage(video, c.x, c.y, c.w, c.h, 0, 0, cv.width, cv.height); POSE.ts = Math.max((POSE.ts || 0) + 1, Math.round(performance.now()));
+  const r = POSE.lm.detectForVideo(cv, POSE.ts), L = r && r.landmarks && r.landmarks[0]; if (!L) return null;
+  return L.map(p => ({ x: p.x * T.vw, y: p.y * T.vh, v: p.visibility == null ? 1 : p.visibility })); }
+async function autoScale(quiet) {
+  if (AS.busy) return false; const k = tgtKind(); if (k === 'plate') return false;
+  if (!T.mode || !video.videoWidth) { if (!quiet) toast('Start the camera or load a video first'); return false; }
+  if (T.tracker) { if (!quiet) toast('Reset first to set a new scale'); return false; }
+  let H = asH(); if (!H) { if (quiet) return false; const v = parseFloat(prompt('Athlete height in cm (needed for auto scale)', '')); if (!(v > 100 && v < 230)) { toast('Auto scale needs the athlete height – or use 📏 Scale (manual)'); return false; }
+    const a = athlete(); if (a) { a.height = v; save(); } H = v; }
+  AS.busy = true; const st = $('#calStatus'); const prev = st.textContent; st.textContent = '⚡ Auto scale: finding the athlete\'s body…';
+  try { if (!POSE.lm) await poseLoadV(); } catch (e) {}
+  if (!POSE.lm) { AS.busy = false; st.textContent = prev; if (!quiet) toast('Body tracking could not load' + (POSE.err ? ': ' + POSE.err : '') + ' – use 📏 Scale (manual)'); return false; }
+  const cv = document.createElement('canvas'), m = 640 / Math.max(T.vw, T.vh); cv.width = Math.round(T.vw * m); cv.height = Math.round(T.vh * m); const cx = cv.getContext('2d');
+  const per = AS_SEG.map(() => []); let last = null, frames = 0;
+  const take = () => { const P = asDetect(cv, cx); if (!P) return; frames++; last = P; AS_SEG.forEach(([i, j, f], n) => { const a = P[i], b = P[j]; if (a.v < 0.6 || b.v < 0.6) return; const px = Math.hypot(a.x - b.x, a.y - b.y); if (px > 8) per[n].push(px / (f * H)); }); };
+  const file = T.mode === 'file' && isFinite(video.duration) && video.duration > 0.5;
+  try {
+    if (file) { const t0 = video.currentTime, wasP = video.paused; video.pause(); const seek = t => new Promise(ok => { const done = () => { video.removeEventListener('seeked', done); setTimeout(ok, 40); }; video.addEventListener('seeked', done); video.currentTime = t; setTimeout(done, 1500); });
+      for (const f of [0.1, 0.25, 0.4, 0.55, 0.7, 0.85]) { await seek(video.duration * f); take(); } await seek(t0); if (!wasP) video.play().catch(() => {}); take(); }
+    else for (let i = 0; i < 12; i++) { take(); await new Promise(r => setTimeout(r, 70)); }
+  } catch (e) { console.warn(e); }
+  AS.busy = false;
+  const segV = per.map(A => A.length ? asQ(A, 0.8) : NaN); const ok = segV.map((v, n) => [v, n]).filter(([v]) => isFinite(v));
+  if (ok.length < 2 || !last) { st.textContent = prev; const msg = 'Auto scale: the athlete\'s body was not seen clearly (need shoulders, elbows / hips, knees in view). Use 📏 Scale (manual).'; if (!quiet) toast(msg); else st.textContent = msg; return false; }
+  const ppc = asQ(ok.map(x => x[0]), 0.5); const spread = (asQ(ok.map(x => x[0]), 0.9) - asQ(ok.map(x => x[0]), 0.1)) / ppc * 100;
+  // draw the scale along the longest visible segment of the last frame, labelled with its estimated real length
+  let best = null; AS_SEG.forEach(([i, j], n) => { const a = last[i], b = last[j]; if (a.v < 0.6 || b.v < 0.6) return; const px = Math.hypot(a.x - b.x, a.y - b.y); if (!best || px > best.px) best = { a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, px }; });
+  if (!best || best.px < 20) best = { a: { x: T.vw * 0.05, y: T.vh * 0.2 }, b: { x: T.vw * 0.05, y: T.vh * 0.2 + ppc * 30 }, px: ppc * 30 };
+  T.scale = { cm: best.px / ppc, px: best.px, a: best.a, b: best.b, auto: { H, seg: ok.length, frames, spread } }; T.scaleTap = []; scaleHide(); tgtRender(); T.phase = 'manT';
+  $('#lockBtn').disabled = !(T.sel || tgtKind() === 'joint');
+  st.textContent = `⚡ Auto scale set from the athlete's body (height ${H} cm, ${ok.length} segments, ${frames} frames): 1 px = ${fmt(10 / ppc, 2)} mm${spread > 15 ? ' – segments disagree, check side-on view or use 📏 Scale' : ''}. ${tgtKind() === 'joint' ? 'Now tap 🔒 Lock.' : T.sel ? 'Now tap 🔒 Lock.' : 'Now tap the ' + tgtLabel().toLowerCase() + '.'}`;
+  if (!quiet) toast('Auto scale set – check the yellow line matches the body segment'); redraw(); updateCTA(); return true; }
+function autoScaleSoon(ms) { if (ST_().autoScale === false || tgtKind() === 'plate' || T.scale || !asH()) return; clearTimeout(AS.t); AS.t = setTimeout(() => { if (!T.scale && !T.tracker && tgtKind() !== 'plate' && T.mode) autoScale(true); }, ms || 1500); }
+$('#autoScaleBtn').onclick = () => autoScale(false);
+
 /* taps for non-plate targets (registered before the ring-adjust handler, so it runs first) */
 view.addEventListener('pointerdown', e => {
   const k = tgtKind(); if (k === 'plate' || !T.mode || T.busy || T.tracker) return;
@@ -3262,13 +3311,13 @@ view.addEventListener('pointerdown', e => {
   const r = T.sel ? T.sel.r : Math.max(8, 0.035 * Math.min(T.vw, T.vh));
   T.sel = { x, y, r, rv: r, rh: r, aspect: 1, contrast: null }; T.baseR = r; T.baseRv = r; T.baseRh = r; $('#radSl').value = 100; $('#radSl').disabled = false;
   if (T.mode === 'file') { try { T.selT = video.currentTime; T.selGray = frameReader(video, 400).read(); } catch (er) { T.selGray = null; } }
-  $('#lockBtn').disabled = !T.scale; $('#calStatus').textContent = T.scale ? `${tgtLabel()} marked – fit the green circle to it (drag / pinch), then 🔒 Lock.` : `${tgtLabel()} marked. Now 📏 Scale: tap two points a known distance apart.`;
-  if (!T.scale) setTimeout(scaleStart, 300);
+  $('#lockBtn').disabled = !T.scale; $('#calStatus').textContent = T.scale ? `${tgtLabel()} marked – fit the green circle to it (drag / pinch), then 🔒 Lock.` : `${tgtLabel()} marked. Setting the scale (⚡ auto, or 📏 manual)…`;
+  if (!T.scale) setTimeout(() => autoScale(true).then(ok => { if (!ok) scaleStart(); else $('#lockBtn').disabled = false; }), 300);
   updatePlateInfo(); redraw(); updateCTA();
 });
 // keep the plate flow untouched; non-plate targets start in manual mode
 { const _rp = renderPanels; renderPanels = function () { const x = _rp.apply(this, arguments); try { tgtRender(); } catch (e) {} return x; }; }
-{ const _sr = sourceReady; sourceReady = function () { const x = _sr.apply(this, arguments); tgtRender(); if (tgtKind() !== 'plate') { T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); updateCTA(); } if (tgtKind() === 'joint') poseLoadV().catch(() => {}); return x; }; }
+{ const _sr = sourceReady; sourceReady = function () { const x = _sr.apply(this, arguments); tgtRender(); if (tgtKind() !== 'plate') { T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); updateCTA(); } if (tgtKind() === 'joint') poseLoadV().catch(() => {}); autoScaleSoon(T.mode === 'file' ? 600 : 2000); return x; }; }
 { const _rc = resetCalib; resetCalib = function () { const x = _rc.apply(this, arguments); if (tgtKind() !== 'plate') { T.scale = null; T.scaleTap = []; scaleHide(); } return x; }; }
 { const _rb = $('#resetBtn').onclick; $('#resetBtn').onclick = async () => { await _rb(); if (tgtKind() !== 'plate' && T.mode) { T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); redraw(); } }; }
 // draw the scale line and the live joint marker
@@ -3700,7 +3749,7 @@ async function analyseFile() {
   video.pause();
   let plate = null;
   const kind = tgtKind();
-  if (kind !== 'plate') { if (!T.scale) { toast('Set the scale first: tap 📏 Scale, then two points a known distance apart'); return scaleStart(); } if (kind !== 'joint' && !T.sel) return toast(kind === 'db' ? 'Pause on a clear frame and tap the dumbbell head first' : 'Pause on a clear frame and tap the end of the bar first');
+  if (kind !== 'plate') { if (!T.scale && !(await autoScale(false))) { toast('Set the scale: ⚡ Auto scale needs the athlete in view, or use 📏 Manual scale'); return scaleStart(); } if (kind !== 'joint' && !T.sel) return toast(kind === 'db' ? 'Pause on a clear frame and tap the dumbbell head first' : 'Pause on a clear frame and tap the end of the bar first');
     if (kind === 'joint' && !POSE.lm) { try { await poseLoadV(); } catch (e) {} if (!POSE.lm) return toast('Body tracking could not load' + (POSE.err ? ': ' + POSE.err : '')); } }
   if (kind === 'joint') { const r0 = 0.03 * Math.min(video.videoWidth, video.videoHeight); plate = { kind, joint: ST_().joint, scale: T.scale, x: video.videoWidth / 2, y: video.videoHeight / 2, r: r0, t: video.currentTime }; }
   else if (T.sel) { const r = T.sel; plate = { x: r.x, y: r.y, r: r.r, t: T.selT != null ? T.selT : video.currentTime, gray: T.selGray || null }; if (kind !== 'plate') Object.assign(plate, { kind, scale: T.scale });
@@ -4780,9 +4829,9 @@ window.VBT = { readinessOf, progLinkZ, decodeProgA, makeXlsx, exportXlsx, syncNo
   if(DB.devUnlock!==DEV_HASH){DB.devUnlock=DEV_HASH;ch=1}           /* platform subscription covers every tracker feature */
   (pdb.athletes||[]).filter(function(a){return a.status!=='Inactive'&&a.name}).forEach(function(a){var nm=String(a.name).trim(),parts=nm.split(/\s+/);
    var v=DB.athletes.find(function(x){return x.pid===a.id})||DB.athletes.find(function(x){return !x.pid&&!x.self&&String(x.name||'').trim().toLowerCase()===nm.toLowerCase()});
-   if(!v){v={id:uid(),name:nm,first:parts[0],last:parts.slice(1).join(' '),email:a.email||'',sport:a.sport||'',bodyMass:kg(a),created:Date.now(),pid:a.id};DB.athletes.push(v);ch=1}
+   if(!v){v={id:uid(),name:nm,first:parts[0],last:parts.slice(1).join(' '),email:a.email||'',sport:a.sport||'',bodyMass:kg(a),height:+a.height>100?+a.height:undefined,created:Date.now(),pid:a.id};DB.athletes.push(v);ch=1}
    else{if(v.pid!==a.id||v.name!==nm){v.pid=a.id;v.name=nm;v.first=parts[0];v.last=parts.slice(1).join(' ');delete v.placeholder;ch=1}
-    if(!v.sport&&a.sport){v.sport=a.sport;ch=1}if(!v.bodyMass){var b=kg(a);if(b){v.bodyMass=b;ch=1}}}});
+    if(!v.sport&&a.sport){v.sport=a.sport;ch=1}if(!v.bodyMass){var b=kg(a);if(b){v.bodyMass=b;ch=1}}if(!v.height&&+a.height>100){v.height=+a.height;ch=1}}});
   var ph=DB.athletes.filter(function(x){return x.placeholder&&!DB.workouts.some(function(w){return w.athleteId===x.id})});
   if(ph.length&&DB.athletes.some(function(x){return x.pid})){DB.athletes=DB.athletes.filter(function(x){return ph.indexOf(x)<0});if(!athlete())DB.curAthlete=(DB.athletes.find(function(x){return x.pid})||DB.athletes[0]).id;ch=1}
   if(ch){save();try{renderHeader();renderRoster()}catch(e){}}}
