@@ -7010,7 +7010,7 @@ function psyShare(id,on){const r=byId('psyTests',id);if(!r)return;r.share=!!on;s
 /* ---------- staff page ---------- */
 P.psychology=()=>{psyInit();const me=authUser();const ed=psyEdit(me);const L=nutAthletes();if(!L.some(a=>a.id===PSY.aid))PSY.aid=L[0]?L[0].id:'';const a=byId('athletes',PSY.aid);
  const tabs=[['overview','Overview'],['tests','Assessments'],['tpl','Sport test template'],['norms','Protocols & norms'],['refs','References']];
- const pick=`<select data-ro-ok style="width:auto;min-width:200px" onchange="PSY.aid=this.value;render()">${L.map(x=>`<option value="${x.id}" ${x.id===PSY.aid?'selected':''}>${esc(x.name)}${x.sport?' · '+esc(x.sport):''}</option>`).join('')}</select>`;
+ const pick=athPick(`<select data-ro-ok style="width:auto;min-width:200px" onchange="PSY.aid=this.value;render()">${L.map(x=>`<option value="${x.id}" ${x.id===PSY.aid?'selected':''}>${esc(x.name)}${x.sport?' · '+esc(x.sport):''}</option>`).join('')}</select>`);
  let body='';try{body=PSY.tab==='overview'?psyOverview(me):PSY.tab==='norms'?psyNormsPage():PSY.tab==='refs'?`<div class="card"><h3 style="margin-top:0">References</h3><ol style="padding-left:18px;font-size:13px">${Object.values(PSY_REF).map(r=>`<li style="margin:4px 0">${esc(r)}</li>`).join('')}</ol></div>`:!a?'<div class="card"><p class="muted">Add athletes first.</p></div>':PSY.tab==='tpl'?psyTplPage(a,ed,me):psyTestsPage(a,ed,me)}catch(e){console.error(e);body=`<div class="card"><p class="muted">Could not show this tab: ${esc(e.message||e)}</p></div>`}
  return head('Psychology','Sport Psychology','Validated mental-skills and mental-health assessments with sport-specific test templates, normative data, interpretation and recommendations.',['tests','tpl'].includes(PSY.tab)?pick:'')+
  `<div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${PSY.tab===k?'on':''}" data-ro-ok onclick="PSY.tab='${k}';render()">${l}</button>`).join('')}</div>`+
@@ -7767,7 +7767,7 @@ function athPickK(e,inp){const r=inp.parentNode.querySelector('.apr');const bs=[
 function athPickGo(b){const box=b.closest('.athpick'),sel=box.querySelector('select');sel.value=b.dataset.v;sel.dispatchEvent(new Event('change',{bubbles:true}))}
 /* ============ AUTO UPDATE (a new version was published → the app reloads itself when nobody is typing) ============ */
 /* BM_APP_VER must equal VERSION in sw.js – both change with every release. */
-const BM_APP_VER='biomotor-v54-2026-11-27';
+const BM_APP_VER='biomotor-v55-2026-11-27';
 var UPD={shown:false,t:null};
 function updCheck(){if(UPD.shown||!/^https?:$/.test(location.protocol)||globalThis.BIOMOTOR_NATIVE)return;
  fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=String(t).match(/VERSION\s*=\s*'([^']+)'/);if(!m||m[1]===BM_APP_VER)return;
