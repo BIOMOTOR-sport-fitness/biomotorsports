@@ -7396,7 +7396,7 @@ const ltEdit=me=>!!me&&!roUser(me)&&!portalUser(me);
 /* ---------- staff page ---------- */
 P.ltad=()=>{ltInit();const me=authUser();const ed=ltEdit(me);const L=nutAthletes();if(!L.some(a=>a.id===LT.aid))LT.aid=L[0]?L[0].id:'';const a=byId('athletes',LT.aid);
  const tabs=[['overview','Overview'],['ath','Athlete'],['growth','Growth & maturation'],['tests','Testing'],['workout','Workout design'],['program','Stage programs'],['ex','Exercise library'],['norms','Norms & references']];
- const pick=`<select data-ro-ok style="width:auto;min-width:200px" onchange="LT.aid=this.value;LT.wk=null;WSH.id=null;render()">${L.map(x=>`<option value="${x.id}" ${x.id===LT.aid?'selected':''}>${esc(x.name)} · ${esc(ltSt(ltStage(x)).n)}</option>`).join('')}</select>`;
+ const pick=athPick(`<select data-ro-ok style="width:auto;min-width:200px" onchange="LT.aid=this.value;LT.wk=null;WSH.id=null;render()">${L.map(x=>`<option value="${x.id}" ${x.id===LT.aid?'selected':''}>${esc(x.name)}${x.sport?' · '+esc(x.sport):''} · ${esc(ltSt(ltStage(x)).n)}</option>`).join('')}</select>`);
  let body='';try{body=LT.tab==='overview'?ltOverview():LT.tab==='program'?ltProgramPage():LT.tab==='ex'?ltExPage():LT.tab==='norms'?ltNormsPage():!a?'<div class="card"><p class="muted">Add athletes first.</p></div>':LT.tab==='growth'?ltGrowthPage(a,ed):LT.tab==='tests'?ltTestsPage(a,ed):LT.tab==='workout'?ltWorkoutPage(a,ed):ltAthPage(a,ed)}catch(e){console.error(e);body=`<div class="card"><p class="muted">Could not show this tab: ${esc(e.message||e)}</p></div>`}
  return head('LTAD','Long-Term Athlete Development','Stage-wise program and workout design, growth & maturation tracking, testing, interpretation and recommendations.',['ath','growth','tests','workout'].includes(LT.tab)?pick+` <button class="btn" data-ro-ok onclick="ltPdf('${LT.aid}')">⬇ PDF</button>`:'')+
  `<div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${LT.tab===k?'on':''}" data-ro-ok onclick="LT.tab='${k}';WSH.id=null;render()">${l}</button>`).join('')}</div>`+body};
@@ -7755,7 +7755,7 @@ function rampRows(w){const R=rampFix(w);return [['Phase','Exercise','Sets','Reps
 function rampRecs(w){const R=rampFix(w);const out=[];if(!RAMP.some(([k])=>R[k].rows.length))return out;const nd=RAMP.filter(([k])=>R[k].rows.length&&/Not|Partly/.test(R.done[k]||'')).map(([,n])=>n);if(nd.length)out.push(`RAMP warm-up: ${nd.join(', ')} not fully completed – plan enough time; potentiation matters most before speed / power work.`);return out}
 
 /* ---------- athlete search box (type a name, pick from the list) ---------- */
-function athPick(sel){return `<div class="athpick" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><div style="position:relative"><input data-ro-ok type="search" autocomplete="off" placeholder="🔍 Search athlete…" style="width:230px" oninput="athPickF(this)" onfocus="athPickF(this)" onblur="setTimeout(()=>{const r=this.parentNode&&this.parentNode.querySelector('.apr');if(r)r.style.display='none'},200)" onkeydown="athPickK(event,this)"><div class="apr" style="position:absolute;z-index:60;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:340px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);max-height:300px;overflow:auto;display:none;padding:4px"></div></div>${sel}</div>`}
+function athPick(sel){return `<div class="athpick" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><div style="position:relative"><input data-ro-ok type="search" autocomplete="off" placeholder="🔍 Search athlete…" style="width:230px" oninput="athPickF(this)" onfocus="athPickF(this)" onblur="setTimeout(()=>{const r=this.parentNode&&this.parentNode.querySelector('.apr');if(r)r.style.display='none'},200)" onkeydown="athPickK(event,this)"><div class="apr" style="position:absolute;z-index:60;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);max-height:300px;overflow:auto;display:none;padding:4px"></div></div>${sel}</div>`}
 function athPickF(inp){const box=inp.closest('.athpick'),sel=box.querySelector('select'),r=box.querySelector('.apr');const q=inp.value.trim().toLowerCase();
  if(!q){r.style.display='none';r.innerHTML='';return}
  const words=q.split(/\s+/);const hits=[...sel.options].filter(o=>{const t=o.textContent.toLowerCase();return words.every(w=>t.includes(w))});
@@ -7767,7 +7767,7 @@ function athPickK(e,inp){const r=inp.parentNode.querySelector('.apr');const bs=[
 function athPickGo(b){const box=b.closest('.athpick'),sel=box.querySelector('select');sel.value=b.dataset.v;sel.dispatchEvent(new Event('change',{bubbles:true}))}
 /* ============ AUTO UPDATE (a new version was published → the app reloads itself when nobody is typing) ============ */
 /* BM_APP_VER must equal VERSION in sw.js – both change with every release. */
-const BM_APP_VER='biomotor-v55-2026-11-27';
+const BM_APP_VER='biomotor-v56-2026-11-27';
 var UPD={shown:false,t:null};
 function updCheck(){if(UPD.shown||!/^https?:$/.test(location.protocol)||globalThis.BIOMOTOR_NATIVE)return;
  fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=String(t).match(/VERSION\s*=\s*'([^']+)'/);if(!m||m[1]===BM_APP_VER)return;
