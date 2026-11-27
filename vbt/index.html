@@ -273,7 +273,8 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
         <input id="wName" style="flex:1;font-weight:700;font-size:16px" placeholder="Workout name">
         <input id="wDate" type="date" style="width:auto">
       </div>
-      <div class="row" style="margin-top:6px"><b id="wClock" style="color:var(--brand)"></b><span class="sp"></span><span class="wStreak muted"></span></div>
+      <div class="row" style="margin-top:6px;align-items:center;gap:8px"><b id="wClock" style="color:var(--brand)"></b><button class="btn sm" id="restStopBtn" style="display:none" title="Stop the rest timer">⏹ Stop rest</button><span class="sp"></span><span class="wStreak muted"></span></div>
+      <div class="row" id="camAllRow" style="margin-top:6px;display:none"><button class="btn sm" id="camAllBtn" title="Switch every exercise in this workout to live camera tracking">📷 Track all exercises with camera</button></div>
       <textarea id="wNotes" placeholder="Notes for this workout (rest, cues, targets…)" style="margin-top:8px;min-height:44px"></textarea>
       <div class="ex-sum" id="wSum" style="margin-top:8px"></div>
       <div class="row" style="margin-top:4px"><button class="btn pri" id="finBtn">🏁 Finish workout</button><span class="sp"></span><button class="btn sm" id="delWBtn" style="color:var(--critical)">Delete</button></div>
@@ -311,7 +312,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
       <select id="setPick"></select>
       <button class="btn sm" id="nextSet">›</button>
       <button class="btn sm" id="qsBtn" title="Quick set">⚡ Quick</button>
-    </div><div class="teamStrip" style="margin-top:6px"></div><div class="muted" id="trkRest" style="text-align:right;margin-top:4px;color:var(--brand);font-weight:700"></div><div style="display:none">
+    </div><div class="teamStrip" style="margin-top:6px"></div><div class="row" style="justify-content:flex-end;align-items:center;gap:8px;margin-top:4px"><span class="muted" id="trkRest" style="color:var(--brand);font-weight:700"></span><button class="btn sm" id="trkRestStop" style="display:none" title="Stop the rest timer">⏹ Stop rest</button></div><div style="display:none">
     </div>
     <div class="row" id="qsForm" style="display:none;margin-top:8px"><select id="qsEx" style="flex:2"></select><input id="qsKg" type="number" step="0.5" inputmode="decimal" placeholder="kg" style="flex:1"><input id="qsReps" type="number" inputmode="numeric" value="5" style="flex:1" placeholder="reps"><button class="btn sm pri" id="qsGo">Add</button></div>
   </div>
@@ -2290,6 +2291,9 @@ function ssLabels(w) {
   return L;
 }
 function lastDoneAt(sets) { let t = 0; sets.forEach(s => { if (isDone(s) && s.result.doneAt) t = Math.max(t, s.result.doneAt); }); return t; }
+// rest timer: running from the last completed set until the coach stops it (w.restStop) or the next set is completed
+const restOn = w => { if (!w || w.finished) return 0; const t = lastDoneAt(w.exercises.flatMap(e => e.sets)); return t && !(w.restStop && w.restStop >= t) ? t : 0; };
+function stopRest() { const w = curW(); if (!w) return; const t = restOn(w); if (!t) return; w.restStop = Date.now(); save(); renderWorkout(); toast('Rest timer stopped at ' + mmss(w.restStop - t) + ' – it starts again after the next set'); }
 function workoutStart(w) { return w.started || (() => { let t = Infinity; w.exercises.forEach(e => e.sets.forEach(s => { if (s.result && s.result.doneAt) t = Math.min(t, s.result.doneAt); })); return isFinite(t) ? t : null; })(); }
 
 const MCYC = [['M vel', r => fmt(r.summary.mean)], ['Prop vel', r => fmt(Math.max(...r.reps.map(q => q.mpv ?? q.mcv), 0))], ['Ecc pow', r => fmt(r.summary.eccPow || 0, 0) + ' W'], ['P vel', r => fmt(Math.max(...r.reps.map(q => q.pv), 0))], ['M pow', r => fmt(r.summary.mpow, 0) + ' W'], ['P pow', r => fmt(r.summary.ppow, 0) + ' W'], ['ROM', r => fmt(r.summary.rom * 100, 0) + ' cm'], ['VL', r => fmt(r.summary.vl, 0) + '%']];
@@ -2378,6 +2382,7 @@ function renderWorkout() {
   $('#wName').value = w.name; $('#wDate').value = w.date; $('#wNotes').value = w.notes || '';
   seg($('#wTrack'), [[1, 'On'], [0, 'Off']], w.tracking === false ? 0 : 1, v => { w.tracking = v === '1'; save(); renderWorkout(); renderSetPicker(); });
   $('#finBtn').textContent = w.finished ? '✓ Finished – close' : '🏁 Finish workout';
+  if ($('#camAllRow')) $('#camAllRow').style.display = !w.finished && w.exercises.some(e => isManualEx(w, e)) ? '' : 'none';
   const st = w.exercises.map(exStats).filter(Boolean);
   const ov = (() => { const D = w.exercises.flatMap(e => e.sets.filter(isDone).map(s => ({ e, s }))); if (!D.length) return ''; const R2 = D.filter(x => isVel(x.s)).map(x => readinessOf(w, x.e, x.s)).filter(Boolean), pr = D.filter(x => isVel(x.s) && prOnce(w, x.e, x.s)).length, st0 = workoutStart(w);
     return `<span>Sets <b>${D.length}/${w.exercises.reduce((t, e) => t + e.sets.length, 0)}</b></span>${st0 ? `<span>Time <b>${mmss((w.finished || Date.now()) - st0)}</b></span>` : ''}${R2.length ? `<span>Trend <b class="${(m => m >= 102 ? 'up' : m < 98 ? 'dn' : '')(R2.reduce((a, r) => a + r.pct, 0) / R2.length)}">${fmt(R2.reduce((a, r) => a + r.pct, 0) / R2.length, 0)}%</b></span>` : ''}${pr ? `<span>🏆 <b>${pr}</b> PR set${pr > 1 ? 's' : ''}</span>` : ''}`; })();
@@ -2387,7 +2392,7 @@ function renderWorkout() {
     const s = exStats(e), man = isManualEx(w, e), lastI = e.sets.reduce((k, x, i) => isDone(x) ? i : k, -1), nextOpen = e.sets.findIndex((x, i) => i > lastI && !isDone(x));
     const heavy = !man && s && s.maxLoad != null && e.sets.some(x => isDone(x) && x.result.manual && x.result.load >= s.maxLoad);
     const menu = `<select class="camb rowmenu" data-exmenu="${ei}"><option value="">⋯</option>${ei > 0 ? '<option value="ssUp">Superset with above</option>' : ''}${ei < w.exercises.length - 1 ? '<option value="ssDown">Superset with below</option>' : ''}${e.ss ? '<option value="ssOff">Remove from superset</option>' : ''}${ei > 0 ? '<option value="up">Move up</option>' : ''}${ei < w.exercises.length - 1 ? '<option value="down">Move down</option>' : ''}${man ? '' : '<option value="settings">Exercise settings</option>'}${man ? '' : '<option value="warm">Add warm-up sets…</option>'}<option value="swap">Swap exercise</option><option value="type">${(e.type || exType(e.name)) === 'manual' ? 'Track with camera' : 'Log by hand (no camera)'}</option><option value="del">Delete exercise &amp; sets</option></select>`;
-    const head = `<div class="ex-h">${SS[ei] ? `<span class="pill" style="background:var(--brand);color:#fff;border:0">${SS[ei]}</span>` : ''}<span class="muted" style="cursor:grab" title="Drag to reorder – drop on the middle of another card to superset">⠿</span><b style="flex:1;font-size:15px;cursor:pointer" data-coll="${e.id}" title="Tap to collapse">${COLL.has(e.id) ? '▸ ' : ''}${esc(e.name)}${COLL.has(e.id) ? ` <span class="muted" style="font-weight:400;font-size:12px">${e.sets.filter(isDone).length}/${e.sets.length} sets${e.sets.some(isDone) ? ' · top ' + Math.max(...e.sets.filter(isDone).map(q => q.result.load || 0)) + ' kg' : ''}</span>` : ''}</b><span class="muted" title="${man ? 'Logged by hand' : 'Tracked with the camera'}">${man ? '✍' : '📷'}</span>
+    const head = `<div class="ex-h">${SS[ei] ? `<span class="pill" style="background:var(--brand);color:#fff;border:0">${SS[ei]}</span>` : ''}<span class="muted" style="cursor:grab" title="Drag to reorder – drop on the middle of another card to superset">⠿</span><b style="flex:1;font-size:15px;cursor:pointer" data-coll="${e.id}" title="Tap to collapse">${COLL.has(e.id) ? '▸ ' : ''}${esc(e.name)}${COLL.has(e.id) ? ` <span class="muted" style="font-weight:400;font-size:12px">${e.sets.filter(isDone).length}/${e.sets.length} sets${e.sets.some(isDone) ? ' · top ' + Math.max(...e.sets.filter(isDone).map(q => q.result.load || 0)) + ' kg' : ''}</span>` : ''}</b>${w.finished ? `<span class="muted" title="${man ? 'Logged by hand' : 'Tracked with the camera'}">${man ? '✍' : '📷'}</span>` : man ? `<button class="btn sm" data-camon="${ei}" title="Track this exercise live with the camera (bar speed, ROM, power)" style="white-space:nowrap">📷 Track</button>` : `<button class="btn sm ghost" data-camoff="${ei}" title="Tracked with the camera – tap to log by hand instead" style="padding:4px 8px">📷</button>`}
       ${man ? '' : `<select data-exfocus="${ei}" title="Training focus" style="width:auto;max-width:120px;padding:5px">${Object.entries(FOCUS).map(([k, f]) => `<option value="${k}" ${(e.focus || focusFor(e.name)) === k ? 'selected' : ''}>${f.name}</option>`).join('')}</select><input type="number" step="0.01" value="${e.mvt}" data-exmvt="${ei}" title="1RM velocity (m/s)" style="width:58px;text-align:center">`}${menu}</div>`;
     const noteH = e.note ? `<div class="muted" style="font-size:12px;margin:-2px 0 4px">📝 ${esc(e.note)}</div>` : '';
     const hint = heavy ? `<div class="muted" style="font-size:12px;margin-bottom:4px">ℹ Heaviest set was marked complete – record it so e1RM and velocity trends can use it</div>` : '';
@@ -2420,8 +2425,9 @@ function renderWorkout() {
 }
 function tickTimers() {
   const now = Date.now(), w = curW();
-  $$('[data-since]').forEach(el => { const t = +el.dataset.since; el.textContent = t ? mmss(now - t) : '–'; });
-  const rest = w ? lastDoneAt(w.exercises.flatMap(e => e.sets)) : 0, st = w ? workoutStart(w) : null;
+  $$('[data-since]').forEach(el => { const t = +el.dataset.since; const stopped = w && w.restStop && t && w.restStop >= t; const row = el.closest('tr'); if (row) row.style.display = stopped ? 'none' : ''; el.textContent = t ? mmss(now - t) : '–'; });
+  const rest = restOn(w), st = w ? workoutStart(w) : null;
+  ['#restStopBtn', '#trkRestStop'].forEach(id => { const b = $(id); if (b) b.style.display = rest ? '' : 'none'; });
   const txt = w && !w.finished ? `${st ? '⏱ ' + mmss(now - st) : '⏱ not started'}${rest ? ' · rest ' + mmss(now - rest) : ''}` : w && w.finished && st ? `Finished · ${mmss(w.finished - st)}` : '';
   if ($('#wClock')) $('#wClock').textContent = txt;
   if ($('#trkRest')) $('#trkRest').textContent = w && !w.finished && rest ? `⏱ rest ${mmss(now - rest)}` : '';
@@ -2465,6 +2471,8 @@ $('#exList').addEventListener('click', e => {
   if (b.dataset.track) { const [ei, si] = b.dataset.track.split(':').map(Number); CUR = { ei, si }; showTab('track'); return; }
   if (b.dataset.qadd) { const [ei, si, d] = b.dataset.qadd.split(':').map(Number), st = w.exercises[ei].sets[si]; st.load = Math.max(0, +((st.load || 0) + d).toFixed(2)); save(); renderWorkout(); renderSetPicker(); return; }
   if (b.dataset.ptab) { const [id, t] = b.dataset.ptab.split(':'); PTAB[id] = t; return renderWorkout(); }
+  if (b.dataset.camon) { camTrack(w, [w.exercises[+b.dataset.camon]]); return; }
+  if (b.dataset.camoff) { const ex = w.exercises[+b.dataset.camoff]; if (ex.sets.some(isDone) && !confirm2('cm' + ex.id, `Log ${ex.name} by hand from now on`)) return; ex.type = 'manual'; save(); renderWorkout(); renderSetPicker(); return toast(ex.name + ' – logged by hand (tap 📷 Track to use the camera again)'); }
   if (b.dataset.prof && locked('e1rm')) return;
   if (b.dataset.prof) { SHOWPROF.has(b.dataset.prof) ? SHOWPROF.delete(b.dataset.prof) : SHOWPROF.add(b.dataset.prof); return renderWorkout(); }
   if (b.dataset.pctgo) { const ex = w.exercises.find(x => x.id === b.dataset.pctgo), pc = parseFloat($(`[data-pctin="${ex.id}"]`).value) || 0, kg = Math.round(+b.dataset.base * pc / 100 / 2.5) * 2.5; let n = 0; ex.sets.forEach(x => { if (!isDone(x)) { x.load = kg; n++; } }); save(); renderWorkout(); renderSetPicker(); return toast(`${n} open set${n === 1 ? '' : 's'} set to ${kg} kg (${pc}% of ${fmt(+b.dataset.base, 1)})`); }
@@ -2555,6 +2563,17 @@ $('#wHist').onchange = e => { const el = e.target; if (!el.dataset.hmenu) return
 $('#wName').onchange = e => { curW().name = e.target.value; save(); };
 $('#wDate').onchange = e => { curW().date = e.target.value || today(); save(); renderWorkout(); };
 $('#wNotes').onchange = e => { curW().notes = e.target.value; save(); };
+// switch exercises to live camera tracking (every set row gets a 📷 record button)
+function camTrack(w, list) { if (!w || !list.length) return;
+  if (w.tracking === false) { w.exercises.forEach(x => { if (!x.type) x.type = 'manual'; }); w.tracking = true; }
+  list.forEach(x => { x.type = 'tracked'; if (!(x.mvt > 0)) x.mvt = mvtOf(x.name); if (!x.focus) x.focus = focusFor(x.name);
+    x.sets.forEach(st => { if (isDone(st)) return; if (!(st.vMin > 0 && st.vMax > st.vMin && st.vMax <= 3)) { st.vMin = 0.5; st.vMax = 0.75; } }); });
+  const nonBar = list.filter(x => MANUAL_EX.includes(x.name) || /dumbbell|db |cable|machine|kettlebell|band|plank|bodyweight|pull-?up|push-?up|jump|throw/i.test(x.name)).map(x => x.name);
+  save(); renderWorkout(); renderSetPicker();
+  toast(list.length > 1 ? `${list.length} exercises now tracked with the camera – tap 📷 on a set to record` : `${list[0].name} – tap 📷 on a set to record it live`);
+  if (nonBar.length) setTimeout(() => toast('Note: the camera follows a round plate. ' + nonBar.slice(0, 3).join(', ') + (nonBar.length > 3 ? '…' : '') + ' may need a plate or tracking disc in view; otherwise use Load video or log by hand.'), 2600); }
+$('#camAllBtn').onclick = () => { const w = curW(); if (!w) return; camTrack(w, w.exercises.filter(e => isManualEx(w, e))); };
+$('#restStopBtn').onclick = stopRest; $('#trkRestStop').onclick = stopRest;
 $('#finBtn').onclick = () => { const w = curW(); if (!w) return; if (w.finished) { DB.curWorkout[w.athleteId] = null; save(); renderWorkout(); renderSetPicker(); return; } openFinish(w); };
 let PROGR = [];
 // suggest next session's loads: every planned set done; tracked sets at or above their target speed → +2.5 kg (lower body big lifts +5); hand-logged sets that hit their reps → +2.5 kg, or +1 rep without load
