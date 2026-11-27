@@ -402,6 +402,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
       <span id="fileCtl" style="display:none" class="row"><button class="btn sm" id="playBtn">⏯</button><select id="rateSel" style="width:auto"><option value="1">1×</option><option value="0.5" selected>0.5×</option><option value="0.25">0.25×</option></select></span>
     </div>
     <div class="row" id="scaleRow" style="margin-top:8px;gap:6px;flex-wrap:wrap;align-items:center;display:none"><span>Real length between the 2 points</span><input id="scaleCm" type="number" step="0.5" min="1" inputmode="decimal" style="width:90px"><span class="muted">cm</span><span id="scaleChips" class="row" style="gap:6px;flex-wrap:wrap"></span><button class="btn sm pri" id="scaleSave">✓ Use</button><button class="btn sm" id="scaleCancel">✕</button></div>
+    <div class="row" id="objRow" style="margin-top:8px;gap:6px;flex-wrap:wrap;align-items:center;display:none"><span id="objLbl" style="flex-basis:100%"></span><input id="objCm" type="number" step="0.1" min="1" inputmode="decimal" style="width:90px"><span class="muted">cm</span><select id="objShape" style="width:auto"><option value="round">Round head</option><option value="hex">Hex head (fit circle to the flats, measure across flats)</option></select><span id="objChips" class="row" style="gap:6px;flex-wrap:wrap"></span><button class="btn sm pri" id="objSave">✓ Use</button><button class="btn sm" id="objCancel">✕</button></div>
     <div class="muted" id="calStatus" style="margin-top:6px">Waiting for a video source.</div>
   </div>
 
@@ -462,7 +463,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
     <h3>Bar height</h3>
     <canvas class="chart" id="dPos"></canvas>
     <h3>Bar path (side view)</h3>
-    <canvas class="chart" id="dPath"></canvas>
+    <canvas class="chart" id="dPathCv"></canvas>
     <div class="tbl-wrap" style="margin-top:10px"><table id="dTbl"><thead><tr><th>Rep</th><th>M vel</th><th>P vel</th><th>TTPV s</th><th>ROM cm</th><th>Ecc s</th><th>Bottom s</th><th>Con s</th><th>Top s</th><th>Dur s</th><th>M pow W</th><th>P pow W</th><th>Ecc pow W</th><th>VL %</th><th></th></tr></thead><tbody></tbody></table></div>
   </div>
 </section>
@@ -3158,7 +3159,7 @@ $('#radSl').onchange = () => selGrab();
 $('#lockBtn').onclick = () => { if (!T.sel && T.preview) selectCand(refineVideoCircle(T.preview.x, T.preview.y, T.preview.r, 0.15) || T.preview); lockPlate(); };
 function lockPlate(auto) {
   const kind = tgtKind();
-  if (kind !== 'plate') { if (auto) return false; if (!T.scale) { autoScale(false).then(ok => { if (ok) toast('⚡ Auto scale set – tap 🔒 Lock again'); else scaleStart(); }); return false; }
+  if (kind !== 'plate') { if (auto) return false; if (!T.scale) { autoScale(false).then(ok => { if (ok) toast('⚡ Scale set – check the circle, then tap 🔒 Lock again'); else if ($('#objRow').style.display === 'none') scaleStart(); }); return false; }
     if (kind === 'joint') { if (!T.gray) return false; if (!POSE.lm) { toast(POSE.err ? 'Body tracking could not load: ' + POSE.err : 'Loading body tracking… try Lock again in a moment'); poseLoadV(); return false; } const r0 = 0.03 * Math.min(T.vw, T.vh); T.sel = T.sel || { x: T.vw / 2, y: T.vh / 2, r: r0, rv: r0, rh: r0, aspect: 1, contrast: null }; }
     else if (!T.sel) { toast(kind === 'db' ? 'Tap the dumbbell head first' : 'Tap the end of the bar (sleeve / collar) first'); return false; } }
   if (!T.sel || !T.gray) return false;
@@ -3218,13 +3219,14 @@ function poseTracker(getSrc, W, H, joint) {
 function tgtRender() { const S = ST_(), k = tgtKind();
   seg($('#tgtSeg'), Object.entries(TGT).map(([v, t]) => [v, t.icon + ' ' + t.label]), k, v => tgtSet(v));
   const j = $('#tgtJoint'); j.style.display = k === 'joint' ? '' : 'none'; if (!j.options.length) j.innerHTML = JOINTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); j.value = S.joint || 'R_WRIST';
-  $('#scaleBtn').style.display = k === 'plate' ? 'none' : ''; $('#autoScaleBtn').style.display = k === 'plate' ? 'none' : ''; $('#detBtn').style.display = k === 'plate' ? '' : 'none';
+  $('#scaleBtn').style.display = k === 'plate' ? 'none' : ''; $('#autoScaleBtn').style.display = k === 'plate' ? 'none' : ''; $('#autoScaleBtn').textContent = k === 'db' ? '⚡ Auto scale (head Ø)' : k === 'bar' ? '⚡ Auto scale (sleeve Ø)' : '⚡ Auto scale (body)'; $('#detBtn').style.display = k === 'plate' ? '' : 'none';
   seg($('#pnlTgt'), Object.entries(TGT).map(([v, t]) => [v, t.icon + ' ' + t.label]), k, v => tgtSet(v));
   const pj = $('#pnlJoint'); if (!pj.options.length) pj.innerHTML = JOINTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); pj.value = S.joint || 'R_WRIST'; $('#pnlJointRow').style.display = k === 'joint' ? 'flex' : 'none';
   $('#pnlPlateBox').style.display = k === 'plate' ? '' : 'none'; $('#plateInfo').style.display = k === 'plate' ? '' : 'none'; const sc = $('#pnlScale'); sc.style.display = k === 'plate' ? 'none' : 'block';
   sc.innerHTML = `<div class="muted" style="margin-bottom:6px">${T.scale ? `Scale${T.scale.auto ? ' (⚡ auto, height ' + T.scale.auto.H + ' cm)' : ' (manual)'}: <b>${fmt(T.scale.cm, 1)} cm = ${fmt(T.scale.px, 0)} px</b> (1 px = ${fmt(T.scale.cm * 10 / T.scale.px, 2)} mm)` : 'No scale yet – ⚡ Auto scale uses the athlete\'s body and height; 📏 Manual: tap two points a known distance apart and enter the cm.'}</div><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sm pri" id="pnlAutoBtn">⚡ Auto scale</button><button class="btn sm" id="pnlScaleBtn">📏 Manual scale</button><label class="row" style="gap:6px;cursor:pointer;font-size:13px"><input type="checkbox" id="pnlAutoOn" ${S.autoScale === false ? '' : 'checked'} style="width:18px;height:18px"> Auto scale when the video / camera starts</label></div>`;
   $('#pnlAutoBtn').onclick = () => { closePanels(); if (T.tracker) { $('#resetBtn').onclick(); setTimeout(() => autoScale(false), 150); } else autoScale(false); };
   $('#pnlAutoOn').onchange = e => { ST_().autoScale = e.target.checked; save(); };
+  if (k === 'db' || k === 'bar') { $('#pnlAutoOn').parentNode.style.display = 'none'; sc.insertAdjacentHTML('beforeend', `<div class="muted" style="margin-top:6px;font-size:12px">${k === 'db' ? `Dumbbell head sizes saved: ${Object.entries(S.dbHead || {}).filter(([x]) => x !== '_last').map(([x, v]) => x + ' kg = ' + v + ' cm').join(', ') || 'none yet'}` : `Sleeve Ø ${S.barCm || 5.0} cm`} · <a href="javascript:void 0" id="pnlObjEdit">change</a></div>`); $('#pnlObjEdit').onclick = () => { closePanels(); objAsk(); }; }
   $('#pnlScaleBtn').onclick = () => { closePanels(); if (T.tracker) { $('#resetBtn').onclick(); setTimeout(scaleStart, 150); } else scaleStart(); };
   const tp = $('#tPlate'); if (tp) tp.textContent = k === 'plate' ? `${S.plateCm} cm` : k === 'joint' ? 'Joint' : k === 'db' ? 'Dumbbell' : 'Barbell';
   const tb = document.querySelector('[data-tool=plate]'); if (tb && tb.firstChild && tb.firstChild.nodeType === 3) tb.firstChild.nodeValue = TGT[k].icon; }
@@ -3234,7 +3236,8 @@ function tgtSet(v) { if (T.set) return toast('Finish the set first'); const S = 
 function tgtHelp() { const k = tgtKind(); if (k === 'plate') return 'The ring follows the plate – or tap the plate centre, then its edge.';
   const step2 = '2) Scale: ⚡ Auto scale (from the athlete\'s body and height – runs by itself when the athlete height is saved) or 📏 Manual scale (tap two points a known distance apart and enter the cm). 3) 🔒 Lock.';
   if (k === 'joint') return `Body joint: ${jointName()}. 1) Keep the whole body in the picture, side-on. ${step2}`;
-  return `1) Tap the ${k === 'db' ? 'dumbbell head' : 'end of the bar (sleeve or collar)'} – drag / pinch the green circle to fit it. ${step2}`; }
+  return k === 'db' ? '1) Tap the CENTRE of the dumbbell head (round end facing the camera) – the green circle snaps to its edge; drag / pinch so it touches the edge all round. 2) Scale is automatic from the head diameter through the centre (measure it once with a tape – saved per kg). 3) 🔒 Lock. The circle centre is the tracked point. Tip: camera side-on at dumbbell height, 1× lens (not 0.5× ultra-wide).'
+    : '1) Tap the CENTRE of the bar end (sleeve end face) – the green circle snaps to its edge. 2) Scale is automatic from the sleeve diameter (Olympic 5.0 cm). 3) 🔒 Lock. With plates on the bar, ◎ Plate mode is more precise (bigger reference).'; }
 $('#pnlJoint').onchange = e => { $('#tgtJoint').value = e.target.value; $('#tgtJoint').onchange(e); };
 $('#tgtJoint').onchange = e => { ST_().joint = e.target.value; save(); tgtRender(); if (T.tracker && tgtKind() === 'joint') { T.tracker = null; T.phase = 'manT'; } $('#calStatus').textContent = tgtHelp(); redraw(); updateCTA(); };
 /* --- scale: two taps + known length --- */
@@ -3265,7 +3268,7 @@ function asDetect(cv, cx) { // one pose on the current video frame, in crop coor
   const r = POSE.lm.detectForVideo(cv, POSE.ts), L = r && r.landmarks && r.landmarks[0]; if (!L) return null;
   return L.map(p => ({ x: p.x * T.vw, y: p.y * T.vh, v: p.visibility == null ? 1 : p.visibility })); }
 async function autoScale(quiet) {
-  if (AS.busy) return false; const k = tgtKind(); if (k === 'plate') return false;
+  if (AS.busy) return false; const k = tgtKind(); if (k === 'plate') return false; if (k === 'db' || k === 'bar') return objAuto(quiet);
   if (!T.mode || !video.videoWidth) { if (!quiet) toast('Start the camera or load a video first'); return false; }
   if (T.tracker) { if (!quiet) toast('Reset first to set a new scale'); return false; }
   let H = asH(); if (!H) { if (quiet) return false; const v = parseFloat(prompt('Athlete height in cm (needed for auto scale)', '')); if (!(v > 100 && v < 230)) { toast('Auto scale needs the athlete height – or use 📏 Scale (manual)'); return false; }
@@ -3293,8 +3296,55 @@ async function autoScale(quiet) {
   $('#lockBtn').disabled = !(T.sel || tgtKind() === 'joint');
   st.textContent = `⚡ Auto scale set from the athlete's body (height ${H} cm, ${ok.length} segments, ${frames} frames): 1 px = ${fmt(10 / ppc, 2)} mm${spread > 15 ? ' – segments disagree, check side-on view or use 📏 Scale' : ''}. ${tgtKind() === 'joint' ? 'Now tap 🔒 Lock.' : T.sel ? 'Now tap 🔒 Lock.' : 'Now tap the ' + tgtLabel().toLowerCase() + '.'}`;
   if (!quiet) toast('Auto scale set – check the yellow line matches the body segment'); redraw(); updateCTA(); return true; }
-function autoScaleSoon(ms) { if (ST_().autoScale === false || tgtKind() === 'plate' || T.scale || !asH()) return; clearTimeout(AS.t); AS.t = setTimeout(() => { if (!T.scale && !T.tracker && tgtKind() !== 'plate' && T.mode) autoScale(true); }, ms || 1500); }
+function autoScaleSoon(ms) { if (ST_().autoScale === false || tgtKind() !== 'joint' || T.scale || !asH()) return; clearTimeout(AS.t); AS.t = setTimeout(() => { if (!T.scale && !T.tracker && tgtKind() !== 'plate' && T.mode) autoScale(true); }, ms || 1500); }
 $('#autoScaleBtn').onclick = () => autoScale(false);
+/* --- OBJECT SCALE (protocol) for Dumbbell and Barbell end ---
+   Scale must come from a reference in the SAME plane as the movement. The best reference is the tracked object itself:
+   • Dumbbell: the round end of the head. Its real diameter (edge to edge THROUGH THE CENTRE, measured once with a tape) is saved per dumbbell weight.
+   • Barbell end: the end face of the sleeve. Olympic bars have a 50 mm sleeve (IWF / IPF specification); standard 1-inch bars ≈ 25 mm.
+   The green circle is centred on the object (the tracked point = its centre). Its VERTICAL diameter in pixels (top edge → centre → bottom edge)
+   ÷ the real diameter gives mm per pixel. The vertical diameter is used because bar / dumbbell movement is mainly vertical and a camera that is
+   not perfectly side-on shrinks only the horizontal diameter (same rule as plate mode). Body joint keeps the body-segment auto scale. */
+const objKg = () => { const r = curSetRef(); const v = r ? +r.s.load : +(($('#qsKg') || {}).value || 0); return v > 0 ? +(+v).toFixed(2) : 0; };
+function objCm() { const S = ST_(), k = tgtKind(); if (k === 'bar') return +S.barCm || 5.0; if (k === 'db') { const M = S.dbHead || {}, kg = objKg(); return +(kg && M[kg] || 0); } return 0; }
+function objSync() { // keep the scale tied to the current circle (it follows drag / pinch / size slider until Lock)
+  if (!T.scale || !T.scale.obj || !T.sel || T.tracker) return; const rv = T.sel.rv || T.sel.r; T.scale.px = 2 * rv; T.scale.a = { x: T.sel.x, y: T.sel.y - rv }; T.scale.b = { x: T.sel.x, y: T.sel.y + rv }; }
+function objSnap() { // find the round edge around the tapped point: rays → strongest edge → circle fit (outliers removed) → repeat from the fitted centre
+  if (!T.sel || ST_().dbShape === 'hex') return false; let G; try { G = grayHi(720); } catch (e) { return false; } const { g, W, H } = G, s = G.s;
+  const smp = (x, y) => { const x0 = Math.floor(x), y0 = Math.floor(y); if (x0 < 0 || y0 < 0 || x0 >= W - 1 || y0 >= H - 1) return NaN; const fx = x - x0, fy = y - y0, i = y0 * W + x0; return g[i] * (1 - fx) * (1 - fy) + g[i + 1] * fx * (1 - fy) + g[i + W] * (1 - fx) * fy + g[i + W + 1] * fx * fy; };
+  let cx = T.sel.x * s, cy = T.sel.y * s, lo = 4, hi = 0.22 * Math.min(W, H), fit = null;
+  for (let pass = 0; pass < 3; pass++) { const P = [], N = 90;
+    for (let k = 0; k < N; k++) { const a = k / N * 2 * Math.PI, ux = Math.cos(a), uy = Math.sin(a); let best = 0, br = -1;
+      for (let rr = lo; rr <= hi; rr += 0.5) { const d = Math.abs(smp(cx + ux * (rr + 1.5), cy + uy * (rr + 1.5)) - smp(cx + ux * (rr - 1.5), cy + uy * (rr - 1.5))); if (d > best) { best = d; br = rr; } }
+      if (best > 12 && br > 0) P.push([cx + ux * br, cy + uy * br, a, best]); }
+    if (P.length < N * 0.3) return false;
+    let Q = P; for (let it = 0; it < 5; it++) { fit = kasa(Q); if (!fit) return false; const res = Q.map(p => Math.abs(Math.hypot(p[0] - fit.x, p[1] - fit.y) - fit.r)), m = [...res].sort((x, y) => x - y)[res.length >> 1]; const Z = Q.filter((p, i) => res[i] <= Math.max(1, 2.5 * m)); if (Z.length < N * 0.25 || Z.length === Q.length) break; Q = Z; }
+    if (!(fit.r > 4)) return false; cx = fit.x; cy = fit.y; lo = 0.7 * fit.r; hi = 1.3 * fit.r; }
+  const ref = refineCircle(G, cx, cy, fit.r, 0.12); const c = ref && Math.abs(ref.r - fit.r) / fit.r < 0.12 ? ref : { x: fit.x, y: fit.y, r: fit.r, rv: fit.r, rh: fit.r, aspect: 1 };
+  T.sel = { x: c.x / s, y: c.y / s, r: c.r / s, rv: (c.rv || c.r) / s, rh: (c.rh || c.r) / s, aspect: c.aspect || 1, contrast: c.contrast || null }; T.baseR = T.sel.r; T.baseRv = T.sel.rv; T.baseRh = T.sel.rh; $('#radSl').value = 100; return true; }
+function objAuto(quiet) { const k = tgtKind(); if (k !== 'db' && k !== 'bar') return false;
+  if (!T.sel) { if (!quiet) toast(k === 'db' ? 'Tap the centre of the dumbbell head first' : 'Tap the centre of the bar end (sleeve) first'); return false; }
+  const cm = objCm(); if (!cm) { objAsk(); return false; }
+  const rv = T.sel.rv || T.sel.r; T.scale = { cm, px: 2 * rv, a: { x: T.sel.x, y: T.sel.y - rv }, b: { x: T.sel.x, y: T.sel.y + rv }, obj: k }; scaleHide(); objHide(); tgtRender(); T.phase = 'manT'; $('#lockBtn').disabled = false;
+  const ov = T.sel.aspect && Math.abs(1 - T.sel.aspect) > 0.12;
+  $('#calStatus').textContent = `⚡ Scale from the ${k === 'db' ? 'dumbbell head' : 'sleeve end'}: Ø ${fmt(cm, 1)} cm = ${fmt(2 * rv, 0)} px (vertical diameter through the centre) → 1 px = ${fmt(cm * 10 / (2 * rv), 2)} mm.${ov ? ' The end looks oval – the camera is not fully side-on; the vertical diameter is used.' : ''} Fit the green circle edge to edge (drag / pinch), then 🔒 Lock. The tracked point is the circle centre.`;
+  redraw(); updateCTA(); return true; }
+function objHide() { const r = $('#objRow'); if (r) r.style.display = 'none'; }
+function objAsk() { const k = tgtKind(), S = ST_(), kg = objKg(); let chips = [];
+  if (k === 'bar') chips = [['5.0', 'Olympic sleeve 5.0 cm'], ['2.5', 'Standard 1-inch bar 2.5 cm']];
+  else { const M = S.dbHead || {}; chips = Object.keys(M).filter(x => x !== '_last').sort((a, b) => a - b).map(x => [String(M[x]), `${x} kg → ${M[x]} cm`]); }
+  $('#objLbl').innerHTML = k === 'db' ? `<b>Dumbbell head Ø${kg ? ' for ' + kg + ' kg' : ''}</b> – measure once with a tape across the round end, edge to edge <b>through the centre</b>` : '<b>Bar sleeve Ø</b> – end face of the sleeve, edge to edge through the centre (not the collar)';
+  $('#objChips').innerHTML = chips.map(([v, l]) => `<button class="btn sm" data-ocm="${v}">${l}</button>`).join('');
+  $('#objCm').value = k === 'bar' ? (S.barCm || 5.0) : ((S.dbHead || {})[kg] || ''); $('#objShape').style.display = k === 'db' ? '' : 'none'; $('#objShape').value = S.dbShape || 'round';
+  $('#objRow').style.display = 'flex'; scaleHide(); $('#calStatus').textContent = k === 'db' ? 'Enter the real diameter of the dumbbell head (saved for this weight – asked only once).' : 'Confirm the sleeve diameter (Olympic bar = 5.0 cm).'; }
+$('#objChips').onclick = e => { const b = e.target.closest('[data-ocm]'); if (b) $('#objCm').value = b.dataset.ocm; };
+$('#objShape').onchange = e => { ST_().dbShape = e.target.value; save(); };
+$('#objSave').onclick = () => { const cm = parseFloat($('#objCm').value), k = tgtKind(), S = ST_(); if (!(cm >= 1 && cm <= 60)) return toast('Enter the diameter in cm (1–60)');
+  if (k === 'bar') S.barCm = cm; else { const kg = objKg(); S.dbHead = S.dbHead || {}; if (kg) S.dbHead[kg] = cm; else return toast('Pick the set (kg) first – the head size is saved per dumbbell weight'); }
+  save(); objHide(); objAuto(false); };
+$('#objCancel').onclick = () => { objHide(); $('#calStatus').textContent = tgtHelp(); };
+{ const _rd2 = redraw; redraw = function () { objSync(); return _rd2.apply(this, arguments); }; }
+
 
 /* taps for non-plate targets (registered before the ring-adjust handler, so it runs first) */
 view.addEventListener('pointerdown', e => {
@@ -3311,14 +3361,14 @@ view.addEventListener('pointerdown', e => {
   const r = T.sel ? T.sel.r : Math.max(8, 0.035 * Math.min(T.vw, T.vh));
   T.sel = { x, y, r, rv: r, rh: r, aspect: 1, contrast: null }; T.baseR = r; T.baseRv = r; T.baseRh = r; $('#radSl').value = 100; $('#radSl').disabled = false;
   if (T.mode === 'file') { try { T.selT = video.currentTime; T.selGray = frameReader(video, 400).read(); } catch (er) { T.selGray = null; } }
-  $('#lockBtn').disabled = !T.scale; $('#calStatus').textContent = T.scale ? `${tgtLabel()} marked – fit the green circle to it (drag / pinch), then 🔒 Lock.` : `${tgtLabel()} marked. Setting the scale (⚡ auto, or 📏 manual)…`;
-  if (!T.scale) setTimeout(() => autoScale(true).then(ok => { if (!ok) scaleStart(); else $('#lockBtn').disabled = false; }), 300);
+  $('#lockBtn').disabled = !T.scale; $('#calStatus').textContent = T.scale ? `${tgtLabel()} marked – fit the green circle to it (drag / pinch), then 🔒 Lock.` : `${tgtLabel()} marked – finding its edge…`;
+  setTimeout(() => { if (T.scale && !T.scale.obj) { objSync(); } else { T.scale = null; objSnap(); objAuto(true); } updatePlateInfo(); redraw(); updateCTA(); }, 60);
   updatePlateInfo(); redraw(); updateCTA();
 });
 // keep the plate flow untouched; non-plate targets start in manual mode
 { const _rp = renderPanels; renderPanels = function () { const x = _rp.apply(this, arguments); try { tgtRender(); } catch (e) {} return x; }; }
 { const _sr = sourceReady; sourceReady = function () { const x = _sr.apply(this, arguments); tgtRender(); if (tgtKind() !== 'plate') { T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); updateCTA(); } if (tgtKind() === 'joint') poseLoadV().catch(() => {}); autoScaleSoon(T.mode === 'file' ? 600 : 2000); return x; }; }
-{ const _rc = resetCalib; resetCalib = function () { const x = _rc.apply(this, arguments); if (tgtKind() !== 'plate') { T.scale = null; T.scaleTap = []; scaleHide(); } return x; }; }
+{ const _rc = resetCalib; resetCalib = function () { const x = _rc.apply(this, arguments); if (tgtKind() !== 'plate') { T.scale = null; T.scaleTap = []; scaleHide(); objHide(); } return x; }; }
 { const _rb = $('#resetBtn').onclick; $('#resetBtn').onclick = async () => { await _rb(); if (tgtKind() !== 'plate' && T.mode) { T.phase = 'manT'; $('#calStatus').textContent = tgtHelp(); redraw(); } }; }
 // draw the scale line and the live joint marker
 { const _rd = redraw; redraw = function () { _rd.apply(this, arguments); if (!T.mode || !video.videoWidth || tgtKind() === 'plate') return; const s = T.vs, lw = Math.max(2, view.width / 360), P = T.scale ? [T.scale.a, T.scale.b] : (T.scaleTap || []);
@@ -3749,7 +3799,7 @@ async function analyseFile() {
   video.pause();
   let plate = null;
   const kind = tgtKind();
-  if (kind !== 'plate') { if (!T.scale && !(await autoScale(false))) { toast('Set the scale: ⚡ Auto scale needs the athlete in view, or use 📏 Manual scale'); return scaleStart(); } if (kind !== 'joint' && !T.sel) return toast(kind === 'db' ? 'Pause on a clear frame and tap the dumbbell head first' : 'Pause on a clear frame and tap the end of the bar first');
+  if (kind !== 'plate') { if (!T.scale && !(await autoScale(false))) { if ($('#objRow').style.display !== 'none') return; toast(kind === 'joint' ? 'Set the scale: ⚡ Auto scale needs the athlete in view, or use 📏 Manual scale' : 'Tap the centre of the ' + tgtLabel().toLowerCase() + ' first, or use 📏 Manual scale'); return kind === 'joint' ? scaleStart() : undefined; } if (kind !== 'joint' && !T.sel) return toast(kind === 'db' ? 'Pause on a clear frame and tap the dumbbell head first' : 'Pause on a clear frame and tap the end of the bar first');
     if (kind === 'joint' && !POSE.lm) { try { await poseLoadV(); } catch (e) {} if (!POSE.lm) return toast('Body tracking could not load' + (POSE.err ? ': ' + POSE.err : '')); } }
   if (kind === 'joint') { const r0 = 0.03 * Math.min(video.videoWidth, video.videoHeight); plate = { kind, joint: ST_().joint, scale: T.scale, x: video.videoWidth / 2, y: video.videoHeight / 2, r: r0, t: video.currentTime }; }
   else if (T.sel) { const r = T.sel; plate = { x: r.x, y: r.y, r: r.r, t: T.selT != null ? T.selT : video.currentTime, gray: T.selGray || null }; if (kind !== 'plate') Object.assign(plate, { kind, scale: T.scale });
@@ -4085,7 +4135,7 @@ function drawDetailCharts(rec) {
   hover($('#dVel'), x => { const tr = rec.trace; if (x < mv.L || x > mv.R) return null; const t = vo.xr[0] + (x - mv.L) / (mv.R - mv.L) * (vo.xr[1] - vo.xr[0]); let j = 0; while (j < tr.t.length - 1 && tr.t[j] < t) j++; return `t ${fmt(tr.t[j], 2)} s · v <b>${fmt(tr.v[j])}</b> m/s · h ${fmt(tr.y[j] * 100, 0)} cm`; });
   c = prep($('#dPos'), 170); const tr = rec.trace;
   lineChart(c.ctx, { x: 0, y: 0, w: c.w, h: c.h }, { theme: DARK, xr: [0, tr.t[tr.t.length - 1] || 1], yr: [0, Math.max(0.1, ...tr.y) * 110], xlabel: 'Time (s)', ylabel: 'Height (cm)', series: [{ xs: tr.t, ys: tr.y.map(v => v * 100) }], shades: rec.reps.map(r => ({ x0: r.startT, x1: r.endT })) });
-  c = prep($('#dPath'), 300); pathChart(c.ctx, { x: 0, y: 0, w: Math.min(c.w, 420), h: c.h }, rec, DARK);
+  c = prep($('#dPathCv'), 300); pathChart(c.ctx, { x: 0, y: 0, w: Math.min(c.w, 420), h: c.h }, rec, DARK);
   const COLS = [[r => r.mcv, 2], [r => r.pv, 2], [r => r.ttpv, 2], [r => r.rom * 100, 0], [r => r.ecc, 2], [r => r.pauseB, 2], [r => r.conDur, 2], [r => r.pauseT, 2], [r => r.dur, 2], [r => r.power, 0], [r => r.ppow, 0], [r => r.eccPow, 0], [r => r.vl, 0]];
   const row = (lab, f, cls, r) => `<tr ${cls ? 'style="color:var(--ink2);font-weight:700"' : ''}><td>${lab}</td>${COLS.map(([g, d], i) => `<td>${i === 0 && !cls ? '<b>' : ''}${fmt(f(g), d)}${i === 0 && !cls ? '</b>' : ''}</td>`).join('')}<td>${r ? `<button class="btn sm ghost" data-hide="${r.startT}" title="Hide this rep (unrack, re-rack, false rep)">🙈</button>` : ''}</td></tr>`;
   $('#dTbl tbody').innerHTML = rec.reps.map(r => row(r.n, g => g(r), 0, r)).join('') + (rec.reps.length > 1 ? row('Avg', g => rec.reps.reduce((a, r) => a + (g(r) || 0), 0) / rec.reps.length, 1) + row('Best', g => Math.max(...rec.reps.map(r => g(r) || 0)), 1) : '');

@@ -7906,7 +7906,7 @@ async function sprBuild(Lb,D,coach){const {PDFDocument,StandardFonts,rgb}=Lb;con
 
 /* ============ AUTO UPDATE (a new version was published → the app reloads itself when nobody is typing) ============ */
 /* BM_APP_VER must equal VERSION in sw.js – both change with every release. */
-const BM_APP_VER='biomotor-v61-2026-11-27';
+const BM_APP_VER='biomotor-v62-2026-11-27';
 var UPD={shown:false,t:null};
 function updCheck(){if(UPD.shown||!/^https?:$/.test(location.protocol)||globalThis.BIOMOTOR_NATIVE)return;
  fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=String(t).match(/VERSION\s*=\s*'([^']+)'/);if(!m||m[1]===BM_APP_VER)return;
