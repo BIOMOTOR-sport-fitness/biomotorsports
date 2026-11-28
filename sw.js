@@ -1,7 +1,7 @@
 /* BIOMOTOR Sport and Fitness — offline support for the installed app */
-const VERSION = 'biomotor-v73-2026-11-28';
+const VERSION = 'biomotor-v74-2026-11-28';
 const SHELL = ['./', './index.html', './download.html', './css/styles.css', './js/app.js', './sk/config.sk', './manifest.webmanifest',
-  './assets/bm-logo.png', './assets/bm-mark.png', './assets/bm-fav.png', './assets/icons/icon-192.png', './assets/icons/icon-512.png'];
+  './assets/bm-logo.png', './assets/bm-mark.png', './assets/bm-fav.png', './assets/icons/icon-192.png', './assets/icons/icon-512.png', './assets/vendor/pdf-lib.min.js'];
 const CDN = /^(https:\/\/(cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|fonts\.googleapis\.com|fonts\.gstatic\.com|storage\.googleapis\.com\/mediapipe-models))/;
 const BIG = /\/assets\/mediapipe\//;   // body-tracking model files: cache first, they never change
 

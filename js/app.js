@@ -5638,7 +5638,7 @@ function sess(){try{return Shubham.parse(localStorage.getItem(SESS_KEY)||session
 function authUser(){if(CLOUD)return CME&&CME.status==='Active'?CME:null;const s=sess();if(!s)return null;authDb();const a=accs().find(x=>x.id===s.id);if(!a||a.status!=='Active'||a.ver!==s.ver&&a.ver)return null;return a}
 const isAdmin=a=>a&&(a.owner||['Owner','Organization Admin'].includes(a.role));
 function signIn(a,remember){const v={id:a.id,ver:a.ver||0,at:Date.now()};try{(remember?localStorage:sessionStorage).setItem(SESS_KEY,Shubham.stringify(v));(remember?sessionStorage:localStorage).removeItem(SESS_KEY)}catch(e){}a.lastLogin=new Date().toISOString();save()}
-function signOut(){if(CLOUD){CME=null;CPROF=[];CPROF_OK=0;AU={view:'login',msg:'Signed out.',inv:''};location.hash='dashboard';render();if(SB)SB.auth.signOut().catch(()=>{});return}try{localStorage.removeItem(SESS_KEY);sessionStorage.removeItem(SESS_KEY)}catch(e){}AU={view:'login',msg:'Signed out.',inv:''};location.hash='dashboard';render()}
+function signOut(){try{localStorage.removeItem('bm_cme_off')}catch(e){}if(typeof OFF!=='undefined')OFF.on=false;if(CLOUD){CME=null;CPROF=[];CPROF_OK=0;AU={view:'login',msg:'Signed out.',inv:''};location.hash='dashboard';render();if(SB)SB.auth.signOut().catch(()=>{});return}try{localStorage.removeItem(SESS_KEY);sessionStorage.removeItem(SESS_KEY)}catch(e){}AU={view:'login',msg:'Signed out.',inv:''};location.hash='dashboard';render()}
 function authShell(body){const b=brInit();return `<div style="min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at 20% 10%,color-mix(in srgb,${b.accent} 25%,transparent),transparent 45%),linear-gradient(160deg,#8f0c1c,#d81f36)">
  <div class="card" style="max-width:460px;width:100%;margin:0"><div style="text-align:center"><img src="${bmLogo()}" style="max-width:380px;width:100%"><div class="muted" style="margin-top:6px">${esc(b.platform||'Performance Platform')}</div></div>${AU.msg?`<div style="margin:14px 0 0;padding:10px 12px;border-radius:10px;background:var(--card2);font-size:14px">${AU.msg}</div>`:''}${body}
  <div class="muted" style="text-align:center;font-size:12px;margin-top:16px">Owner: ${esc(OWNER_ACC.name)} · ${esc(OWNER_ACC.email)} · ${esc(OWNER_ACC.phone)}<br><a href="javascript:void 0" onclick="location.hash='legal-terms'" style="color:inherit">Terms</a> · <a href="javascript:void 0" onclick="location.hash='legal-privacy'" style="color:inherit">Privacy</a>${dlAppOk()?` · <a href="download.html" style="color:var(--accent);font-weight:700">📲 Download the app</a>`:''}<br><a href="${esc(siteUrl())}" target="_blank" rel="noopener" style="color:inherit;font-weight:600">🌐 ${esc(siteName())}</a></div></div></div>`}
@@ -5714,19 +5714,49 @@ async function skBoot(){if(globalThis.BIOMOTOR_CONFIG&&!CLOUD_CFG.fromCode){docu
 const SB_LIB='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 const cRedirect=()=>location.origin+location.pathname;
 function cloudLib(){return globalThis.supabase&&globalThis.supabase.createClient?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement('script');s.src=SB_LIB;s.onload=ok;s.onerror=()=>no(new Error('Could not load the Supabase library — check the internet connection'));document.head.appendChild(s)})}
+/* ---------- offline mode: the platform keeps working without internet (signed-in device) ----------
+   Last good profile is kept on the device (bm_cme_off). Without internet the app opens with it and the data saved on this
+   device; changes stay on the device. When the internet is back: sign-in check, cloud data pulled, records created while
+   offline (heart-rate sessions, HRV tests, load logs …) merged back in and saved to the cloud; athlete logs queued in
+   bm_outbox are uploaded. */
+var OFF={on:false,since:0,dirty:false,t:null};
+const bmNetErr=e=>/fetch|network|offline|Load failed|Supabase library|internet|timed? ?out|ERR_|NetworkError/i.test(String(e&&(e.message||e.name)||e||''));
+function bmOffStart(){let c=null;try{c=JSON.parse(localStorage.getItem('bm_cme_off')||'null')}catch(e){}let ses=null;try{ses=localStorage.getItem('bm_sb_auth')}catch(e){}
+ if(!c||!c.me||!ses)return false;CME=c.me;OFF.on=true;OFF.since=Date.now();OFF.dirty=false;load();CSYNC={state:'Offline – saved on this device',at:Date.now(),err:''};
+ clearInterval(OFF.t);OFF.t=setInterval(()=>{if(navigator.onLine)bmOffBack()},30000);setTimeout(()=>toast('📴 Offline mode – your work is saved on this device and uploads when the internet is back'),800);return true}
+// records created while offline (any top-level list, items with a newer "at" time) are kept when the cloud copy arrives
+function bmOffMerge(local){let n=0;const since=new Date(OFF.since-60000).toISOString();Object.keys(local||{}).forEach(k=>{const L=local[k];if(!Array.isArray(L))return;if(!Array.isArray(db[k]))db[k]=[];
+ const ids=new Set(db[k].map(x=>x&&x.id));L.forEach(x=>{if(x&&typeof x==='object'&&x.id&&!ids.has(x.id)&&String(x.at||x.createdAt||x.created||'')>=since){db[k].push(x);n++}})});
+ try{const lp=(local.meta||{}).dvPair;if(lp){db.meta=db.meta||{};db.meta.dvPair=Object.assign({},db.meta.dvPair||{},lp)}}catch(e){}return n}
+async function bmOffBack(){if(!OFF.on||OFF.busy)return;OFF.busy=true;const local=Shubham.parse(Shubham.stringify(db));
+ try{await cloudLib();if(!SB)SB=globalThis.supabase.createClient(CLOUD_CFG.url,CLOUD_CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'bm_sb_auth'}});
+  const keep=CME;CME=null;OFF.on=false;await cloudMe();if(!CME){CME=keep;OFF.on=true;OFF.busy=false;return}
+  const n=bmOffMerge(local);if(n){try{localStorage.setItem(KEY,Shubham.stringify(db))}catch(e){}await cloudPush(true)}
+  clearInterval(OFF.t);await bmOutboxFlush();toast('🌐 Back online'+(n?` – ${n} offline record(s) saved to the cloud`:''));render()}
+ catch(e){OFF.on=true;if(!CME)CME=(JSON.parse(localStorage.getItem('bm_cme_off')||'{}').me)||null}
+ OFF.busy=false}
+// athlete logs (meal_logs rows) made without internet wait here
+function bmOutbox(){try{return JSON.parse(localStorage.getItem('bm_outbox')||'[]')}catch(e){return []}}
+function bmOutboxAdd(row){const L=bmOutbox();L.push(Object.assign({_id:uid('ob')},row));try{localStorage.setItem('bm_outbox',JSON.stringify(L))}catch(e){}}
+async function bmOutboxFlush(){const L=bmOutbox();if(!L.length||!SB)return;const left=[];for(const r of L){try{const row=Object.assign({},r);delete row._id;const {error}=await SB.from('meal_logs').insert(row);if(error)throw error}catch(e){left.push(r)}}
+ try{localStorage.setItem('bm_outbox',JSON.stringify(left))}catch(e){}if(L.length>left.length)toast(`☁ ${L.length-left.length} saved log(s) uploaded`)}
+const bmIsOff=()=>OFF.on||navigator.onLine===false;
+window.addEventListener('online',()=>{setTimeout(()=>{if(OFF.on)bmOffBack();else bmOutboxFlush()},1500)});
+window.addEventListener('offline',()=>{if(CLOUD&&CME&&!OFF.on){OFF.on=true;OFF.since=Date.now();CSYNC={state:'Offline – saved on this device',at:Date.now(),err:''};toast('📴 Internet lost – working offline, data is saved on this device');clearInterval(OFF.t);OFF.t=setInterval(()=>{if(navigator.onLine)bmOffBack()},30000)}});
 async function cloudInit(){
  try{await cloudLib();SB=globalThis.supabase.createClient(CLOUD_CFG.url,CLOUD_CFG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'bm_sb_auth'}});
   SB.auth.onAuthStateChange((ev)=>{if(ev==='PASSWORD_RECOVERY'){CREC=true;AU={view:'newpw',msg:'',inv:''};render()}});
   const {data}=await SB.auth.getSession();if(data&&data.session)await cloudMe();
  }catch(e){CSYNC.err=String(e.message||e)}
+ if(!CME&&(!navigator.onLine||bmNetErr(CSYNC.err)))bmOffStart();
  CREADY=true;applyBrand();render()}
 const cRow=r=>({id:r.id,name:r.name||r.email,email:r.email,phone:r.phone||'',role:r.role,status:r.status,owner:!!r.owner,created:String(r.created_at||'').slice(0,10),lastLogin:r.last_login||''});
-async function cloudMe(){const {data:u}=await SB.auth.getUser();if(!u||!u.user){CME=null;return}
+async function cloudMe(){const {data:u,error:ue}=await SB.auth.getUser();if(ue&&bmNetErr(ue))throw new Error('offline: '+(ue.message||ue.name));if(!u||!u.user){CME=null;return}
  let {data:p,error}=await SB.from('profiles').select('*').eq('id',u.user.id).maybeSingle();if(error)throw error;
  if(!p){CME=null;CSYNC.err='Your profile row is missing — run supabase/setup.sql again.';return}
  let tok='';try{tok=localStorage.getItem('bm_inv')||''}catch(e){}
  if(p.status==='Pending'&&tok){const {data:r}=await SB.rpc('accept_invite',{tok});if(r&&!['not-found','no-profile'].includes(r)){({data:p}=await SB.from('profiles').select('*').eq('id',u.user.id).maybeSingle())}}
- CME=cRow(p);if(CME.status!=='Active')return;
+ CME=cRow(p);if(CME.status!=='Active')return;try{localStorage.setItem('bm_cme_off',JSON.stringify({me:CME,uid:u.user.id,at:Date.now()}))}catch(e){}
  try{await SB.rpc('touch_login')}catch(e){}
  await cloudPull();cloudLive();
  if(tok){const inv=(db.invites||[]).find(i=>i.token===tok&&i.status==='Pending'&&normEmail(i.email)===CME.email);if(inv){const pp=CME.name.split(/\s+/);invAccept(inv.id,true,{first:pp[0],last:pp.slice(1).join(' '),phone:CME.phone})}try{localStorage.removeItem('bm_inv')}catch(e){}}
@@ -5739,7 +5769,7 @@ async function cloudPull(rerender){if(!SB||!CME)return;cPulling=true;CSYNC.state
   else CSYNC={state:'Waiting for owner data',at:Date.now(),err:''};
  }catch(e){CSYNC.err=String(e.message||e);CSYNC.state='Offline'}
  cPulling=false;if(rerender){applyBrand();render();toast(CSYNC.err?'Sync failed: '+CSYNC.err:'Latest data loaded')}}
-function cloudQueue(){if(cPulling)return;clearTimeout(cPushT);CSYNC.state='Saving…';cPushT=setTimeout(()=>cloudPush(),1200)}
+function cloudQueue(){if(cPulling)return;if(OFF.on){OFF.dirty=true;CSYNC={state:'Saved on this device (offline)',at:Date.now(),err:''};const el=document.getElementById('cloudDot');if(el)el.outerHTML=cloudDot();return}clearTimeout(cPushT);CSYNC.state='Saving…';cPushT=setTimeout(()=>cloudPush(),1200)}
 async function cloudPush(force){if(!SB||!CME||CME.status!=='Active')return;
  try{const {error}=await SB.from('org_data').upsert({id:'main',data:db,updated_at:new Date().toISOString(),updated_by:CME.id});if(error)throw error;CSYNC={state:'Saved to cloud',at:Date.now(),err:''}}
  catch(e){CSYNC.err=String(e.message||e);CSYNC.state='Not saved';if(force!==false)toast('Cloud save failed — '+CSYNC.err)}
@@ -8015,7 +8045,7 @@ async function axdPdf(aid) { const a = byId('athletes', aid); if (!a) return; to
 
 /* ============ AUTO UPDATE (a new version was published → the app reloads itself when nobody is typing) ============ */
 /* BM_APP_VER must equal VERSION in sw.js – both change with every release. */
-const BM_APP_VER='biomotor-v73-2026-11-28';
+const BM_APP_VER='biomotor-v74-2026-11-28';
 var UPD={shown:false,t:null};
 function updCheck(){if(UPD.shown||!/^https?:$/.test(location.protocol)||globalThis.BIOMOTOR_NATIVE)return;
  fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=String(t).match(/VERSION\s*=\s*'([^']+)'/);if(!m||m[1]===BM_APP_VER)return;
@@ -8237,13 +8267,15 @@ function dvSave(kind,aid,S,load){dvInit();
  if(dvStaff()){const id=uid(kind==='HR'?'hs':'hv');db[kind==='HR'?'hrSessions':'hrvTests'].push(Object.assign({id,athlete:aid,by:nutMe().name,at:new Date().toISOString()},S));
   if(load){lmInit();db.loadLogs.push({id:'ll_'+id,hr:id,athlete:aid,date:S.date,type:load.type,min:load.min,rpe:load.rpe,ext:load.ext,by:nutMe().name,at:new Date().toISOString()})}
   save();toast('✓ Saved'+(load?' · load '+load.min*load.rpe+' AU':''))}
+ else if(CLOUD&&bmIsOff()){const me=authUser(),em=normEmail(me&&me.email||'');bmOutboxAdd({athlete_id:aid,email:em,log_date:S.date,meal:kind,data:S});if(load)bmOutboxAdd({athlete_id:aid,email:em,log_date:S.date,meal:'LOAD',data:load});toast('✓ Saved on this device – uploads when the internet is back');render()}
  else{nutLogAdd(aid,{meal:kind,log_date:S.date,data:S}).then(()=>{if(load)return nutLogAdd(aid,{meal:'LOAD',log_date:S.date,data:load})}).then(()=>dvCloudLoad(aid,true))}}
 async function dvCloudLoad(aid,force){if(!aid)return;const c=DV.cloud[aid];if(c&&!force&&Date.now()-c.t<60000)return;DV.cloud[aid]={t:Date.now(),rows:c?c.rows:[]};
  try{let rows;if(CLOUD&&SB){const {data,error}=await SB.from('meal_logs').select('*').eq('athlete_id',aid).in('meal',['HR','HRV']).gte('log_date',daysAgo(365)).order('log_date');if(error)throw error;rows=data||[]}
-  else rows=nutLocalLogs().filter(r=>r.athlete_id===aid&&['HR','HRV'].includes(r.meal));DV.cloud[aid]={t:Date.now(),rows}}catch(e){DV.cloud[aid]={t:Date.now(),rows:[]}}
+  else rows=nutLocalLogs().filter(r=>r.athlete_id===aid&&['HR','HRV'].includes(r.meal));DV.cloud[aid]={t:Date.now(),rows};try{localStorage.setItem('bm_dvc_'+aid,JSON.stringify(rows))}catch(e){}}
+ catch(e){let rows=[];try{rows=JSON.parse(localStorage.getItem('bm_dvc_'+aid)||'[]')}catch(e2){}DV.cloud[aid]={t:Date.now(),rows}}
  if(['#devices','#my-devices'].includes(location.hash))render()}
 function dvList(aid,kind){dvInit();if(!aid)return [];const loc=(kind==='HR'?db.hrSessions:db.hrvTests).filter(x=>x.athlete===aid).map(x=>Object.assign({src:'staff'},x));
- const cl=((DV.cloud[aid]||{}).rows||[]).filter(r=>r.meal===kind).map(r=>Object.assign({},r.data||{},{id:r.id,src:'athlete',date:r.log_date}));return loc.concat(cl).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')))}
+ const cl=((DV.cloud[aid]||{}).rows||[]).concat(bmOutbox().filter(r=>r.athlete_id===aid).map(r=>Object.assign({id:r._id,pending:true},r))).filter(r=>r.meal===kind).map(r=>Object.assign({},r.data||{},{id:r.id,src:'athlete',date:r.log_date,pending:r.pending}));return loc.concat(cl).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')))}
 const dvHrvList=aid=>dvList(aid,'HRV');
 function dvDel(kind,id){if(!confirm('Delete this record?'))return;dvInit();const k=kind==='HR'?'hrSessions':'hrvTests';db[k]=db[k].filter(x=>x.id!==id);db.loadLogs=(db.loadLogs||[]).filter(l=>l.hr!==id);save();render()}
 function dvPair(k,aid){const d=DV.devs.find(x=>x.k===k);if(!d)return;if(aid&&DV.devs.some(x=>x!==d&&x.aid===aid)&&!confirm('This athlete already has another device. Use this one too?'))return render();
@@ -8278,8 +8310,9 @@ function dvHelp(){const s=dvSupport();modal(`<h3 style="margin-top:0">How to con
  <h4>Wearing the Polar H10</h4><ol style="margin:0;padding-left:18px;line-height:1.6"><li>Wet the two electrode areas (inside of the strap) with water.</li><li>Strap just below the chest muscles, logo up and centred, snug.</li><li>Snap the H10 on – it wakes up only when it touches skin.</li><li>Tap <b>+ Connect</b> and choose “Polar H10 …” (the ID is printed on the sensor).</li></ol>
  <h4>Good to know</h4><ul style="margin:0;padding-left:18px;line-height:1.6"><li>The H10 can be connected to 2 apps at the same time (e.g. Polar Flow + BIOMOTOR).</li><li>Several straps can be connected at once – give each one an athlete, then use <b>Team wall</b> on a TV.</li><li>After <b>Stop</b> the athlete stands still for 60 s – the heart-rate drop (recovery) is saved with the session.</li><li>If it does not appear: take the sensor off the strap for 30 s, wet the strap again, close other apps that use it.</li></ul>
  <div class="row" style="margin-top:12px"><button class="btn" data-ro-ok onclick="closeModal()">Close</button></div>`)}
-function dvSupportBar(){const s=dvSupport();return s.ok?`<div class="card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="pill p-ok">✓ Bluetooth ready</span><span class="muted" style="font-size:13px">${esc(s.how)} · works on Android, iPhone / iPad (Bluefy), Windows, Mac, Chromebook</span><button class="btn sm" data-ro-ok onclick="dvHelp()" style="margin-left:auto">How to connect</button></div>`
- :`<div class="card" style="border-color:#f59e0b;margin-bottom:12px"><b>⚠️ ${s.why==='ios'?'iPhone / iPad: Safari cannot connect Bluetooth sensors (Apple rule).':s.why==='https'?'Open the platform with https:// to use Bluetooth.':'This browser cannot connect Bluetooth sensors.'}</b><p class="muted" style="margin:6px 0 10px">${s.why==='ios'?'Install the free <b>Bluefy – Web BLE Browser</b> app from the App Store, open <b>app.biomotorsports.com</b> in it and log in – everything else works the same.':'Use <b>Chrome</b> or <b>Edge</b>, or the BIOMOTOR Android / Windows / Mac app.'}</p><div class="row">${s.why==='ios'?`<a class="btn pri" data-ro-ok href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank" rel="noopener">Get Bluefy</a>`:''}<button class="btn" data-ro-ok onclick="dvHelp()">How to connect</button></div></div>`}
+function dvSupportBar(){const s=dvSupport();const off=CLOUD&&bmIsOff()?`<span class="pill" style="background:#334155;color:#fff">📴 Offline – saved on this device, uploads when the internet is back</span>`:'';return (off?`<div style="margin:0 0 10px">${off}</div>`:'')+(s.ok?`<div class="card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="pill p-ok">✓ Bluetooth ready</span><span class="muted" style="font-size:13px">${esc(s.how)} · works on Android, iPhone / iPad (Bluefy), Windows, Mac, Chromebook</span><button class="btn sm" data-ro-ok onclick="dvHelp()" style="margin-left:auto">How to connect</button></div>`
+ :`<div class="card" style="border-color:#f59e0b;margin-bottom:12px"><b>⚠️ ${s.why==='ios'?'iPhone / iPad: Safari cannot connect Bluetooth sensors (Apple rule).':s.why==='https'?'Open the platform with https:// to use Bluetooth.':'This browser cannot connect Bluetooth sensors.'}</b><p class="muted" style="margin:6px 0 10px">${s.why==='ios'?'Install the free <b>Bluefy – Web BLE Browser</b> app from the App Store, open <b>app.biomotorsports.com</b> in it and log in – everything else works the same.':'Use <b>Chrome</b> or <b>Edge</b>, or the BIOMOTOR Android / Windows / Mac app.'}</p><div class="row">${s.why==='ios'?`<a class="btn pri" data-ro-ok href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank" rel="noopener">Get Bluefy</a>`:''}<button class="btn" data-ro-ok onclick="dvHelp()">How to connect</button></div></div>`)}
+
 function dvCatalog(){const item=(ic,t,sub,btn)=>`<div class="card" style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:28px">${ic}</span><b style="font-size:16px">${t}</b></div><div class="muted" style="font-size:12.5px;flex:1">${sub}</div><div>${btn}</div></div>`;
  return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
  ${item('❤️','Heart-rate strap','Polar H10 / H9 / OH1 / Verity Sense, Garmin HRM, Wahoo TICKR, Coospo… (any Bluetooth heart-rate sensor). Live HR, zones, TRIMP, recovery, HRV.',`<button class="btn pri" data-ro-ok onclick="dvConnect()">+ Connect</button>`)}
