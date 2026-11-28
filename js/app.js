@@ -5457,7 +5457,7 @@ axNav=(function(f){return function(me){return portalUser(me)?ATH_NAV:f(me)}})(ax
 window.BMP={get db(){return db},save(){save()},user(){return authUser()}};
 var VB={force:0,tab:'track',url:'',aid:'',ex:''};
 function vbSrc(){return 'vbt/index.html'}
-function vbLoad(){const f=document.getElementById('vbtFrame');if(!f||f.dataset.ld)return;f.dataset.ld=1;if(typeof VBT_SRC==='string')f.srcdoc=VBT_SRC;else f.src=vbSrc()}
+function vbLoad(){const f=document.getElementById('vbtFrame');if(!f||f.dataset.ld)return;if(vbRestore())return;f.dataset.ld=1;if(typeof VBT_SRC==='string')f.srcdoc=VBT_SRC;else f.src=vbSrc()}
 const vbCamOk=()=>!!globalThis.BIOMOTOR_NATIVE||/biomotorsports\.com$|^localhost|^127\./.test(location.hostname)
 function vbFull(){const f=document.getElementById('vbtFrame');if(!f)return;const r=f.requestFullscreen||f.webkitRequestFullscreen;try{const p=r&&r.call(f);if(p&&p.catch)p.catch(()=>toast('Full screen is not available here'))}catch(e){toast('Full screen is not available here')}}
 function vbTab(t){VB.tab=t;VB.force=1;render()}
@@ -5475,9 +5475,17 @@ P['live-vbt']=()=>{const t=VB.tab;
  const acts=`<div class="row" style="gap:6px;flex-wrap:wrap" data-ro-ok><button class="btn ${t==='track'?'pri':''}" onclick="vbTab('track')">📹 Tracker</button><button class="btn ${t==='res'?'pri':''}" onclick="vbTab('res')">📊 Results</button>${t==='track'?'<button class="btn" onclick="vbFull()">⛶ Full screen</button>':''}</div>`;
  const h=head('Train','Live VBT Track','Camera velocity-based training: bar speed, ROM, power, e1RM and load–velocity profiles. Your platform athletes appear in the tracker automatically and finished sessions come back to the platform.',acts);
  if(t==='res')return h+vbResults();
- return h+(vbCamOk()?'':`<div class="card" style="border:1px dashed var(--accent);font-size:14px">📷 Live camera works on <b>app.biomotorsports.com</b> and in the installed app. In this preview the browser blocks the camera — use <b>Load video</b> inside the tracker to analyse a recorded lift.</div>`)+`<iframe id="vbtFrame" class="vbt-frame" allow="camera *; microphone *; fullscreen *; autoplay *; screen-wake-lock *" allowfullscreen title="Live VBT Track"></iframe><p class="muted" style="font-size:12px">Tip: put the phone side-on on a tripod with the whole plate in view. Recordings and videos stay on this device; the session summary is saved to the platform.</p>`};
+ return h+(vbCamOk()?'':`<div class="card" style="border:1px dashed var(--accent);font-size:14px">📷 Live camera works on <b>app.biomotorsports.com</b> and in the installed app. In this preview the browser blocks the camera — use <b>Load video</b> inside the tracker to analyse a recorded lift.</div>`)+`<div id="vbtLoad" class="card" style="display:flex;align-items:center;gap:10px;padding:12px 16px"><span class="vbspin"></span><span class="muted">Opening the tracker…</span></div><style>.vbspin{width:18px;height:18px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:vbsp 0.8s linear infinite}@keyframes vbsp{to{transform:rotate(360deg)}}</style><iframe id="vbtFrame" onload="const l=document.getElementById('vbtLoad');if(l)l.remove()" class="vbt-frame" allow="camera *; microphone *; fullscreen *; autoplay *; screen-wake-lock *" allowfullscreen title="Live VBT Track"></iframe><p class="muted" style="font-size:12px">Tip: put the phone side-on on a tripod with the whole plate in view. Recordings and videos stay on this device; the session summary is saved to the platform.</p>`};
 /* keep the tracker running: other renders (sync from another device, timers) must not reload it */
-{const _r=render;render=function(){document.body.classList.toggle('vbt-on',location.hash==='#live-vbt');if(VB.force){VB.force=0;_r();vbLoad();return}if(location.hash==='#live-vbt'&&document.getElementById('vbtFrame')&&authUser()){try{drawNav('live-vbt')}catch(e){}return}_r();vbLoad()}}
+/* keep the loaded tracker alive while you visit other pages: Element.moveBefore (Chrome / Edge / Android) moves the
+   iframe without reloading it, so opening Live VBT Track again is instant; the camera is stopped while you are away */
+function vbKeep(){const f=document.getElementById('vbtFrame');if(!f||!f.dataset.ld||!document.body.moveBefore)return;let h=document.getElementById('vbtKeepBox');
+ if(!h){h=document.createElement('div');h.id='vbtKeepBox';h.style.display='none';document.body.appendChild(h)}
+ try{const w=f.contentWindow;const v=w&&w.document.querySelector('video');if(v&&v.srcObject&&typeof w.stopSource==='function')w.stopSource();try{w.eval('if(typeof WL!=="undefined"&&WL){WL.release();WL=null}')}catch(e){}}catch(e){}
+ try{h.moveBefore(f,null);f.id='vbtKept'}catch(e){}}
+function vbRestore(){const k=document.getElementById('vbtKept'),f=document.getElementById('vbtFrame');if(!k||!f||!f.parentNode.moveBefore)return false;
+ try{f.parentNode.moveBefore(k,f);f.remove();k.id='vbtFrame';const l=document.getElementById('vbtLoad');if(l)l.remove();try{const w=k.contentWindow;if(typeof w.wakeLock==='function')w.wakeLock()}catch(e){}return true}catch(e){k.remove();return false}}
+{const _r=render;render=function(){document.body.classList.toggle('vbt-on',location.hash==='#live-vbt');if(VB.force){VB.force=0;vbKeep();_r();vbLoad();return}if(location.hash==='#live-vbt'&&document.getElementById('vbtFrame')&&authUser()){try{drawNav('live-vbt')}catch(e){}return}vbKeep();_r();vbLoad()}}
 
 /* ============ BIOMOTOR PULSE DESIGN (own icon set, sidebar, labels) ============ */
 var SKI={
@@ -8045,7 +8053,7 @@ async function axdPdf(aid) { const a = byId('athletes', aid); if (!a) return; to
 
 /* ============ AUTO UPDATE (a new version was published → the app reloads itself when nobody is typing) ============ */
 /* BM_APP_VER must equal VERSION in sw.js – both change with every release. */
-const BM_APP_VER='biomotor-v74-2026-11-28';
+const BM_APP_VER='biomotor-v75-2026-11-28';
 var UPD={shown:false,t:null};
 function updCheck(){if(UPD.shown||!/^https?:$/.test(location.protocol)||globalThis.BIOMOTOR_NATIVE)return;
  fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=String(t).match(/VERSION\s*=\s*'([^']+)'/);if(!m||m[1]===BM_APP_VER)return;
