@@ -1,13 +1,16 @@
 /* BIOMOTOR Sport and Fitness — offline support for the installed app */
-const VERSION = 'biomotor-v75-2026-11-28';
+const VERSION = 'biomotor-v76-2026-11-28';
 const SHELL = ['./', './index.html', './download.html', './css/styles.css', './js/app.js', './sk/config.sk', './manifest.webmanifest',
   './assets/bm-logo.png', './assets/bm-mark.png', './assets/bm-fav.png', './assets/icons/icon-192.png', './assets/icons/icon-512.png', './assets/vendor/pdf-lib.min.js', './vbt/index.html'];
 const CDN = /^(https:\/\/(cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|fonts\.googleapis\.com|fonts\.gstatic\.com|storage\.googleapis\.com\/mediapipe-models))/;
 const BIG = /\/assets\/mediapipe\//;   // body-tracking model files: cache first, they never change
 
+// a response that came through a redirect (Firebase "cleanUrls": /index.html -> /) must not be handed to the page as it is:
+// Safari refuses it ("Response served by service worker has redirections") – copy it into a fresh response first
+const clean = r => (r && r.redirected) ? r.blob().then(b => new Response(b, { status: r.status, statusText: r.statusText, headers: r.headers })) : Promise.resolve(r);
 self.addEventListener('install', e => {
   // fresh copies of this version's files (bypass the browser HTTP cache)
-  e.waitUntil(caches.open(VERSION).then(c => Promise.all(SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => null)))).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then(c => Promise.all(SHELL.map(u => fetch(new Request(u, { cache: 'reload' })).then(r => r.ok ? clean(r).then(x => c.put(u, x)) : null).catch(() => null)))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
@@ -23,14 +26,20 @@ self.addEventListener('fetch', e => {
   }
   if (url.origin === location.origin) {
     if (/\/sw\.js$/.test(url.pathname) || req.cache === 'no-store') return;   // update checks always go to the network
-    // pages, code and the VBT tracker: open at once from this version's cache, refresh the cache in the background
+    if (req.mode === 'navigate') {
+      // pages: network first (always the newest page), the cached copy when offline
+      e.respondWith(fetch(req).then(r => { if (r.ok) { const c = r.clone(); clean(c).then(x => caches.open(VERSION).then(k => k.put(req, x))); } return r; })
+        .catch(() => caches.open(VERSION).then(async k => clean((await k.match(req)) || (await k.match('./index.html')) || (await k.match('./'))).then(x => x || Response.error()))));
+      return;
+    }
+    // code and the VBT tracker: open at once from this version's cache, refresh the cache in the background
     // (every release changes VERSION, so a new version installs fresh copies of all files and the app reloads itself)
     e.respondWith(caches.open(VERSION).then(async c => {
       const hit = await c.match(req);
-      const net = fetch(req, { cache: 'no-cache' }).then(r => { if (r.ok) c.put(req, r.clone()); return r; }).catch(() => null);
-      if (hit) { e.waitUntil(net); return hit; }
+      const net = fetch(req, { cache: 'no-cache' }).then(r => { if (r.ok) { const x = r.clone(); clean(x).then(y => c.put(req, y)); } return r; }).catch(() => null);
+      if (hit) { e.waitUntil(net); return clean(hit); }
       const r = await net;
-      return r || (req.mode === 'navigate' ? (await c.match('./index.html')) || Response.error() : Response.error());
+      return r ? clean(r) : Response.error();
     }));
     return;
   }
