@@ -5642,7 +5642,9 @@ function signOut(){if(CLOUD){CME=null;CPROF=[];CPROF_OK=0;AU={view:'login',msg:'
 function authShell(body){const b=brInit();return `<div style="min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at 20% 10%,color-mix(in srgb,${b.accent} 25%,transparent),transparent 45%),linear-gradient(160deg,#8f0c1c,#d81f36)">
  <div class="card" style="max-width:460px;width:100%;margin:0"><div style="text-align:center"><img src="${bmLogo()}" style="max-width:380px;width:100%"><div class="muted" style="margin-top:6px">${esc(b.platform||'Performance Platform')}</div></div>${AU.msg?`<div style="margin:14px 0 0;padding:10px 12px;border-radius:10px;background:var(--card2);font-size:14px">${AU.msg}</div>`:''}${body}
  <div class="muted" style="text-align:center;font-size:12px;margin-top:16px">Owner: ${esc(OWNER_ACC.name)} · ${esc(OWNER_ACC.email)} · ${esc(OWNER_ACC.phone)}<br><a href="javascript:void 0" onclick="location.hash='legal-terms'" style="color:inherit">Terms</a> · <a href="javascript:void 0" onclick="location.hash='legal-privacy'" style="color:inherit">Privacy</a>${dlAppOk()?` · <a href="download.html" style="color:var(--accent);font-weight:700">📲 Download the app</a>`:''}<br><a href="${esc(siteUrl())}" target="_blank" rel="noopener" style="color:inherit;font-weight:600">🌐 ${esc(siteName())}</a></div></div></div>`}
-const dlAppOk=()=>!!globalThis.BIOMOTOR_CONFIG&&!globalThis.BIOMOTOR_NATIVE&&/^https?:$/.test(location.protocol);
+// inside the BIOMOTOR Android / desktop app (bundled copy, or the live site opened by the app)
+const bmInApp=()=>!!globalThis.BIOMOTOR_NATIVE||!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())||/Electron\//.test(navigator.userAgent);
+const dlAppOk=()=>!!globalThis.BIOMOTOR_CONFIG&&!bmInApp()&&/^https?:$/.test(location.protocol);
 const af=(id,l,t='text',v='',ex='')=>`<div style="margin-top:12px"><label>${l}</label><input id="${id}" type="${t}" value="${esc(v)}" ${ex}></div>`;
 function renderAuth(){if(CLOUD)return renderCloudAuth();closeModal();document.body.classList.add('tvmode');const o=authDb();const v=document.getElementById('view');
  if(!o.hash)AU.view='owner';let h='';
@@ -5765,7 +5767,7 @@ function renderCloudAuth(){closeModal();document.body.classList.add('tvmode');co
  <div class="row" style="justify-content:space-between;margin-top:14px;font-size:14px"><a href="javascript:void 0" style="color:var(--accent)" onclick="AU.view='signup';AU.msg='';renderAuth()">Create account</a><a href="javascript:void 0" style="color:var(--muted)" onclick="AU.view='forgot';AU.msg='';renderAuth()">Forgot password?</a></div>`;
  v.innerHTML=authShell(h)}
 const cErr=e=>{const m=String(e&&e.message||e||'');return /Invalid login/i.test(m)?'Wrong email or password':/Email not confirmed/i.test(m)?'Please confirm your email first — open the link we sent you':/already registered/i.test(m)?'This email already has an account — sign in instead':/rate limit/i.test(m)?'Too many attempts — wait a minute and try again':m}
-const cGoogleOk=()=>!globalThis.BIOMOTOR_NATIVE&&/^https?:$/.test(location.protocol);
+const cGoogleOk=()=>!bmInApp()&&/^https?:$/.test(location.protocol);
 async function cAuthGoogle(){if(AU.inv)try{localStorage.setItem('bm_inv',AU.inv)}catch(x){}const {error}=await SB.auth.signInWithOAuth({provider:'google',options:{redirectTo:cRedirect(),queryParams:{prompt:'select_account'}}});if(error)toast(/provider is not enabled/i.test(error.message||'')?'Google sign-in is not switched on yet — turn it on in Supabase → Authentication → Providers → Google':cErr(error))}
 async function cAuthLogin(){const e=normEmail(aval('alI')),w=aval('alW');if(!e||!w){toast('Enter email and password');return}
  const {error}=await SB.auth.signInWithPassword({email:e,password:w});if(error){AU.msg=esc(cErr(error));renderAuth();return}
@@ -5949,7 +5951,7 @@ async function medVerifyAssert(cred,bio,challenge){
  try{if(cred.alg===-257){const k=await crypto.subtle.importKey('spki',pk,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['verify']);return {ok:await crypto.subtle.verify('RSASSA-PKCS1-v1_5',k,sig,data)}}
   const k=await crypto.subtle.importKey('spki',pk,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);return {ok:await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},k,medDer2Raw(sig),data)}}
  catch(e){return {ok:false,why:'signature check failed'}}}
-const medNative=()=>!!globalThis.BIOMOTOR_NATIVE||!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
+const medNative=()=>bmInApp();
 const medWebOk=()=>!!(window.PublicKeyCredential&&window.isSecureContext&&!medNative());
 async function medBioOk(){try{return medWebOk()&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()}catch(e){return false}}
 const MED_LIVE='https://app.biomotorsports.com/';
@@ -8013,13 +8015,13 @@ async function axdPdf(aid) { const a = byId('athletes', aid); if (!a) return; to
 
 /* ============ AUTO UPDATE (a new version was published → the app reloads itself when nobody is typing) ============ */
 /* BM_APP_VER must equal VERSION in sw.js – both change with every release. */
-const BM_APP_VER='biomotor-v67-2026-11-28';
+const BM_APP_VER='biomotor-v72-2026-11-28';
 var UPD={shown:false,t:null};
 function updCheck(){if(UPD.shown||!/^https?:$/.test(location.protocol)||globalThis.BIOMOTOR_NATIVE)return;
  fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=String(t).match(/VERSION\s*=\s*'([^']+)'/);if(!m||m[1]===BM_APP_VER)return;
   try{if(sessionStorage.getItem('bm_upd_tried')===m[1])return}catch(e){}updShow(m[1])}).catch(()=>{})}
 // new version found: update by itself, but never while someone is typing, has a box open or the page is hidden
-function updBusy(){const a=document.activeElement,m=document.getElementById('modal');return document.hidden||!!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)&&a.type!=='checkbox')||!!(m&&m.classList.contains('open'))||!!(typeof MED!=='undefined'&&MED.busy)||!!(typeof AX_EVT!=='undefined'&&Date.now()-AX_EVT<15000)||!!(typeof CSYNC!=='undefined'&&/Saving/.test(CSYNC.state||''))}
+function updBusy(){const a=document.activeElement,m=document.getElementById('modal');return document.hidden||!!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)&&a.type!=='checkbox')||!!(m&&m.classList.contains('open'))||!!(typeof MED!=='undefined'&&MED.busy)||!!(typeof AX_EVT!=='undefined'&&Date.now()-AX_EVT<15000)||!!(typeof CSYNC!=='undefined'&&/Saving/.test(CSYNC.state||''))||!!(typeof DV!=='undefined'&&DV.devs.length)}
 function updShow(v){UPD.v=v;if(UPD.shown)return;UPD.shown=true;updTry()}
 function updTry(){clearTimeout(UPD.t);if(updBusy()){UPD.t=setTimeout(updTry,20000);return}
  const d=document.createElement('div');d.id='updBar';d.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483646;background:#1d1d22;color:#fff;border-radius:14px;padding:10px 16px;box-shadow:0 10px 30px rgba(0,0,0,.35);font:14px Inter,system-ui,sans-serif';
@@ -8028,4 +8030,451 @@ function updTry(){clearTimeout(UPD.t);if(updBusy()){UPD.t=setTimeout(updTry,2000
   try{const r=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration();if(r)await r.update()}catch(e){}
   try{const ks=await caches.keys();await Promise.all(ks.filter(k=>k!==UPD.v).map(k=>caches.delete(k)))}catch(e){}setTimeout(()=>location.reload(),600)},2000)}
 setTimeout(updCheck,4000);setInterval(updCheck,2*60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)updCheck()});
+/* ============ DEVICE CONNECTOR ============
+   One place for every sensor / wearable. Now: Bluetooth heart-rate straps (Polar H10, H9, Verity Sense, Garmin HRM, Wahoo
+   TICKR … – the standard Bluetooth Heart Rate service 0x180D, beat-to-beat RR intervals included). Later: OVR Velocity and
+   other devices go in the same page.
+   Works in: Chrome / Edge (Android, Windows, Mac, Chromebook, Linux) through Web Bluetooth; the BIOMOTOR Android app and the
+   desktop apps through their own Bluetooth bridge; iPhone / iPad through the Bluefy browser (Safari has no Web Bluetooth).
+   v69: heart-rate monitor 2 – zone gauge with beating heart, zone ladder with time in zone, zone-coloured live chart,
+   live session tiles (time, avg, max, kcal, TRIMP, live RMSSD), 60-s heart-rate recovery after each session, team wall
+   (full screen for a TV), session report with chart + zone donut, HRV trend with the 7-day rolling baseline band.
+   Saved: staff → db.hrSessions / db.hrvTests (+ db.loadLogs when an RPE is entered); athletes → their own logs (meal_logs:
+   HR / HRV / LOAD). */
+var DV={devs:[],n:0,tab:'live',aid:'',cloud:{},tick:null,wake:null,log:[]};
+const DV_U={hrs:'0000180d-0000-1000-8000-00805f9b34fb',hrm:'00002a37-0000-1000-8000-00805f9b34fb',bas:'0000180f-0000-1000-8000-00805f9b34fb',bl:'00002a19-0000-1000-8000-00805f9b34fb'};
+const DV_Z=[[.5,'Z1 Very light','#94a3b8','Warm-up / recovery'],[.6,'Z2 Light','#3b82f6','Aerobic base, fat use'],[.7,'Z3 Moderate','#22c55e','Aerobic fitness'],[.8,'Z4 Hard','#f59e0b','Threshold, lactate'],[.9,'Z5 Maximum','#ef4444','Maximal / anaerobic']];
+const DV_REF={tanaka:'Tanaka H, Monahan KD, Seals DR. Age-predicted maximal heart rate revisited. J Am Coll Cardiol 2001;37:153-6.',
+ edwards:'Edwards S. The Heart Rate Monitor Book. Polar Electro; 1993 (summated heart-rate-zone TRIMP).',
+ banister:'Banister EW. Modeling elite athletic performance. In: Physiological Testing of Elite Athletes. Human Kinetics; 1991.',
+ keytel:'Keytel LR, et al. Prediction of energy expenditure from heart rate monitoring during submaximal exercise. J Sports Sci 2005;23:289-97.',
+ hrr:'Daanen HAM, Lamberts RP, Kallen VL, Jin A, Van Meeteren NLU. A systematic review on heart-rate recovery to monitor changes in training status in athletes. Int J Sports Physiol Perform 2012;7:251-60.',
+ hrv:'Plews DJ, Laursen PB, Stanley J, Kilding AE, Buchheit M. Training adaptation and heart rate variability in elite endurance athletes. Sports Med 2013;43:773-81.',
+ esc:'Task Force of the ESC and NASPE. Heart rate variability: standards of measurement. Circulation 1996;93:1043-65.'};
+function dvInit(){['hrSessions','hrvTests'].forEach(k=>{if(!Array.isArray(db[k]))db[k]=[]})}
+const dvNative=()=>{try{const C=window.Capacitor;return !!(C&&C.isNativePlatform&&C.isNativePlatform()&&(C.Plugins&&C.Plugins.BluetoothLe||C.registerPlugin))}catch(e){return false}};
+const dvBLE=()=>{const C=window.Capacitor;return (C.Plugins&&C.Plugins.BluetoothLe)||(DV._ble||(DV._ble=C.registerPlugin('BluetoothLe')))};
+const dvIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function dvSupport(){if(dvNative())return {ok:true,how:'BIOMOTOR app Bluetooth'};
+ if(navigator.bluetooth&&navigator.bluetooth.requestDevice)return {ok:true,how:/Bluefy/i.test(navigator.userAgent)?'Bluefy browser':'Web Bluetooth'};
+ if(dvIOS())return {ok:false,why:'ios'};return {ok:false,why:location.protocol!=='https:'&&!/localhost|127\.0\.0\.1/.test(location.hostname)?'https':'browser'}}
+function dvToDV(v){if(!v)return new DataView(new ArrayBuffer(0));if(v instanceof DataView)return v;if(v instanceof ArrayBuffer)return new DataView(v);
+ if(Array.isArray(v))return new DataView(Uint8Array.from(v).buffer);const h=String(v).replace(/[^0-9a-f]/gi,'');const u=new Uint8Array(h.length>>1);for(let i=0;i<u.length;i++)u[i]=parseInt(h.substr(2*i,2),16);return new DataView(u.buffer)}
+// Heart Rate Measurement (0x2A37): flags, HR (8/16 bit), energy, RR intervals in 1/1024 s
+function dvParseHR(dv){if(dv.byteLength<2)return null;const f=dv.getUint8(0);let i=1;const hr=f&1?dv.getUint16(i,true):dv.getUint8(i);i+=f&1?2:1;if(f&8)i+=2;
+ const rr=[];if(f&16)for(;i+1<dv.byteLength;i+=2)rr.push(dv.getUint16(i,true)*1000/1024);return {hr,rr,contact:f&4?!!(f&2):null}}
+/* ---- athlete numbers ---- */
+function dvAth(aid){return aid?byId('athletes',aid):null}
+function dvHRmax(a){if(a&&+a.hrMax>100)return {v:+a.hrMax,src:'measured'};const g=a&&a.dob?+ageOf(a.dob):NaN;return isFinite(g)&&g>5?{v:Math.round(208-0.7*g),src:'208 − 0.7 × age'}:{v:190,src:'default – add date of birth'}}
+function dvHRrest(a){if(a&&+a.hrRest>25)return +a.hrRest;const L=dvHrvList(a&&a.id).slice(-7).map(x=>+x.mhr).filter(v=>v>25);return L.length?Math.round(Math.min(...L)):60}
+function dvKg(a){if(!a)return NaN;const w=(db.weighins||[]).filter(x=>x.athlete===a.id&&+x.weight>0).sort((x,y)=>String(y.date).localeCompare(String(x.date)))[0];return w?+w.weight:+a.weight||NaN}
+// energy (kcal per minute) from heart rate, sex, weight, age – Keytel 2005 (no VO2max); null when weight or age is missing
+function dvKcalMin(a,hr){const kg=dvKg(a),g=a&&a.dob?+ageOf(a.dob):NaN;if(!(kg>0)||!(g>0)||hr<80)return 0;const f=/^f/i.test((a&&a.gender)||'');
+ return Math.max(0,(f?-20.4022+0.4472*hr-0.1263*kg+0.074*g:-55.0969+0.6309*hr+0.1988*kg+0.2017*g)/4.184)}
+const dvZone=(hr,mx)=>{let z=0;DV_Z.forEach(([p],k)=>{if(hr>=p*mx)z=k+1});return z};
+const dvZc=z=>z?DV_Z[z-1][2]:'#94a3b8';
+/* ---- connect ---- */
+function dvMsg(t){DV.log.unshift(new Date().toTimeString().slice(0,8)+'  '+t);DV.log.length=Math.min(DV.log.length,30);toast(t)}
+function dvConnect(){const s=dvSupport();if(!s.ok){dvHelp();return}
+ if(dvNative())return dvConnectNative();
+ navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']},{namePrefix:'Polar'}],optionalServices:['heart_rate','battery_service']})
+  .then(dev=>dvAttachWeb(dev)).catch(e=>{if(!/cancel|chosen|NotFound/i.test(e.name+' '+e.message))dvMsg('Could not connect: '+(e.message||e))})}
+async function dvAttachWeb(dev){if(DV.devs.some(d=>d.web===dev&&d.status!=='gone')){dvMsg(dev.name+' is already connected');return}
+ const d=dvNew(dev.name||'Heart-rate sensor',dev.id);d.web=dev;dev.addEventListener('gattserverdisconnected',()=>dvLost(d));await dvWebGatt(d)}
+async function dvWebGatt(d){d.status='connecting';dvPaint();try{const srv=await d.web.gatt.connect();const hs=await srv.getPrimaryService('heart_rate');const ch=await hs.getCharacteristic('heart_rate_measurement');
+  ch.addEventListener('characteristicvaluechanged',e=>dvOnData(d,e.target.value));await ch.startNotifications();d.status='on';d.retry=0;dvMsg('✓ '+d.name+' connected');
+  try{const bs=await srv.getPrimaryService('battery_service');const b=await(await bs.getCharacteristic('battery_level')).readValue();d.batt=b.getUint8(0)}catch(e){}
+ }catch(e){d.status='off';dvMsg('Could not connect '+d.name+': '+(e.message||e))}dvPaint();render()}
+async function dvConnectNative(){const B=dvBLE();try{await B.initialize({});const r=await B.requestDevice({services:[DV_U.hrs],optionalServices:[DV_U.bas]});
+  if(DV.devs.some(d=>d.nid===r.deviceId&&d.status!=='gone')){dvMsg((r.name||'Device')+' is already connected');return}
+  const d=dvNew(r.name||'Heart-rate sensor',r.deviceId);d.nid=r.deviceId;await dvNativeGatt(d)}catch(e){if(!/cancel/i.test(e.message||''))dvMsg('Could not connect: '+(e.message||e))}}
+async function dvNativeGatt(d){const B=dvBLE(),id=d.nid;d.status='connecting';dvPaint();try{
+  if(!d.ls){d.ls=[await B.addListener('disconnected|'+id,()=>dvLost(d)),await B.addListener(`notification|${id}|${DV_U.hrs}|${DV_U.hrm}`,ev=>dvOnData(d,dvToDV(ev&&ev.value)))]}
+  await B.connect({deviceId:id});await B.startNotifications({deviceId:id,service:DV_U.hrs,characteristic:DV_U.hrm});d.status='on';d.retry=0;dvMsg('✓ '+d.name+' connected');
+  try{const b=await B.read({deviceId:id,service:DV_U.bas,characteristic:DV_U.bl});d.batt=dvToDV(b&&b.value).getUint8(0)}catch(e){}
+ }catch(e){d.status='off';dvMsg('Could not connect '+d.name+': '+(e.message||e))}dvPaint();render()}
+function dvNew(name,key){const d={k:'d'+(++DV.n),name,key,status:'connecting',bpm:0,batt:null,contact:null,last:0,hist:[],rrBuf:[],rec:null,aid:'',retry:0};
+ const me=authUser();if(portalUser(me)){const {a}=axCur(me);d.aid=a?a.id:''}else{const used=new Set(DV.devs.map(x=>x.aid));const p=(db.meta&&db.meta.dvPair||{})[key];d.aid=p&&!used.has(p)?p:''}
+ DV.devs.push(d);dvTicker();return d}
+function dvLost(d){if(d.status==='gone')return;d.status='off';d.bpm=0;dvPaint();
+ if(d.manual)return;if(d.retry<5){d.retry++;dvMsg(d.name+' lost – reconnecting ('+d.retry+')…');setTimeout(()=>{if(d.status==='off'&&!d.manual)(d.web?dvWebGatt(d):dvNativeGatt(d))},1500*d.retry)}
+ else dvMsg(d.name+' disconnected – tap Reconnect')}
+function dvReconnect(k){const d=DV.devs.find(x=>x.k===k);if(!d)return;d.manual=false;d.retry=0;d.web?dvWebGatt(d):dvNativeGatt(d)}
+async function dvDisconnect(k){const d=DV.devs.find(x=>x.k===k);if(!d)return;if(d.rec&&!confirm('A recording is running on this device. Stop it without saving?'))return;d.rec=null;d.manual=true;d.status='gone';
+ try{if(d.web&&d.web.gatt.connected)d.web.gatt.disconnect();if(d.nid){const B=dvBLE();await B.disconnect({deviceId:d.nid});(d.ls||[]).forEach(l=>l&&l.remove&&l.remove())}}catch(e){}
+ DV.devs=DV.devs.filter(x=>x!==d);dvTicker();render()}
+/* ---- data ---- */
+function dvOnData(d,dv){const p=dvParseHR(dv);if(!p)return;d.last=Date.now();d.contact=p.contact;if(p.hr>0)d.bpm=p.hr;
+ p.rr.forEach(x=>{d.rrBuf.push(x);if(d.rrBuf.length>90)d.rrBuf.shift()});if(d.rec&&!d.rec.done)p.rr.forEach(x=>d.rec.rr.push(x));
+ const el=document.getElementById('dvB_'+d.k);if(el)el.textContent=d.bpm||'—'}
+const dvLive=d=>d.status==='on'&&Date.now()-d.last<3000&&d.bpm>0&&d.contact!==false;
+function dvTicker(){const on=DV.devs.length>0;if(on&&!DV.tick){DV.tick=setInterval(dvSecond,1000)}else if(!on&&DV.tick){clearInterval(DV.tick);DV.tick=null}}
+function dvSecond(){DV.devs.forEach(d=>{const live=dvLive(d);d.hist.push(live?d.bpm:null);if(d.hist.length>180)d.hist.shift();const R=d.rec;if(!R||R.done)return;
+  if(R.mode==='hr'){if(R.phase==='rec'){R.rs++;R.rhr.push(live?d.bpm:null);if(R.rs>=60)dvRecDone(d);return}
+   R.sec++;R.hr.push(live?d.bpm:null);if(live){const a=dvAth(R.aid),z=dvZone(d.bpm,dvHRmax(a).v);if(z)R.zs[z-1]++;R.kcal+=dvKcalMin(a,d.bpm)/60}}
+  else{R.sec++;if(R.sec===R.settle)R.rr.length=0;if(R.sec>=R.settle+R.dur){R.done=true;dvHrvDone(d)}}});
+ dvPaint();dvWake()}
+async function dvWake(){const need=DV.devs.some(d=>d.rec&&!d.rec.done);try{if(need&&!DV.wake&&navigator.wakeLock){DV.wake=await navigator.wakeLock.request('screen');DV.wake.addEventListener('release',()=>DV.wake=null)}if(!need&&DV.wake){DV.wake.release();DV.wake=null}}catch(e){}}
+/* ---- drawing helpers ---- */
+const dvPt=(cx,cy,r,a)=>[cx+r*Math.cos(a),cy+r*Math.sin(a)];
+function dvArc(cx,cy,r,a0,a1){const [x0,y0]=dvPt(cx,cy,r,a0),[x1,y1]=dvPt(cx,cy,r,a1);return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${a1-a0>Math.PI?1:0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`}
+// gauge: 40–100 % HRmax over a 270° arc, zone segments, value arc in the zone colour
+function dvGauge(pct){const A0=Math.PI*0.75,SW=Math.PI*1.5,ang=p=>A0+SW*Math.max(0,Math.min(1,(p-0.4)/0.6)),cx=80,cy=80,r=66;
+ let s=`<path d="${dvArc(cx,cy,r,ang(0.4),ang(0.5))}" stroke="var(--line)" stroke-width="12" fill="none" stroke-linecap="round"/>`;
+ DV_Z.forEach(([p,,c],k)=>{s+=`<path d="${dvArc(cx,cy,r,ang(p)+0.015,ang(k<4?DV_Z[k+1][0]:1)-0.015)}" stroke="${c}" stroke-opacity=".22" stroke-width="12" fill="none"/>`});
+ if(pct>0.4){const z=dvZone(pct,1);s+=`<path d="${dvArc(cx,cy,r,ang(0.4),Math.max(ang(0.4)+0.02,ang(pct)))}" stroke="${dvZc(z)}" stroke-width="12" fill="none" stroke-linecap="round" style="filter:drop-shadow(0 0 6px ${dvZc(z)}88)"/>`;
+  const [px,py]=dvPt(cx,cy,r,ang(pct));s+=`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="8" fill="var(--card)" stroke="${dvZc(z)}" stroke-width="4"/>`}
+ [0.5,0.6,0.7,0.8,0.9].forEach(p=>{const [x,y]=dvPt(cx,cy,r-17,ang(p));s+=`<text x="${x.toFixed(1)}" y="${(y+3).toFixed(1)}" text-anchor="middle" font-size="8.5" fill="var(--muted)">${p*100}</text>`});
+ return `<svg viewBox="0 0 160 150" width="100%" style="max-width:190px;display:block">${s}</svg>`}
+// SVG heart-rate chart: zone bands, line coloured by zone (vertical gradient), optional label
+function dvChart(hr,step,mx,opt={}){const v=hr.map(x=>x>0?x:null),n=v.length;if(n<2)return '';const W=opt.w||640,H=opt.h||200,pl=30,pb=18,pt=6,lo=Math.max(30,Math.min(Math.round(mx*.45),...v.filter(Boolean))-5),hi=mx+3;
+ const X=i=>pl+i/(n-1)*(W-pl-4),Y=b=>pt+(H-pt-pb)*(1-(Math.min(hi,Math.max(lo,b))-lo)/(hi-lo)),id='g'+Math.random().toString(36).slice(2,8);
+ let bands='',grad='';DV_Z.forEach(([p,l,c],k)=>{const top=k<4?DV_Z[k+1][0]*mx:hi,y0=Y(top),y1=Y(p*mx);if(y1>pt)bands+=`<rect x="${pl}" y="${y0.toFixed(1)}" width="${W-pl-4}" height="${Math.max(0,y1-y0).toFixed(1)}" fill="${c}" opacity=".09"/><text x="${pl-4}" y="${((y0+y1)/2+3).toFixed(1)}" text-anchor="end" font-size="9" fill="${c}" font-weight="700">Z${k+1}</text>`});
+ DV_Z.forEach(([p,,c],k)=>{const o=1-(Y(p*mx)-pt)/(H-pt-pb);grad+=`<stop offset="${Math.max(0,Math.min(1,o)).toFixed(3)}" stop-color="${k?DV_Z[k-1][2]:'#94a3b8'}"/><stop offset="${Math.max(0,Math.min(1,o)).toFixed(3)}" stop-color="${c}"/>`});
+ let d='',ar='',pen=false,first=null,lastX=0;v.forEach((b,i)=>{if(b==null){pen=false;return}const x=X(i).toFixed(1),y=Y(b).toFixed(1);d+=(pen?'L':'M')+x+' '+y+' ';if(first==null)first=x;lastX=x;pen=true});
+ const vv=v.filter(Boolean);const avg=vv.reduce((s,x)=>s+x,0)/vv.length,imx=v.indexOf(Math.max(...vv));
+ const tl=[];const tot=(n-1)*step;const tick=tot>3600?900:tot>1200?300:tot>300?60:30;for(let t=0;t<=tot;t+=tick)tl.push(`<text x="${X(t/step).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="9" fill="var(--muted)">${dvClock(t)}</text>`);
+ return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block" role="img" aria-label="Heart rate chart"><defs><linearGradient id="${id}" x1="0" y1="${H-pb}" x2="0" y2="${pt}" gradientUnits="userSpaceOnUse">${grad}</linearGradient></defs>${bands}
+ <line x1="${pl}" x2="${W-4}" y1="${Y(avg).toFixed(1)}" y2="${Y(avg).toFixed(1)}" stroke="var(--muted)" stroke-dasharray="4 4" opacity=".7"/><text x="${W-6}" y="${(Y(avg)-4).toFixed(1)}" text-anchor="end" font-size="9.5" fill="var(--muted)">avg ${Math.round(avg)}</text>
+ <path d="${d}" fill="none" stroke="url(#${id})" stroke-width="${opt.sw||2.4}" stroke-linejoin="round" stroke-linecap="round"/>
+ <circle cx="${X(imx).toFixed(1)}" cy="${Y(v[imx]).toFixed(1)}" r="4" fill="#ef4444"/><text x="${Math.min(W-30,X(imx)+6).toFixed(1)}" y="${(Y(v[imx])-6).toFixed(1)}" font-size="10" font-weight="700" fill="#ef4444">max ${v[imx]}</text>${tl.join('')}</svg>`}
+function dvDonut(zs,size=150){const tot=zs.reduce((s,x)=>s+x,0)||1,r=size/2-12,c=2*Math.PI*r;let off=0;
+ return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--line)" stroke-width="16"/>${zs.map((s,i)=>{if(!s)return '';const L=s/tot*c,el=`<circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${DV_Z[i][2]}" stroke-width="16" stroke-dasharray="${L.toFixed(2)} ${(c-L).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 ${size/2} ${size/2})"/>`;off+=L;return el}).join('')}
+ <text x="50%" y="47%" text-anchor="middle" font-size="20" font-weight="800" fill="var(--text)">${dvClock(zs.reduce((s,x)=>s+x,0))}</text><text x="50%" y="61%" text-anchor="middle" font-size="10" fill="var(--muted)">in zones</text></svg>`}
+function dvZoneRows(zs,cur){const tot=zs.reduce((s,x)=>s+x,0)||1;return [4,3,2,1,0].map(i=>`<div style="display:grid;grid-template-columns:30px 1fr 52px;gap:6px;align-items:center;margin:3px 0;font-size:12px${cur===i+1?';font-weight:800':''}"><span style="color:${DV_Z[i][2]};font-weight:800">Z${i+1}</span><div style="height:${cur===i+1?12:8}px;background:var(--line);border-radius:6px;overflow:hidden;transition:height .3s"><div style="height:100%;width:${(zs[i]/tot*100).toFixed(1)}%;background:${DV_Z[i][2]};border-radius:6px"></div></div><span style="text-align:right;font-variant-numeric:tabular-nums">${dvClock(zs[i])}</span></div>`).join('')}
+function dvRmssd(rr){const c=dvRRclean(rr);if(c.length<20)return NaN;let s=0;for(let i=1;i<c.length;i++)s+=(c[i]-c[i-1])**2;return Math.sqrt(s/(c.length-1))}
+/* ---- live view (updated in place, no re-render) ---- */
+function dvPaint(){if(location.hash!=='#devices'&&location.hash!=='#my-devices')return;const now=Date.now();
+ DV.devs.forEach(d=>{const a=dvAth(d.aid),mx=dvHRmax(a).v,live=dvLive(d),pct=live?d.bpm/mx:0,z=live?dvZone(d.bpm,mx):0,R=d.rec;
+  const set=(id,v,prop='innerHTML')=>{const e=document.getElementById(id+'_'+d.k);if(e&&e[prop]!==v)e[prop]=v};
+  set('dvB',live?String(d.bpm):'—','textContent');set('dvP',live?Math.round(pct*100)+' % HRmax':'','textContent');set('dvGa',dvGauge(pct));
+  set('dvZ',live?`<span style="background:${dvZc(z)};color:#fff;border-radius:999px;padding:3px 10px;font-weight:700">${z?DV_Z[z-1][1]:'Below Z1'}</span> <span class="muted">${z?DV_Z[z-1][3]:'Rest / very easy'}</span>`:`<span class="muted">${d.status==='connecting'?'Connecting…':d.status==='on'?(d.contact===false?'No skin contact – wet the strap':'Waiting for heart beat…'):'Disconnected'}</span>`);
+  const h=document.getElementById('dvH_'+d.k);if(h){h.style.animationDuration=live?(60/d.bpm).toFixed(2)+'s':'0s';h.style.color=live?dvZc(z):'var(--muted)'}
+  const card=document.getElementById('dvC_'+d.k);if(card){card.style.borderColor=z?dvZc(z):'var(--line)';card.style.boxShadow=z?`0 10px 30px ${dvZc(z)}33`:''}
+  set('dvS',(d.status==='on'?'<span class="dvdot"></span>Connected':d.status==='connecting'?'○ Connecting…':'○ Disconnected')+(d.batt!=null?` · 🔋 ${d.batt} %`:''));
+  const rm=dvRmssd(d.rrBuf.slice(-60));set('dvR',isFinite(rm)?`HRV ${Math.round(rm)} ms`:'','textContent');
+  set('dvZl',dvZoneRows(R&&R.mode==='hr'?R.zs:[0,0,0,0,0],z));
+  if(R){if(R.mode==='hr'&&R.phase==='rec'){set('dvT',`💓 Recovery ${60-R.rs} s`,'textContent');set('dvA',`stopped at ${R.hrStop} bpm → now ${live?d.bpm:'—'} (drop ${live?R.hrStop-d.bpm:'—'})`,'textContent')}
+   else if(R.mode==='hr'){const v=R.hr.filter(x=>x>0);set('dvT','⏺ '+dvClock(R.sec),'textContent');
+    set('dvTiles',[['Avg',v.length?Math.round(v.reduce((s,x)=>s+x,0)/v.length):'—','bpm'],['Max',v.length?Math.max(...v):'—','bpm'],['TRIMP',Math.round(R.zs.reduce((s,x,i)=>s+x/60*(i+1),0)),'AU'],['Energy',R.kcal>0?Math.round(R.kcal):'—','kcal']].map(([l,x,u])=>`<div class="dvtile"><span>${l}</span><b>${x}</b><small>${u}</small></div>`).join(''))}
+   else{set('dvT',R.sec<R.settle?`🫀 Settle ${R.settle-R.sec} s – stay still`:`🫀 Measuring ${Math.max(0,R.settle+R.dur-R.sec)} s`,'textContent');set('dvA',`${dvRRclean(R.rr).length} clean beats`,'textContent')}}
+  dvDraw(d,mx);
+  // team wall tile
+  const w=document.getElementById('dvW_'+d.k);if(w){w.style.background=live?`linear-gradient(150deg,${dvZc(z)},${dvZc(z)}cc)`:'var(--card2)';w.style.color=live?'#fff':'var(--text)';
+   const s=(id,v)=>{const e=document.getElementById(id+'_'+d.k);if(e&&e.textContent!==v)e.textContent=v};s('dvWb',live?String(d.bpm):'—');s('dvWp',live?Math.round(pct*100)+' %':'');s('dvWz',live?(z?DV_Z[z-1][1]:'Below Z1'):(d.status==='on'?'No signal':'Disconnected'));s('dvWt',R&&R.mode==='hr'&&R.phase!=='rec'?'⏺ '+dvClock(R.sec):'')}})}
+const dvClock=s=>{s=Math.max(0,Math.round(s));return `${Math.floor(s/3600)?Math.floor(s/3600)+':':''}${String(Math.floor(s/60)%60).padStart(Math.floor(s/3600)?2:1,'0')}:${String(s%60).padStart(2,'0')}`};
+function dvDraw(d,mx){const c=document.getElementById('dvG_'+d.k);if(!c)return;const W=c.width=(c.clientWidth||300)*2,H=c.height=(c.clientHeight||110)*2,g=c.getContext('2d');g.clearRect(0,0,W,H);
+ const lo=Math.max(30,Math.round(mx*.4)),hi=mx+5,Y=v=>H-8-(Math.min(hi,Math.max(lo,v))-lo)/(hi-lo)*(H-16);const css=getComputedStyle(document.body);
+ DV_Z.forEach(([p,,col],k)=>{const y1=Y(p*mx),y0=Y(k<4?DV_Z[k+1][0]*mx:hi);g.fillStyle=col+'14';g.fillRect(0,y0,W,y1-y0);g.fillStyle=col;g.font='bold 18px Inter,sans-serif';g.fillText('Z'+(k+1),6,(y0+y1)/2+6)});
+ const gr=g.createLinearGradient(0,H,0,0);DV_Z.forEach(([p,,col],k)=>{const o=Math.max(0,Math.min(1,1-Y(p*mx)/H));gr.addColorStop(o,k?DV_Z[k-1][2]:'#94a3b8');gr.addColorStop(o,col)});
+ const h=d.hist,n=180,X=i=>W-(h.length-1-i)*W/(n-1);
+ // filled area under the line
+ g.beginPath();let pen=false,sx=0;h.forEach((v,i)=>{if(v>0){if(!pen){sx=X(i);g.moveTo(sx,H)}g.lineTo(X(i),Y(v));pen=true}else if(pen){g.lineTo(X(i-1),H);pen=false}});if(pen)g.lineTo(X(h.length-1),H);
+ const fill=g.createLinearGradient(0,0,0,H);fill.addColorStop(0,'rgba(239,68,68,.20)');fill.addColorStop(1,'rgba(59,130,246,0)');g.fillStyle=fill;g.fill();
+ g.strokeStyle=gr;g.lineWidth=4;g.lineJoin='round';g.lineCap='round';g.beginPath();pen=false;h.forEach((v,i)=>{if(v>0){pen?g.lineTo(X(i),Y(v)):g.moveTo(X(i),Y(v));pen=true}else pen=false});g.stroke();
+ const lv=h[h.length-1];if(lv>0){const z=dvZone(lv,mx);g.fillStyle=dvZc(z);g.beginPath();g.arc(W-8,Y(lv),8,0,7);g.fill();g.fillStyle=css.getPropertyValue('--card')||'#fff';g.beginPath();g.arc(W-8,Y(lv),4,0,7);g.fill()}}
+/* ---- recording ---- */
+function dvStart(k,mode){const d=DV.devs.find(x=>x.k===k);if(!d)return;if(!d.aid)return toast('Choose the athlete first');if(d.status!=='on')return toast('Device is not connected');
+ const dur=+((document.getElementById('dvHd_'+k)||{}).value||120);d.rec={mode,aid:d.aid,t0:Date.now(),sec:0,hr:[],rr:[],zs:[0,0,0,0,0],kcal:0,phase:'run',rs:0,rhr:[],settle:mode==='hrv'?30:0,dur,done:false};render();dvWake()}
+function dvStartAll(){let n=0;DV.devs.forEach(d=>{if(!d.rec&&d.aid&&d.status==='on'){dvStart(d.k,'hr');n++}});toast(n?`⏺ ${n} session(s) started`:'Connect straps and choose athletes first')}
+function dvStop(k){const d=DV.devs.find(x=>x.k===k);if(!d||!d.rec)return;const R=d.rec;
+ if(R.mode==='hrv'){R.done=true;if(R.sec<R.settle+60){d.rec=null;render();return toast('HRV test stopped (needs at least 1 minute of measuring)')}return dvHrvDone(d)}
+ if(R.phase==='rec')return dvRecDone(d);
+ if(R.hr.filter(x=>x>0).length<30){d.rec=null;render();return toast('Too short – nothing saved')}
+ // 60-s heart-rate recovery: athlete stops, stands still; the drop in 60 s is saved with the session
+ R.phase='rec';R.rs=0;R.hrStop=dvLive(d)?d.bpm:(R.hr.filter(x=>x>0).slice(-1)[0]||0);render();toast('💓 60-s heart-rate recovery – athlete stands still')}
+function dvRecDone(d){const R=d.rec;if(!R)return;R.done=true;const L=R.rhr.filter(x=>x>0);const end=L.length?Math.round(L.slice(-5).reduce((s,x)=>s+x,0)/Math.min(5,L.length)):NaN;R.hrr=R.rs>=55&&isFinite(end)?R.hrStop-end:null;dvSaveDlg(d)}
+function dvHrSummary(R){const a=dvAth(R.aid),mx=dvHRmax(a).v,rest=dvHRrest(a),v=R.hr.filter(x=>x>0);if(v.length<30)return null;const zs=[0,0,0,0,0];let ban=0,kc=0;const fem=/^f/i.test((a&&a.gender)||'');
+ v.forEach(h=>{const z=dvZone(h,mx);if(z)zs[z-1]++;const r=Math.max(0,Math.min(1,(h-rest)/(mx-rest)));ban+=r*(fem?0.86*Math.exp(1.67*r):0.64*Math.exp(1.92*r))/60;kc+=dvKcalMin(a,h)/60});
+ const ed=zs.reduce((s,x,i)=>s+x/60*(i+1),0);const ds=[];for(let i=0;i<R.hr.length;i+=5){const w=R.hr.slice(i,i+5).filter(x=>x>0);ds.push(w.length?Math.round(w.reduce((s,x)=>s+x,0)/w.length):0)}
+ const dt=new Date(R.t0);return {date:_loc(dt),time:dt.toTimeString().slice(0,5),dur:R.sec,valid:v.length,avg:Math.round(v.reduce((s,x)=>s+x,0)/v.length),max:Math.max(...v),min:Math.min(...v),hrmax:mx,hrrest:rest,zones:zs,trimp:Math.round(ed),btrimp:Math.round(ban),kcal:kc>0?Math.round(kc):null,hrr:R.hrr!=null?R.hrr:null,hr5:ds}}
+const dvHrrTxt=h=>h==null?'':h>=30?'very good':h>=20?'good':h>=12?'normal':'low – check fatigue';
+function dvReport(S,name){const pk=S.max/S.hrmax;return `<div class="dvtiles">${[['Duration',dvClock(S.dur),''],['Average',S.avg,'bpm'],['Peak',S.max,'bpm · '+Math.round(pk*100)+' %'],['TRIMP',S.trimp,'Edwards AU'],['Banister',S.btrimp,'AU'],['Energy',S.kcal!=null?S.kcal:'—',S.kcal!=null?'kcal (est.)':'add weight + DOB'],['HR recovery',S.hrr!=null?(S.hrr>=0?'−'+S.hrr:'+'+(-S.hrr)):'—',S.hrr!=null?'bpm in 60 s · '+dvHrrTxt(S.hrr):'not measured']].map(([l,x,u])=>`<div class="dvtile"><span>${l}</span><b>${x}</b><small>${u}</small></div>`).join('')}</div>
+ <div class="card" style="margin:12px 0;padding:10px">${dvChart(S.hr5||[],5,S.hrmax)}</div>
+ <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div>${dvDonut(S.zones)}</div><div style="flex:1;min-width:220px">${dvZoneRows(S.zones,0)}<div class="muted" style="font-size:11.5px;margin-top:6px">HRmax ${S.hrmax} · rest ${S.hrrest} bpm${name?' · '+esc(name):''}</div></div></div>`}
+function dvSaveDlg(d){const R=d.rec,S=dvHrSummary(R);if(!S){d.rec=null;render();return toast('Too short – nothing saved')}DV._sv={k:d.k,S,aid:R.aid};
+ modal(`<h3 style="margin-top:0">Session report · ${esc((dvAth(R.aid)||{}).name||'')}</h3><p class="muted" style="margin:0 0 10px">${fmtDate(S.date)} ${S.time} · ${esc(d.name)}</p>${dvReport(S)}
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px"><div><label>Session type</label><select id="dvTy" data-ro-ok>${LM_TYPES.map(t=>`<option ${t==='Conditioning'?'selected':''}>${t}</option>`).join('')}</select></div>
+  <div><label>Session RPE (0–10, ~30 min after)</label><input id="dvRpe" type="number" min="0" max="10" step="1" placeholder="optional" data-ro-ok></div></div>
+  <p class="muted" style="font-size:12px">With an RPE the session also goes to Load Monitoring (sRPE load = RPE × minutes; TRIMP saved as external load).</p>
+  <div class="row" style="margin-top:12px"><button class="btn pri" data-ro-ok onclick="dvSaveHr()">💾 Save</button><button class="btn" data-ro-ok onclick="if(confirm('Discard this recording?')){const d=DV.devs.find(x=>x.k==='${d.k}');if(d)d.rec=null;closeModal();render()}">Discard</button></div>`);
+ const mb=document.getElementById('modalBody');if(mb)mb.style.width='min(760px,96vw)';d.rec=null;render()}
+function dvSaveHr(){const x=DV._sv;if(!x)return closeModal();const rv=document.getElementById('dvRpe').value,ty=document.getElementById('dvTy').value;const S=x.S;
+ const rpe=rv===''?null:Math.max(0,Math.min(10,+rv));Object.assign(S,{type:ty,rpe,dev:(DV.devs.find(d=>d.k===x.k)||{}).name||''});closeModal();dvSave('HR',x.aid,S,rpe!=null?{type:ty,min:Math.round(S.dur/60),rpe,ext:S.trimp}:null);DV._sv=null;render()}
+/* ---- HRV (RMSSD) ---- */
+function dvRRclean(rr){const o=[];let p=null;rr.forEach(x=>{if(x<300||x>2000)return;if(p&&Math.abs(x-p)/p>0.2){p=x;return}o.push(x);p=x});return o}
+function dvHrvCalc(rr){const c=dvRRclean(rr);if(c.length<40)return null;let s=0;for(let i=1;i<c.length;i++)s+=(c[i]-c[i-1])**2;const rmssd=Math.sqrt(s/(c.length-1));const m=c.reduce((a,x)=>a+x,0)/c.length;
+ const sd=Math.sqrt(c.reduce((a,x)=>a+(x-m)**2,0)/(c.length-1));return {rmssd:+rmssd.toFixed(1),ln:+Math.log(rmssd).toFixed(2),sdnn:+sd.toFixed(1),mhr:Math.round(60000/m),n:c.length,art:+((rr.length-c.length)/Math.max(1,rr.length)*100).toFixed(1),tach:c.slice(-120).map(x=>Math.round(x))}}
+function dvTacho(rr,w=520,h=90){if(rr.length<3)return '';const lo=Math.min(...rr),hi=Math.max(...rr);const p=rr.map((x,i)=>`${i?'L':'M'}${(i/(rr.length-1)*w).toFixed(1)} ${(h-4-(x-lo)/Math.max(1,hi-lo)*(h-8)).toFixed(1)}`).join(' ');
+ return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="display:block"><path d="${p}" fill="none" stroke="#8b5cf6" stroke-width="1.8"/></svg><div class="muted" style="font-size:11px">beat-to-beat RR intervals (${lo}–${hi} ms) – breathing makes the waves</div>`}
+function dvHrvDone(d){const R=d.rec;const H=dvHrvCalc(R.rr);d.rec=null;if(!H){render();return modal(`<h3 style="margin-top:0">HRV test</h3><p>Not enough clean beats were received. Check the strap is wet and tight, stay still, and try again.</p><button class="btn" data-ro-ok onclick="closeModal()">OK</button>`)}
+ const dt=new Date(R.t0),S=Object.assign({date:_loc(dt),time:dt.toTimeString().slice(0,5),dur:R.dur,dev:d.name},H);const st=dvHrvStatus(R.aid,S.ln);
+ modal(`<h3 style="margin-top:0">HRV result · ${esc((dvAth(R.aid)||{}).name||'')}</h3><div class="dvtiles">${[['RMSSD',S.rmssd,'ms'],['ln RMSSD',S.ln,''],['Resting HR',S.mhr,'bpm'],['SDNN',S.sdnn,'ms'],['Beats',S.n,S.art+' % removed']].map(([l,x,u])=>`<div class="dvtile"><span>${l}</span><b>${x}</b><small>${u}</small></div>`).join('')}</div>
+  <div style="margin:12px 0;padding:12px;border-radius:14px;background:${st.c}18;border:1px solid ${st.c}55"><b style="color:${st.c}">${st.t}</b><br><span class="muted">${st.d}</span></div>${dvTacho(S.tach)}
+  <div style="margin-top:10px"><label>Position</label><select id="dvPos" data-ro-ok><option>Lying (supine)</option><option>Sitting</option><option>Standing</option></select></div>
+  <div class="row" style="margin-top:12px"><button class="btn pri" data-ro-ok onclick="dvSaveHrv()">💾 Save</button><button class="btn" data-ro-ok onclick="closeModal()">Discard</button></div>`);delete S.tach;DV._hrv={aid:R.aid,S};render()}
+function dvSaveHrv(){const x=DV._hrv;if(!x)return closeModal();x.S.pos=document.getElementById('dvPos').value;closeModal();dvSave('HRV',x.aid,x.S,null);DV._hrv=null;render()}
+function dvHrvStatus(aid,ln){const L=dvHrvList(aid).filter(x=>x.date>=addD(today(),-7)&&x.date<today()).map(x=>+x.ln).filter(isFinite);
+ if(L.length<3)return {t:'Building baseline ('+L.length+'/3 days)',d:'Measure every morning, same position, after waking up. The comparison starts after 3 days.',c:'#64748b'};
+ const m=L.reduce((s,x)=>s+x,0)/L.length,sd=Math.sqrt(L.reduce((s,x)=>s+(x-m)**2,0)/(L.length-1))||0.05;const z=(ln-m)/sd;
+ return z>=-0.5?{t:'🟢 Normal / ready',d:`ln RMSSD ${ln} vs 7-day baseline ${m.toFixed(2)} ± ${sd.toFixed(2)}. Train as planned.`,c:'#16a34a'}
+  :z>=-1?{t:'🟡 Slightly low',d:`ln RMSSD ${ln} is below the 7-day baseline ${m.toFixed(2)}. Check sleep, soreness and stress; consider less intensity today.`,c:'#d97706'}
+  :{t:'🔴 Low – recovery needed',d:`ln RMSSD ${ln} is more than 1 SD below the 7-day baseline ${m.toFixed(2)}. Prefer recovery / technique, re-test tomorrow; talk to the coach.`,c:'#dc2626'}}
+// HRV trend: daily ln RMSSD dots, 7-day rolling mean line, normal band = rolling mean ± 0.5 SD of the last 28 days (Plews 2013)
+function dvHrvChart(V,W=680,H=210){const pts=V.slice(-42);if(pts.length<2)return '';const pl=34,pb=20,pt=8,xs=pts.map(x=>new Date(x.date).getTime()),t0=Math.min(...xs),t1=Math.max(...xs)||t0+1;
+ const roll=pts.map((x,i)=>{const w=V.filter(y=>y.date<=x.date&&y.date>addD(x.date,-7)).map(y=>+y.ln),b=V.filter(y=>y.date<=x.date&&y.date>addD(x.date,-28)).map(y=>+y.ln);const m=w.reduce((s,y)=>s+y,0)/w.length;const bm=b.reduce((s,y)=>s+y,0)/b.length;const sd=b.length>2?Math.sqrt(b.reduce((s,y)=>s+(y-bm)**2,0)/(b.length-1)):0.1;return {m,lo:m-0.5*sd,hi:m+0.5*sd}});
+ const all=pts.map(x=>+x.ln).concat(roll.map(r=>r.lo),roll.map(r=>r.hi)),lo=Math.min(...all)-0.1,hi=Math.max(...all)+0.1,X=t=>pl+(t-t0)/Math.max(1,t1-t0)*(W-pl-10),Y=v=>pt+(H-pt-pb)*(1-(v-lo)/(hi-lo));
+ const band=roll.map((r,i)=>`${i?'L':'M'}${X(xs[i]).toFixed(1)} ${Y(r.hi).toFixed(1)}`).join(' ')+' '+roll.slice().reverse().map((r,i)=>`L${X(xs[xs.length-1-i]).toFixed(1)} ${Y(r.lo).toFixed(1)}`).join(' ')+' Z';
+ const mean=roll.map((r,i)=>`${i?'L':'M'}${X(xs[i]).toFixed(1)} ${Y(r.m).toFixed(1)}`).join(' ');
+ const dots=pts.map((x,i)=>{const r=roll[i],v=+x.ln,c=v>=r.lo?'#16a34a':v>=r.m-(r.hi-r.m)*2?'#d97706':'#dc2626';return `<circle cx="${X(xs[i]).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4.5" fill="${c}"><title>${x.date}: ln ${x.ln} (RMSSD ${x.rmssd} ms)</title></circle>`}).join('');
+ const yl=[lo+0.1,(lo+hi)/2,hi-0.1].map(v=>`<text x="${pl-5}" y="${(Y(v)+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--muted)">${v.toFixed(1)}</text>`).join('');
+ return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block" role="img" aria-label="HRV trend"><path d="${band}" fill="#16a34a" opacity=".12"/><path d="${mean}" fill="none" stroke="#16a34a" stroke-width="2"/>${dots}${yl}
+ <text x="${pl}" y="${H-5}" font-size="9" fill="var(--muted)">${fmtDate(pts[0].date)}</text><text x="${W-10}" y="${H-5}" text-anchor="end" font-size="9" fill="var(--muted)">${fmtDate(pts[pts.length-1].date)}</text></svg>
+ <div class="muted" style="font-size:11.5px">● daily ln RMSSD · line = 7-day average · green band = normal range (± 0.5 SD). Dots below the band = recovery not complete.</div>`}
+/* ---- save + read ---- */
+function dvStaff(){const me=authUser();return !!me&&!portalUser(me)&&!roUser(me)}
+function dvSave(kind,aid,S,load){dvInit();
+ if(dvStaff()){const id=uid(kind==='HR'?'hs':'hv');db[kind==='HR'?'hrSessions':'hrvTests'].push(Object.assign({id,athlete:aid,by:nutMe().name,at:new Date().toISOString()},S));
+  if(load){lmInit();db.loadLogs.push({id:'ll_'+id,hr:id,athlete:aid,date:S.date,type:load.type,min:load.min,rpe:load.rpe,ext:load.ext,by:nutMe().name,at:new Date().toISOString()})}
+  save();toast('✓ Saved'+(load?' · load '+load.min*load.rpe+' AU':''))}
+ else{nutLogAdd(aid,{meal:kind,log_date:S.date,data:S}).then(()=>{if(load)return nutLogAdd(aid,{meal:'LOAD',log_date:S.date,data:load})}).then(()=>dvCloudLoad(aid,true))}}
+async function dvCloudLoad(aid,force){if(!aid)return;const c=DV.cloud[aid];if(c&&!force&&Date.now()-c.t<60000)return;DV.cloud[aid]={t:Date.now(),rows:c?c.rows:[]};
+ try{let rows;if(CLOUD&&SB){const {data,error}=await SB.from('meal_logs').select('*').eq('athlete_id',aid).in('meal',['HR','HRV']).gte('log_date',daysAgo(365)).order('log_date');if(error)throw error;rows=data||[]}
+  else rows=nutLocalLogs().filter(r=>r.athlete_id===aid&&['HR','HRV'].includes(r.meal));DV.cloud[aid]={t:Date.now(),rows}}catch(e){DV.cloud[aid]={t:Date.now(),rows:[]}}
+ if(['#devices','#my-devices'].includes(location.hash))render()}
+function dvList(aid,kind){dvInit();if(!aid)return [];const loc=(kind==='HR'?db.hrSessions:db.hrvTests).filter(x=>x.athlete===aid).map(x=>Object.assign({src:'staff'},x));
+ const cl=((DV.cloud[aid]||{}).rows||[]).filter(r=>r.meal===kind).map(r=>Object.assign({},r.data||{},{id:r.id,src:'athlete',date:r.log_date}));return loc.concat(cl).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')))}
+const dvHrvList=aid=>dvList(aid,'HRV');
+function dvDel(kind,id){if(!confirm('Delete this record?'))return;dvInit();const k=kind==='HR'?'hrSessions':'hrvTests';db[k]=db[k].filter(x=>x.id!==id);db.loadLogs=(db.loadLogs||[]).filter(l=>l.hr!==id);save();render()}
+function dvPair(k,aid){const d=DV.devs.find(x=>x.k===k);if(!d)return;if(aid&&DV.devs.some(x=>x!==d&&x.aid===aid)&&!confirm('This athlete already has another device. Use this one too?'))return render();
+ d.aid=aid;if(d.rec)d.rec.aid=aid;if(dvStaff()&&aid){db.meta=db.meta||{};db.meta.dvPair=db.meta.dvPair||{};if(db.meta.dvPair[d.key]!==aid){db.meta.dvPair[d.key]=aid;save()}}render()}
+function dvOpen(aid,id){const S=dvList(aid,'HR').find(x=>String(x.id)===String(id));if(!S)return;const a=dvAth(aid);
+ modal(`<h3 style="margin-top:0">Session report · ${esc(a?a.name:'')}</h3><p class="muted" style="margin:0 0 10px">${fmtDate(S.date)} ${esc(S.time||'')} · ${esc(S.type||'')}${S.rpe!=null?' · RPE '+S.rpe:''}${S.dev?' · '+esc(S.dev):''}</p>${dvReport(Object.assign({hrmax:dvHRmax(a).v,hrrest:60,zones:[0,0,0,0,0],btrimp:0},S))}<div class="row" style="margin-top:12px"><button class="btn pri" data-ro-ok onclick="dvCardFrom('${esc(aid)}','${esc(String(S.id))}','${S.date}')">📸 Photo card &amp; PDF</button><button class="btn" data-ro-ok onclick="closeModal()">Close</button></div>`);
+ const mb=document.getElementById('modalBody');if(mb)mb.style.width='min(760px,96vw)'}
+/* ---- pages ---- */
+function dvCss(){return `<style>
+.dvdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:5px;box-shadow:0 0 0 0 #22c55e88;animation:dvping 1.6s infinite}
+@keyframes dvping{0%{box-shadow:0 0 0 0 #22c55e88}70%{box-shadow:0 0 0 8px #22c55e00}100%{box-shadow:0 0 0 0 #22c55e00}}
+.dvheart{display:inline-block;font-size:22px;line-height:1;animation:dvbeat 1s infinite;animation-duration:0s}
+@keyframes dvbeat{0%,100%{transform:scale(1)}15%{transform:scale(1.28)}30%{transform:scale(1)}45%{transform:scale(1.14)}}
+.dvcard{transition:border-color .5s,box-shadow .5s}
+.dvgw{position:relative;width:190px;max-width:48%;flex:none}.dvgc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:18px}
+.dvnum{font:800 clamp(40px,7vw,54px)/1 'Space Grotesk',Inter,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+.dvtiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px}
+.dvtile{background:var(--card2);border-radius:14px;padding:8px 10px;display:flex;flex-direction:column}.dvtile span{font-size:11px;color:var(--muted)}.dvtile b{font:800 22px/1.15 'Space Grotesk',Inter,sans-serif;font-variant-numeric:tabular-nums}.dvtile small{font-size:10.5px;color:var(--muted)}
+.dvwall{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}.dvw{border-radius:22px;padding:16px;min-height:170px;display:flex;flex-direction:column;transition:background .6s}
+.dvw b.n{font:800 clamp(56px,9vw,84px)/1 'Space Grotesk',Inter,sans-serif;font-variant-numeric:tabular-nums}
+#dvWall:fullscreen{background:#0f1115;padding:24px;overflow:auto}#dvWall:fullscreen .dvwall{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+@media (prefers-reduced-motion:reduce){.dvheart,.dvdot{animation:none!important}}
+@media (max-width:520px){.dvgw{width:160px}}
+</style>`}
+function dvHelp(){const s=dvSupport();modal(`<h3 style="margin-top:0">How to connect on each device</h3>${!s.ok?`<p style="color:#dc2626"><b>${s.why==='ios'?'iPhone / iPad Safari cannot use Bluetooth sensors.':s.why==='https'?'Bluetooth needs the secure (https) address of the platform.':'This browser cannot use Bluetooth sensors.'}</b></p>`:''}
+ <table><tr><th>Device</th><th>What to use</th></tr>
+ <tr><td>Android phone / tablet</td><td><b>Chrome</b> browser, or the BIOMOTOR Android app. Turn on Bluetooth (and Location on Android 11 or older).</td></tr>
+ <tr><td>iPhone / iPad</td><td>Install the free <b>Bluefy – Web BLE Browser</b> app from the App Store, open <b>app.biomotorsports.com</b> in Bluefy and log in. (Safari and Chrome on iPhone have no Web Bluetooth – Apple rule.)</td></tr>
+ <tr><td>Windows laptop / PC</td><td><b>Chrome</b> or <b>Edge</b>, or the BIOMOTOR Windows app. Bluetooth on (built-in or USB dongle, Bluetooth 4.0+).</td></tr>
+ <tr><td>Mac</td><td><b>Chrome</b> or <b>Edge</b>, or the BIOMOTOR Mac app. Allow Bluetooth for the browser in System Settings → Privacy &amp; Security → Bluetooth.</td></tr>
+ <tr><td>Chromebook / Linux</td><td><b>Chrome</b>.</td></tr></table>
+ <h4>Wearing the Polar H10</h4><ol style="margin:0;padding-left:18px;line-height:1.6"><li>Wet the two electrode areas (inside of the strap) with water.</li><li>Strap just below the chest muscles, logo up and centred, snug.</li><li>Snap the H10 on – it wakes up only when it touches skin.</li><li>Tap <b>+ Connect</b> and choose “Polar H10 …” (the ID is printed on the sensor).</li></ol>
+ <h4>Good to know</h4><ul style="margin:0;padding-left:18px;line-height:1.6"><li>The H10 can be connected to 2 apps at the same time (e.g. Polar Flow + BIOMOTOR).</li><li>Several straps can be connected at once – give each one an athlete, then use <b>Team wall</b> on a TV.</li><li>After <b>Stop</b> the athlete stands still for 60 s – the heart-rate drop (recovery) is saved with the session.</li><li>If it does not appear: take the sensor off the strap for 30 s, wet the strap again, close other apps that use it.</li></ul>
+ <div class="row" style="margin-top:12px"><button class="btn" data-ro-ok onclick="closeModal()">Close</button></div>`)}
+function dvSupportBar(){const s=dvSupport();return s.ok?`<div class="card" style="padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="pill p-ok">✓ Bluetooth ready</span><span class="muted" style="font-size:13px">${esc(s.how)} · works on Android, iPhone / iPad (Bluefy), Windows, Mac, Chromebook</span><button class="btn sm" data-ro-ok onclick="dvHelp()" style="margin-left:auto">How to connect</button></div>`
+ :`<div class="card" style="border-color:#f59e0b;margin-bottom:12px"><b>⚠️ ${s.why==='ios'?'iPhone / iPad: Safari cannot connect Bluetooth sensors (Apple rule).':s.why==='https'?'Open the platform with https:// to use Bluetooth.':'This browser cannot connect Bluetooth sensors.'}</b><p class="muted" style="margin:6px 0 10px">${s.why==='ios'?'Install the free <b>Bluefy – Web BLE Browser</b> app from the App Store, open <b>app.biomotorsports.com</b> in it and log in – everything else works the same.':'Use <b>Chrome</b> or <b>Edge</b>, or the BIOMOTOR Android / Windows / Mac app.'}</p><div class="row">${s.why==='ios'?`<a class="btn pri" data-ro-ok href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank" rel="noopener">Get Bluefy</a>`:''}<button class="btn" data-ro-ok onclick="dvHelp()">How to connect</button></div></div>`}
+function dvCatalog(){const item=(ic,t,sub,btn)=>`<div class="card" style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="display:flex;gap:10px;align-items:center"><span style="font-size:28px">${ic}</span><b style="font-size:16px">${t}</b></div><div class="muted" style="font-size:12.5px;flex:1">${sub}</div><div>${btn}</div></div>`;
+ return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px">
+ ${item('❤️','Heart-rate strap','Polar H10 / H9 / OH1 / Verity Sense, Garmin HRM, Wahoo TICKR, Coospo… (any Bluetooth heart-rate sensor). Live HR, zones, TRIMP, recovery, HRV.',`<button class="btn pri" data-ro-ok onclick="dvConnect()">+ Connect</button>`)}
+ ${item('⚡','OVR Velocity (VBT sensor)','Bar velocity sensor – will appear here and feed Live VBT Track.','<span class="pill">Coming soon</span>')}
+ ${item('📡','More devices','GPS vests, force plates and other sensors will be added to this page.','<span class="pill">Coming soon</span>')}</div>`}
+function dvDevCard(d,aths,lockAth){const R=d.rec,a=dvAth(d.aid),mx=dvHRmax(a);
+ const sel=lockAth?`<b>${esc(a?a.name:'')}</b>`:`<select data-ro-ok style="width:auto;min-width:170px" onchange="dvPair('${d.k}',this.value)" ${R?'disabled':''}><option value="">– choose athlete –</option>${aths.map(x=>`<option value="${x.id}" ${x.id===d.aid?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`;
+ const ctl=R?(R.mode==='hr'&&R.phase!=='rec'?`<span class="pill p-blue" id="dvT_${d.k}"></span><button class="btn pri" data-ro-ok onclick="dvStop('${d.k}')">■ Stop</button>`
+  :`<span class="pill p-blue" id="dvT_${d.k}"></span><span class="muted" id="dvA_${d.k}" style="font-size:12.5px"></span><button class="btn" data-ro-ok onclick="dvStop('${d.k}')">${R.mode==='hr'?'Skip → report':'■ Stop'}</button>`)
+  :`<button class="btn pri" data-ro-ok onclick="dvStart('${d.k}','hr')" ${d.status==='on'?'':'disabled'}>⏺ Start session</button><span class="row" style="gap:4px"><button class="btn" data-ro-ok onclick="dvStart('${d.k}','hrv')" ${d.status==='on'?'':'disabled'}>🫀 HRV test</button><select id="dvHd_${d.k}" data-ro-ok style="width:auto"><option value="60">1 min</option><option value="120" selected>2 min</option><option value="300">5 min</option></select></span>`;
+ return `<div class="card dvcard" id="dvC_${d.k}" style="margin:0;border-width:2px"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><div><b>${esc(d.name)}</b><div class="muted" style="font-size:12px" id="dvS_${d.k}"></div></div>
+ <div class="row" style="gap:6px">${d.status==='off'?`<button class="btn sm" data-ro-ok onclick="dvReconnect('${d.k}')">↻ Reconnect</button>`:''}<button class="btn sm" data-ro-ok onclick="dvDisconnect('${d.k}')" aria-label="Disconnect">✕</button></div></div>
+ <div class="row" style="margin:8px 0;gap:8px;flex-wrap:wrap">${sel}<span class="muted" style="font-size:12px">HRmax ${mx.v} (${esc(mx.src)})</span></div>
+ <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div class="dvgw"><div id="dvGa_${d.k}">${dvGauge(0)}</div><div class="dvgc"><span class="dvheart" id="dvH_${d.k}">❤</span><span class="dvnum" id="dvB_${d.k}">—</span><span class="muted" style="font-size:11px;line-height:1.2;text-align:center">bpm<br><span id="dvP_${d.k}"></span></span></div></div>
+ <div style="flex:1;min-width:160px"><div id="dvZ_${d.k}" style="font-size:12.5px;margin-bottom:6px;line-height:1.9"></div><div id="dvZl_${d.k}"></div><div class="muted" style="font-size:11.5px;margin-top:4px" id="dvR_${d.k}"></div></div></div>
+ ${R&&R.mode==='hr'&&R.phase!=='rec'?`<div class="dvtiles" id="dvTiles_${d.k}" style="margin:10px 0"></div>`:''}
+ <canvas id="dvG_${d.k}" style="width:100%;height:110px;display:block;border-radius:12px;background:var(--card2);margin-top:8px"></canvas>
+ <div class="muted" style="font-size:11px;margin:3px 0 10px">last 3 minutes · line colour = training zone</div><div class="row" style="gap:8px;flex-wrap:wrap">${ctl}</div></div>`}
+function dvLivePage(aths,lockAth){return dvSupportBar()+dvCatalog()+(DV.devs.length?`<div class="row" style="justify-content:space-between;margin:6px 0 10px"><h3 style="margin:0">Connected devices (${DV.devs.length})</h3>${!lockAth&&DV.devs.length>1?`<button class="btn" data-ro-ok onclick="dvStartAll()">⏺ Start all</button>`:''}</div><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:12px">${DV.devs.map(d=>dvDevCard(d,aths,lockAth)).join('')}</div>`
+ :`<div class="card"><p class="muted" style="margin:0">No device connected. Put the strap on (wet electrodes), then tap <b>+ Connect</b> on Heart-rate strap.</p></div>`)+(DV.log.length?`<details style="margin-top:12px"><summary class="muted">Connection log</summary><pre style="font-size:11.5px;white-space:pre-wrap">${esc(DV.log.join('\n'))}</pre></details>`:'')}
+function dvWallPage(){const L=DV.devs.slice().sort((x,y)=>{const a=dvAth(x.aid),b=dvAth(y.aid);return String(a?a.name:'~').localeCompare(String(b?b.name:'~'))});
+ return `<div id="dvWall"><div class="row" style="justify-content:space-between;margin-bottom:12px"><span class="muted">${L.length} device(s) · colours = training zones</span><button class="btn" data-ro-ok onclick="const e=document.getElementById('dvWall');(e.requestFullscreen||e.webkitRequestFullscreen||function(){}).call(e)">⛶ Full screen (TV)</button></div>
+ ${L.length?`<div class="dvwall">${L.map(d=>{const a=dvAth(d.aid);return `<div class="dvw" id="dvW_${d.k}"><div class="row" style="justify-content:space-between"><b style="font-size:17px">${esc(a?a.name:d.name)}</b><span id="dvWt_${d.k}" style="font-size:12px;font-weight:700"></span></div><div style="flex:1;display:flex;align-items:center;gap:8px"><b class="n" id="dvWb_${d.k}">—</b><span style="font-size:14px;opacity:.85">bpm<br><span id="dvWp_${d.k}"></span></span></div><div id="dvWz_${d.k}" style="font-weight:700;font-size:14px"></div></div>`}).join('')}</div>`:'<div class="card"><p class="muted" style="margin:0">Connect straps in <b>Live &amp; connect</b> first.</p></div>'}
+ <div class="row" style="gap:6px;margin-top:12px;flex-wrap:wrap">${DV_Z.map(([p,l,c],k)=>`<span class="pill" style="background:${c};color:#fff">${l} · ${Math.round(p*100)}–${k<4?Math.round(DV_Z[k+1][0]*100):100} %</span>`).join('')}</div></div>`}
+function dvSpark(a,w=220,h=40){const v=a.filter(x=>x>0);if(v.length<2)return '';const lo=Math.min(...v),hi=Math.max(...v)||1,n=a.length;let p='';a.forEach((x,i)=>{if(!(x>0))return;p+=`${p?'L':'M'}${(i/(n-1)*w).toFixed(1)} ${(h-2-(x-lo)/Math.max(1,hi-lo)*(h-4)).toFixed(1)} `});return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="${p}" fill="none" stroke="#ef4444" stroke-width="1.6"/></svg>`}
+function dvHistory(aid,canDel){if(!aid)return '<div class="card"><p class="muted">Choose an athlete.</p></div>';dvCloudLoad(aid);const H=dvList(aid,'HR').reverse(),V=dvHrvList(aid);const st=V.length?dvHrvStatus(aid,+V[V.length-1].ln):null;
+ const wk=H.filter(x=>x.date>=addD(today(),-6)),wT=wk.reduce((s,x)=>s+(+x.trimp||0),0),wM=wk.reduce((s,x)=>s+(+x.dur||0),0),wz=[0,1,2,3,4].map(i=>wk.reduce((s,x)=>s+((x.zones||[])[i]||0),0));
+ return `<div class="dvtiles" style="margin-bottom:12px">${[['Sessions (7 d)',wk.length,''],['Time (7 d)',dvClock(wM),''],['TRIMP (7 d)',wT,'AU'],['Hard time Z4–Z5',dvClock(wz[3]+wz[4]),'7 days'],['Last HRV',V.length?V[V.length-1].rmssd:'—',V.length?'ms RMSSD':'']].map(([l,x,u])=>`<div class="dvtile"><span>${l}</span><b>${x}</b><small>${u}</small></div>`).join('')}</div>
+ ${dvRepCard(aid)}
+ <div class="card"><h3 style="margin-top:0">🫀 Morning HRV</h3>${V.length?`<div style="margin:0 0 10px;padding:10px 12px;border-radius:12px;background:${st.c}14"><b style="color:${st.c}">${st.t}</b> <span class="muted">· last ${fmtDate(V[V.length-1].date)}: RMSSD ${V[V.length-1].rmssd} ms, HR ${V[V.length-1].mhr} bpm</span></div>${dvHrvChart(V)}
+ <details style="margin-top:8px"><summary class="muted">All HRV tests (${V.length})</summary><table><tr><th>Date</th><th>RMSSD</th><th>ln</th><th>Rest HR</th><th>SDNN</th><th>Position</th><th>By</th>${canDel?'<th></th>':''}</tr>${V.slice().reverse().slice(0,40).map(x=>`<tr><td>${fmtDate(x.date)} ${esc(x.time||'')}</td><td><b>${x.rmssd}</b> ms</td><td>${x.ln}</td><td>${x.mhr}</td><td>${x.sdnn}</td><td>${esc(x.pos||'')}</td><td class="muted">${x.src==='athlete'?'athlete':esc(x.by||'')}</td>${canDel?`<td>${x.src==='staff'?`<button class="btn sm" onclick="dvDel('HRV','${x.id}')">🗑</button>`:''}</td>`:''}</tr>`).join('')}</table></details>`:'<p class="muted" style="margin:0">No HRV tests yet. Do a 2-minute test every morning after waking up, lying still.</p>'}</div>
+ <div class="card"><h3 style="margin-top:0">❤️ Heart-rate sessions</h3>${H.length?`<div class="scroll"><table><tr><th>Date</th><th>Type</th><th>Time</th><th>Avg / max</th><th>Zones</th><th>TRIMP</th><th>Recovery</th><th>Heart rate</th>${canDel?'<th></th>':''}</tr>${H.slice(0,40).map(x=>{const tot=(x.zones||[]).reduce((s,y)=>s+y,0)||1;return `<tr style="cursor:pointer" data-ro-ok onclick="if(!event.target.closest('button'))dvOpen('${aid}','${x.id}')"><td>${fmtDate(x.date)} ${esc(x.time||'')}</td><td>${esc(x.type||'')}${x.rpe!=null?` · RPE ${x.rpe}`:''}</td><td>${dvClock(+x.dur||0)}</td><td>${x.avg} / <b>${x.max}</b></td><td><div style="display:flex;width:120px;height:10px;border-radius:5px;overflow:hidden">${(x.zones||[]).map((s,i)=>s?`<div style="width:${s/tot*100}%;background:${DV_Z[i][2]}"></div>`:'').join('')}</div></td><td><b>${x.trimp}</b></td><td>${x.hrr!=null?(x.hrr>=0?'−'+x.hrr:'+'+(-x.hrr))+' bpm':'—'}</td><td>${dvSpark(x.hr5||[],140,30)}</td>${canDel?`<td>${x.src==='staff'?`<button class="btn sm" onclick="dvDel('HR','${x.id}')">🗑</button>`:''}</td>`:''}</tr>`}).join('')}</table></div><div class="muted" style="font-size:11.5px">Tap a session for its full report.</div>`:'<p class="muted" style="margin:0">No sessions yet.</p>'}</div>`}
+function dvRefs(){return `<div class="card"><h3 style="margin-top:0">Methods &amp; references</h3><ul style="line-height:1.6;padding-left:18px;margin:0">
+ <li><b>HRmax</b> = measured value in the athlete profile (field “hrMax”) if present, otherwise 208 − 0.7 × age. ${esc(DV_REF.tanaka)}</li>
+ <li><b>Zones</b> (% HRmax): Z1 50–60, Z2 60–70, Z3 70–80, Z4 80–90, Z5 90–100.</li>
+ <li><b>TRIMP (Edwards)</b> = Σ minutes in zone × zone number (1–5). Saved as external load in Load Monitoring. ${esc(DV_REF.edwards)}</li>
+ <li><b>Banister TRIMP</b> = Σ Δt × HRr × 0.64·e^(1.92·HRr) (men) / 0.86·e^(1.67·HRr) (women); HRr = (HR − HRrest)/(HRmax − HRrest). ${esc(DV_REF.banister)}</li>
+ <li><b>Energy</b> (estimate, needs weight + date of birth): Keytel equations from heart rate, sex, weight and age; most accurate between ~90 and 150 bpm. ${esc(DV_REF.keytel)}</li>
+ <li><b>Heart-rate recovery</b>: bpm at stop minus bpm 60 s later (mean of the last 5 s), athlete standing still. Track it over weeks: a rising value shows better fitness, a falling value can show fatigue. ${esc(DV_REF.hrr)}</li>
+ <li><b>HRV</b>: beat-to-beat RR from the strap, 30 s settling then 1–5 min; beats outside 300–2000 ms or changing &gt; 20 % from the previous beat removed; RMSSD and ln RMSSD; status vs the athlete's 7-day baseline (≥ −0.5 SD normal, −0.5 to −1 SD slightly low, &lt; −1 SD low); trend chart with 7-day rolling mean and ± 0.5 SD band. ${esc(DV_REF.hrv)} ${esc(DV_REF.esc)}</li>
+ <li>Live “HRV” on the device card = RMSSD of the last ~60 beats – only meaningful when the athlete is still.</li>
+ <li>Heart-rate data support training decisions; they are not a medical diagnosis.</li></ul></div>`}
+const dvTabs=(L)=>`<div class="tabs">${L.map(([k,l])=>`<button class="tab ${DV.tab===k?'on':''}" data-ro-ok onclick="DV.tab='${k}';render()">${l}</button>`).join('')}</div>`;
+P.devices=()=>{dvInit();const aths=nutAthletes();if(DV.aid&&!aths.some(a=>a.id===DV.aid))DV.aid='';if(!DV.aid)DV.aid=(DV.devs.find(d=>d.aid)||{}).aid||(aths[0]||{}).id||'';
+ const pick=athPick(`<select data-ro-ok style="width:auto;min-width:200px" onchange="DV.aid=this.value;render()">${aths.map(x=>`<option value="${x.id}" ${x.id===DV.aid?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`);
+ const body=DV.tab==='hist'?dvHistory(DV.aid,dvStaff()):DV.tab==='refs'?dvRefs():DV.tab==='wall'?dvWallPage():dvLivePage(aths,false);
+ setTimeout(dvPaint,0);
+ return dvCss()+head('Devices','Device Nexus','Connect heart-rate straps (Polar H10 and others) – live heart rate, zones, TRIMP, heart-rate recovery and morning HRV. More devices (OVR Velocity…) will be added here.',DV.tab==='hist'?pick:`<button class="btn" data-ro-ok onclick="dvHelp()">How to connect</button>`)+
+ dvTabs([['live','Live & connect'],['wall',`Team wall${DV.devs.length?' ('+DV.devs.length+')':''}`],['hist','History'],['refs','Methods']])+body};
+P['my-devices']=()=>{dvInit();const me=authUser();const {a}=axCur(me);if(!a)return axHead(me,'Device Nexus','')+axNone(me);
+ DV.devs.forEach(d=>{if(!d.rec)d.aid=a.id});if(DV.tab==='wall')DV.tab='live';setTimeout(dvPaint,0);
+ return dvCss()+axHead(me,'Device Nexus','Connect your heart-rate strap (Polar H10 and others) – live heart rate, zones, recovery and morning HRV.').replace(/<div class="pill p-blue"[^>]*>👁 View only[^<]*<\/div>/,'')+
+ dvTabs([['live','Live & connect'],['hist','My history'],['refs','Methods']])+(DV.tab==='hist'?dvHistory(a.id,false):DV.tab==='refs'?dvRefs():dvLivePage([a],true))};
+/* ---- reports: daily (any date) and monthly – photo card (own photo + heart-rate overlay, PNG) and PDF ---- */
+DV.rep=DV.rep||{mode:'day',date:'',month:'',sel:'all',photo:null,logo:null};
+const dvMonthName=m=>{const x=new Date(m+'-01T00:00');return isNaN(x)?m:x.toLocaleDateString('en-GB',{month:'long',year:'numeric'})};
+const dvMonthEnd=m=>{const x=new Date(m+'-01T00:00');x.setMonth(x.getMonth()+1);x.setDate(0);return _loc(x)};
+// all numbers for one day or one month
+function dvRange(aid,mode,key){const a=dvAth(aid),mx=dvHRmax(a).v;const from=mode==='month'?key+'-01':key,to=mode==='month'?dvMonthEnd(key):key;
+ const S=dvList(aid,'HR').filter(x=>x.date>=from&&x.date<=to),V=dvHrvList(aid).filter(x=>x.date>=from&&x.date<=to);
+ const L=mode==='day'&&DV.rep.sel!=='all'&&S.some(x=>String(x.id)===String(DV.rep.sel))?S.filter(x=>String(x.id)===String(DV.rep.sel)):S;
+ const dur=L.reduce((s,x)=>s+(+x.dur||0),0),zs=[0,1,2,3,4].map(i=>L.reduce((s,x)=>s+((x.zones||[])[i]||0),0));
+ const avg=dur?Math.round(L.reduce((s,x)=>s+(+x.avg||0)*(+x.dur||0),0)/dur):0,max=L.length?Math.max(...L.map(x=>+x.max||0)):0;
+ const kc=L.reduce((s,x)=>s+(+x.kcal||0),0),hr=[];if(mode==='day')L.forEach((x,i)=>{if(i)hr.push(0,0,0);(x.hr5||[]).forEach(v=>hr.push(v))});
+ const H=L.filter(x=>x.hrr!=null).map(x=>+x.hrr),days=[];if(mode==='month'){for(let d=from;d<=to;d=addD(d,1)){const ds=L.filter(x=>x.date===d);days.push({d,n:ds.length,trimp:ds.reduce((s,x)=>s+(+x.trimp||0),0),dur:ds.reduce((s,x)=>s+(+x.dur||0),0),hard:ds.reduce((s,x)=>s+((x.zones||[])[3]||0)+((x.zones||[])[4]||0),0)})}}
+ return {mode,key,from,to,a,mx,d:from,S,L,V,dur,zs,avg,max,trimp:L.reduce((s,x)=>s+(+x.trimp||0),0),btrimp:L.reduce((s,x)=>s+(+x.btrimp||0),0),kcal:kc||null,
+  hrr:H.length?(mode==='day'?H[H.length-1]:Math.round(H.reduce((s,x)=>s+x,0)/H.length)):null,hrrN:H.length,hr,days,hrv:V.slice(-1)[0]||null,type:[...new Set(L.map(x=>x.type).filter(Boolean))].join(' + '),
+  title:mode==='month'?dvMonthName(key):fmtDate(key)}}
+function dvLogoImg(){if(DV.rep.logo)return Promise.resolve(DV.rep.logo);return new Promise(ok=>{const i=new Image();i.onload=()=>{DV.rep.logo=i;ok(i)};i.onerror=()=>ok(null);i.src=(db.brand&&(db.brand.logo||db.brand.logoUrl))||BM_LOGO})}
+function dvPhotoPick(inp){const f=inp.files&&inp.files[0];if(!f)return;if(!/^image\//.test(f.type))return toast('Choose a photo');const r=new FileReader();
+ r.onload=()=>{const i=new Image();i.onload=()=>{DV.rep.photo=i;render()};i.onerror=()=>toast('This photo cannot be opened – try a JPG or PNG');i.src=r.result};r.readAsDataURL(f)}
+function dvRR(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+// heart-rate curve on a canvas (photo card + PDF)
+function dvChartCv(g,x,y,w,h,hr,mx,step,dark){const v=hr.map(b=>b>0?b:null),n=v.length,vv=v.filter(Boolean);if(n<2||!vv.length)return;
+ const lo=Math.max(30,Math.min(Math.round(mx*.45),...vv)-5),hi=mx+3,X=i=>x+i/(n-1)*w,Y=b=>y+h*(1-(Math.min(hi,Math.max(lo,b))-lo)/(hi-lo));
+ DV_Z.forEach(([p,,c],k)=>{const y0=Y(k<4?DV_Z[k+1][0]*mx:hi),y1=Y(p*mx);if(y1>y){g.fillStyle=c+(dark?'2e':'1c');g.fillRect(x,y0,w,Math.max(0,y1-y0));g.fillStyle=c;g.font=`800 ${Math.round(h/11)}px Inter,Arial,sans-serif`;g.fillText('Z'+(k+1),x+6,Math.min(y1,y+h)-6)}});
+ const gr=g.createLinearGradient(0,y+h,0,y);DV_Z.forEach(([p,,c],k)=>{const o=Math.max(0,Math.min(1,1-(Y(p*mx)-y)/h));gr.addColorStop(o,k?DV_Z[k-1][2]:'#94a3b8');gr.addColorStop(o,c)});
+ g.beginPath();let pen=false;v.forEach((b,i)=>{if(b==null){pen=false;return}pen?g.lineTo(X(i),Y(b)):g.moveTo(X(i),Y(b));pen=true});g.strokeStyle=gr;g.lineWidth=Math.max(2.5,h/45);g.lineJoin='round';g.lineCap='round';g.stroke();
+ const im=v.indexOf(Math.max(...vv)),rt=X(im)>x+w*.8;g.fillStyle='#ef4444';g.beginPath();g.arc(X(im),Y(v[im]),h/28,0,7);g.fill();g.font=`800 ${Math.round(h/10)}px Inter,Arial,sans-serif`;g.fillStyle=dark?'#fff':'#ef4444';g.textAlign=rt?'right':'left';g.fillText('max '+v[im],X(im)+(rt?-12:12),Math.max(y+h/8,Y(v[im])-10));g.textAlign='left';
+ const tot=(n-1)*step,tick=tot>3600?900:tot>1200?300:tot>300?60:30;g.fillStyle=dark?'rgba(255,255,255,.75)':'#64748b';g.font=`${Math.round(h/13)}px Inter,Arial,sans-serif`;g.textAlign='center';for(let t=0;t<=tot;t+=tick)g.fillText(dvClock(t),X(t/step),y+h+h/9);g.textAlign='left'}
+// daily load bars for a month (TRIMP per day, red part = hard time share)
+function dvBarsCv(g,x,y,w,h,days,dark){const n=days.length,mx=Math.max(10,...days.map(d=>d.trimp)),bw=w/n;const fs=Math.round(h/12);
+ g.strokeStyle=dark?'rgba(255,255,255,.15)':'#e5e7eb';g.lineWidth=1;[0.5,1].forEach(f=>{const yy=y+h-h*f;g.beginPath();g.moveTo(x,yy);g.lineTo(x+w,yy);g.stroke();g.fillStyle=dark?'rgba(255,255,255,.6)':'#64748b';g.font=`${fs}px Inter,Arial,sans-serif`;g.fillText(String(Math.round(mx*f)),x+2,yy-4)});
+ days.forEach((d,i)=>{if(!d.trimp)return;const bh=h*d.trimp/mx,bx=x+i*bw+bw*.16,ww=bw*.68,hs=d.dur?Math.min(1,d.hard/d.dur):0;const gr=g.createLinearGradient(0,y+h-bh,0,y+h);gr.addColorStop(0,'#ef4444');gr.addColorStop(Math.max(.01,hs),'#f59e0b');gr.addColorStop(1,'#3b82f6');g.fillStyle=gr;dvRR(g,bx,y+h-bh,ww,bh,Math.min(ww/2,8));g.fill()});
+ g.fillStyle=dark?'rgba(255,255,255,.7)':'#64748b';g.font=`${fs}px Inter,Arial,sans-serif`;g.textAlign='center';days.forEach((d,i)=>{const dd=+d.d.slice(8);if(dd===1||dd%5===0)g.fillText(String(dd),x+i*bw+bw/2,y+h+fs+4)});g.textAlign='left'}
+// HRV trend on a canvas (dots + 7-day mean + ± 0.5 SD band)
+function dvHrvCv(g,x,y,w,h,V,all){if(V.length<2)return;const xs=V.map(v=>new Date(v.date).getTime()),t0=Math.min(...xs),t1=Math.max(...xs);
+ const roll=V.map(v=>{const wv=all.filter(z=>z.date<=v.date&&z.date>addD(v.date,-7)).map(z=>+z.ln),b=all.filter(z=>z.date<=v.date&&z.date>addD(v.date,-28)).map(z=>+z.ln);const m=wv.reduce((s,z)=>s+z,0)/wv.length,bm=b.reduce((s,z)=>s+z,0)/b.length,sd=b.length>2?Math.sqrt(b.reduce((s,z)=>s+(z-bm)**2,0)/(b.length-1)):.1;return {m,lo:m-.5*sd,hi:m+.5*sd}});
+ const vals=V.map(v=>+v.ln).concat(roll.map(r=>r.lo),roll.map(r=>r.hi)),lo=Math.min(...vals)-.1,hi=Math.max(...vals)+.1,X=t=>x+(t-t0)/Math.max(1,t1-t0)*w,Y=v=>y+h*(1-(v-lo)/(hi-lo));
+ g.beginPath();roll.forEach((r,i)=>i?g.lineTo(X(xs[i]),Y(r.hi)):g.moveTo(X(xs[i]),Y(r.hi)));for(let i=roll.length-1;i>=0;i--)g.lineTo(X(xs[i]),Y(roll[i].lo));g.closePath();g.fillStyle='rgba(22,163,74,.15)';g.fill();
+ g.beginPath();roll.forEach((r,i)=>i?g.lineTo(X(xs[i]),Y(r.m)):g.moveTo(X(xs[i]),Y(r.m)));g.strokeStyle='#16a34a';g.lineWidth=3;g.stroke();
+ V.forEach((v,i)=>{const r=roll[i],c=+v.ln>=r.lo?'#16a34a':+v.ln>=r.m-2*(r.hi-r.m)?'#d97706':'#dc2626';g.fillStyle=c;g.beginPath();g.arc(X(xs[i]),Y(+v.ln),Math.max(4,h/40),0,7);g.fill()});
+ g.fillStyle='#64748b';g.font=`${Math.round(h/13)}px Inter,Arial,sans-serif`;[lo+.1,hi-.1].forEach(v=>g.fillText(v.toFixed(1),x-34,Y(v)+5))}
+async function dvCardDraw(cv,D){const W=1080,H=1350;cv.width=W;cv.height=H;const g=cv.getContext('2d');const P=DV.rep.photo,logo=await dvLogoImg();try{await document.fonts.ready}catch(e){}const mon=D.mode==='month';
+ if(P){const s=Math.max(W/P.width,H/P.height),w=P.width*s,h=P.height*s;g.drawImage(P,(W-w)/2,(H-h)/2*0.6,w,h)}
+ else{const bg=g.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#7a0a1a');bg.addColorStop(1,'#d81f36');g.fillStyle=bg;g.fillRect(0,0,W,H);g.globalAlpha=.08;g.fillStyle='#fff';g.font='420px serif';g.fillText('❤',W-520,560);g.globalAlpha=1;
+  g.fillStyle='rgba(255,255,255,.85)';g.font='600 30px Inter,Arial,sans-serif';g.textAlign='center';g.fillText('Add your photo – 📸 Choose photo',W/2,330);g.textAlign='left'}
+ let sh=g.createLinearGradient(0,0,0,240);sh.addColorStop(0,'rgba(0,0,0,.55)');sh.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=sh;g.fillRect(0,0,W,240);
+ if(logo){const lh=92,lw=Math.min(330,logo.width*lh/logo.height);dvRR(g,40,40,lw+36,lh+24,22);g.fillStyle='rgba(255,255,255,.95)';g.fill();g.drawImage(logo,58,52,lw,lh)}
+ g.fillStyle='#fff';g.textAlign='right';g.font='700 34px Inter,Arial,sans-serif';g.fillText(D.title,W-44,88);g.font='500 26px Inter,Arial,sans-serif';g.fillText(mon?'Monthly summary':(D.L.length>1?D.L.length+' sessions':(D.L[0]&&D.L[0].time||'')),W-44,126);g.textAlign='left';
+ const top=H-790;sh=g.createLinearGradient(0,top-200,0,H);sh.addColorStop(0,'rgba(0,0,0,0)');sh.addColorStop(.35,'rgba(0,0,0,.55)');sh.addColorStop(1,'rgba(0,0,0,.8)');g.fillStyle=sh;g.fillRect(0,top-200,W,H-top+200);
+ dvRR(g,36,top,W-72,H-top-36,36);g.fillStyle='rgba(14,16,22,.72)';g.fill();g.strokeStyle='rgba(255,255,255,.12)';g.lineWidth=2;g.stroke();
+ const z=dvZone(D.avg,D.mx),zc=dvZc(z);g.fillStyle=zc;g.font='72px serif';g.fillText('❤',70,top+96);
+ g.fillStyle='#fff';g.font="800 54px 'Space Grotesk',Inter,Arial,sans-serif";g.fillText(D.a?D.a.name:'Athlete',160,top+70);g.font='500 28px Inter,Arial,sans-serif';g.fillStyle='rgba(255,255,255,.78)';
+ g.fillText(mon?`${D.L.length} sessions · ${D.days.filter(d=>d.n).length} training days`:(D.type||'Heart-rate session')+(D.L[0]&&D.L[0].dev?'  ·  '+D.L[0].dev:''),160,top+110);
+ const tiles=mon?[['SESSIONS',D.L.length],['TIME',dvClock(D.dur)],['AVG HR',D.avg||'—'],['TRIMP',D.trimp],['KCAL',D.kcal!=null?D.kcal:'—']]:[['TIME',dvClock(D.dur)],['AVG HR',D.avg||'—'],['MAX HR',D.max||'—'],['TRIMP',D.trimp],['KCAL',D.kcal!=null?D.kcal:'—']];const tw=(W-72-48-4*14)/5;
+ tiles.forEach(([l,v],i)=>{const x=60+i*(tw+14),y=top+140;dvRR(g,x,y,tw,124,22);g.fillStyle=(!mon&&(i===1||i===2))||(mon&&i===2)?zc+'33':'rgba(255,255,255,.08)';g.fill();g.fillStyle='rgba(255,255,255,.7)';g.font='700 20px Inter,Arial,sans-serif';g.fillText(l,x+18,y+38);g.fillStyle='#fff';g.font=`800 ${String(v).length>6?40:50}px 'Space Grotesk',Inter,Arial,sans-serif`;g.fillText(String(v),x+18,y+96)});
+ if(mon){g.fillStyle='rgba(255,255,255,.7)';g.font='600 22px Inter,Arial,sans-serif';g.fillText('Daily training load (TRIMP)',70,top+300);dvBarsCv(g,70,top+320,W-140,200,D.days,true)}else dvChartCv(g,70,top+300,W-140,220,D.hr.length?D.hr:[0,0],D.mx,5,true);
+ const zt=D.zs.reduce((s,x)=>s+x,0)||1,by=top+580;let bx=70;D.zs.forEach((s,i)=>{const w=(W-140)*s/zt;if(w>0){g.fillStyle=DV_Z[i][2];g.fillRect(bx,by,w,26)}bx+=w});dvRR(g,70,by,W-140,26,13);g.strokeStyle='rgba(255,255,255,.25)';g.lineWidth=2;g.stroke();
+ g.font='600 22px Inter,Arial,sans-serif';const cw=(W-140)/5;D.zs.forEach((s,i)=>{g.fillStyle=DV_Z[i][2];g.fillText('Z'+(i+1),70+i*cw,by+64);g.fillStyle='#fff';g.fillText(dvClock(s),70+i*cw+40,by+64)});
+ g.fillStyle='rgba(255,255,255,.75)';g.font='500 22px Inter,Arial,sans-serif';const foot=[D.hrr!=null?`HR recovery ${D.hrr>=0?'−':'+'}${Math.abs(D.hrr)} bpm/60 s${mon?' (avg)':''}`:'',D.hrv?`${mon?'Last':'Morning'} HRV ${D.hrv.rmssd} ms`:'',`HRmax ${D.mx}`].filter(Boolean).join('   ·   ');g.fillText(foot,70,by+108);
+ g.textAlign='right';g.fillStyle='rgba(255,255,255,.6)';g.font='600 20px Inter,Arial,sans-serif';g.fillText(((db.org&&db.org.name)||'BIOMOTOR Sport & Fitness')+'  ·  Device Nexus',W-70,H-58);g.textAlign='left'}
+const dvRepKey=()=>DV.rep.mode==='month'?(DV.rep.month||today().slice(0,7)):(DV.rep.date||today());
+async function dvCardPaint(){const cv=document.getElementById('dvCard');if(!cv)return;await dvCardDraw(cv,dvRange(cv.dataset.aid,DV.rep.mode,dvRepKey()))}
+function dvRepSet(k,v){DV.rep[k]=v;if(k==='date'||k==='mode')DV.rep.sel='all';render()}
+async function dvDownload(bytes,name,mime){const cap=window.Capacitor;
+ if(cap&&cap.isNativePlatform&&cap.isNativePlatform()&&cap.Plugins&&cap.Plugins.Filesystem)return fcDownload(bytes,name);
+ const blob=new Blob([bytes],{type:mime}),url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}
+const dvB64=u=>{const b=atob(u.split(',')[1]);const o=new Uint8Array(b.length);for(let i=0;i<b.length;i++)o[i]=b.charCodeAt(i);return o};
+const dvFile=(D,kind,ext)=>(`HR_${kind}_${D.a?D.a.name:'athlete'}_${D.key}`).replace(/[^\w.-]+/g,'_')+'.'+ext;
+async function dvCardPng(aid){const D=dvRange(aid,DV.rep.mode,dvRepKey());if(!D.L.length)return toast(D.mode==='month'?'No heart-rate session in this month':'No heart-rate session on this day');const cv=document.createElement('canvas');await dvCardDraw(cv,D);
+ await dvDownload(dvB64(cv.toDataURL('image/png')),dvFile(D,D.mode==='month'?'monthly_card':'card','png'),'image/png');toast('Photo card ready')}
+async function dvPdf(aid){const D=dvRange(aid,DV.rep.mode,dvRepKey()),mon=D.mode==='month';if(!D.L.length&&!D.V.length)return toast(mon?'No heart-rate data in this month':'No heart-rate data on this day');toast(mon?'Preparing monthly report…':'Preparing daily report…');
+ try{const Lb=await fcLib();const {PDFDocument,StandardFonts,rgb}=Lb;const doc=await PDFDocument.create();const F=await doc.embedFont(StandardFonts.Helvetica),B=await doc.embedFont(StandardFonts.HelveticaBold);const logo=await fcImg(doc);
+  const W=595.28,H=841.89,M=36;let pg=doc.addPage([W,H]),y;const red=rgb(.71,.07,.11),grey=rgb(.4,.4,.4),lg=rgb(.88,.88,.88),blk=rgb(.08,.08,.08),soft=rgb(.97,.96,.96);
+  const hex=h=>rgb(parseInt(h.slice(1,3),16)/255,parseInt(h.slice(3,5),16)/255,parseInt(h.slice(5,7),16)/255);
+  const T=(t,x,yy,o={})=>pg.drawText(fcTx(t),{x,y:yy,size:o.z||9,font:o.f||F,color:o.c||blk});const tw=(t,z,f)=>(f||F).widthOfTextAtSize(fcTx(t),z);
+  const wrap=(t,f,s,w)=>{const out=[];let line='';String(fcTx(t)).split(/\s+/).forEach(wd=>{const tr=line?line+' '+wd:wd;if(f.widthOfTextAtSize(tr,s)>w&&line){out.push(line);line=wd}else line=tr});if(line)out.push(line);return out};
+  const RT=mon?'Monthly heart-rate report':'Daily heart-rate report';const np=()=>{pg=doc.addPage([W,H]);T(((db.org&&db.org.name)||'BIOMOTOR')+'  ·  '+RT+'  ·  '+(D.a?D.a.name:'')+'  ·  '+D.title,M,H-26,{z:7.5,c:grey});y=H-46};
+  const need=h=>{if(y-h<48)np()};const sec=t=>{need(40);y-=4;pg.drawRectangle({x:M,y:y-4,width:4,height:15,color:red});T(t,M+10,y,{z:12,f:B});y-=20};
+  const img=async(draw,cw,ch)=>{const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cw,ch);draw(g);const im=await doc.embedPng(dvB64(cv.toDataURL('image/png')));const ih=(W-2*M)*ch/cw;need(ih+6);pg.drawImage(im,{x:M,y:y-ih,width:W-2*M,height:ih});y-=ih+10};
+  pg.drawRectangle({x:0,y:H-92,width:W,height:92,color:red});if(logo){const s=Math.min(150/logo.width,52/logo.height);pg.drawRectangle({x:M-6,y:H-80,width:logo.width*s+12,height:logo.height*s+12,color:rgb(1,1,1)});pg.drawImage(logo,{x:M,y:H-74,width:logo.width*s,height:logo.height*s})}
+  const ttl=RT.toUpperCase();T(ttl,W-M-tw(ttl,15,B),H-44,{z:15,f:B,c:rgb(1,1,1)});const sub=(D.a?D.a.name:'')+'  ·  '+(mon?D.title:fcLongDate(D.d));T(sub,W-M-tw(sub,10),H-62,{z:10,c:rgb(1,.9,.9)});
+  y=H-112;let cardH=0;
+  if(D.L.length){const cv=document.createElement('canvas');await dvCardDraw(cv,D);const im=await doc.embedJpg(dvB64(cv.toDataURL('image/jpeg',0.86)));const cw=228,ch=cw*1350/1080;pg.drawImage(im,{x:M,y:y-ch,width:cw,height:ch});cardH=ch}
+  const kx=D.L.length?M+244:M,kw=W-M-kx;let ky=y;const tDays=D.days.filter(d=>d.n).length;
+  const prev=mon?dvRange(D.a.id,'month',(()=>{const x=new Date(D.key+'-01T00:00');x.setMonth(x.getMonth()-1);return _loc(x).slice(0,7)})()):null;
+  const chg=(a,b)=>b>0?` (${a>=b?'+':''}${Math.round((a-b)/b*100)} % vs last month)`:'';
+  const kv=mon?[['Sessions',D.L.length+' in '+tDays+' training days'],['Total time',dvClock(D.dur)+(prev?chg(D.dur,prev.dur):'')],['Training load',`TRIMP ${D.trimp} AU${prev?chg(D.trimp,prev.trimp):''}`],['Average heart rate',D.avg?D.avg+' bpm ('+Math.round(D.avg/D.mx*100)+' % HRmax)':'-'],['Peak heart rate',D.max?D.max+' bpm ('+Math.round(D.max/D.mx*100)+' % HRmax)':'-'],['Hard time (Z4-Z5)',dvClock(D.zs[3]+D.zs[4])],['Energy (estimate)',D.kcal!=null?D.kcal+' kcal':'add weight + date of birth'],['Heart-rate recovery',D.hrr!=null?'avg -'+D.hrr+' bpm in 60 s ('+D.hrrN+' tests)':'not measured'],['Morning HRV',D.V.length?`${D.V.length} tests · avg RMSSD ${(D.V.reduce((s,v)=>s+ +v.rmssd,0)/D.V.length).toFixed(1)} ms`:'no tests']]
+   :[['Sessions',String(D.L.length)],['Total time',dvClock(D.dur)],['Average heart rate',D.avg?D.avg+' bpm ('+Math.round(D.avg/D.mx*100)+' % HRmax)':'-'],['Peak heart rate',D.max?D.max+' bpm ('+Math.round(D.max/D.mx*100)+' % HRmax)':'-'],['Training load',`TRIMP ${D.trimp} AU (Edwards) · ${D.btrimp} AU (Banister)`],['Energy (estimate)',D.kcal!=null?D.kcal+' kcal':'add weight + date of birth'],['Heart-rate recovery',D.hrr!=null?(D.hrr>=0?'-':'+')+Math.abs(D.hrr)+' bpm in 60 s ('+dvHrrTxt(D.hrr)+')':'not measured'],['Morning HRV',D.hrv?`RMSSD ${D.hrv.rmssd} ms · ln ${D.hrv.ln} · rest HR ${D.hrv.mhr}`:'no test today'],['HRmax used',D.mx+' bpm ('+dvHRmax(D.a).src+')']];
+  kv.forEach(([k,v],i)=>{if(i%2===0)pg.drawRectangle({x:kx,y:ky-15,width:kw,height:21,color:soft});T(k,kx+6,ky-9,{z:8.5,c:grey});const L=wrap(v,B,9,kw-130);L.forEach((l,j)=>T(l,kx+124,ky-9-j*10,{z:9,f:B}));ky-=21+Math.max(0,L.length-1)*10});
+  if(D.hrv){const st=dvHrvStatus(D.a.id,+D.hrv.ln);ky-=6;const c=hex(/^#[0-9a-f]{6}$/i.test(st.c)?st.c:'#64748b');pg.drawRectangle({x:kx,y:ky-30,width:kw,height:34,color:soft,borderColor:c,borderWidth:1});T((mon?'Latest HRV: ':'')+st.t.replace(/[🟢🟡🔴]/gu,'').trim(),kx+8,ky-12,{z:9.5,f:B,c});wrap(st.d,F,7.5,kw-16).slice(0,1).forEach(l=>T(l,kx+8,ky-24,{z:7.5,c:grey}));ky-=38}
+  y=Math.min(y-cardH,ky)-14;
+  if(mon){sec('Daily training load (TRIMP)');await img(g=>dvBarsCv(g,50,30,1520,380,D.days,false),1600,460);T('Bar height = TRIMP of the day; red/orange top = share of hard time (Z4-Z5).',M,y+4,{z:7.5,c:grey});y-=8;
+   if(D.V.length>1){sec('Morning HRV (ln RMSSD)');await img(g=>dvHrvCv(g,70,25,1500,330,D.V,dvHrvList(D.a.id)),1600,390);T('Dots = daily ln RMSSD (green normal, orange slightly low, red low) · line = 7-day average · band = normal range.',M,y+4,{z:7.5,c:grey});y-=8}}
+  else if(D.hr.length>2){sec('Heart rate');await img(g=>dvChartCv(g,60,30,1500,420,D.hr,D.mx,5,false),1600,520)}
+  if(D.L.length){sec('Time in heart-rate zones');const zt=D.zs.reduce((s,x)=>s+x,0)||1;const cols=[M,M+150,M+260,M+340,M+410];['Zone','% HRmax','bpm','Time','Share'].forEach((h,i)=>T(h,cols[i],y,{z:8,f:B,c:grey}));y-=6;
+   DV_Z.forEach(([p,l,c],k)=>{need(18);y-=14;const hi=k<4?DV_Z[k+1][0]:1;pg.drawRectangle({x:M,y:y-3,width:8,height:10,color:hex(c)});T(l,M+12,y,{z:9});T(Math.round(p*100)+'-'+Math.round(hi*100)+' %',cols[1],y,{z:9});T(Math.round(p*D.mx)+'-'+Math.round(hi*D.mx),cols[2],y,{z:9});T(dvClock(D.zs[k]),cols[3],y,{z:9,f:B});
+    const sw=(W-M-cols[4]-34)*D.zs[k]/zt;pg.drawRectangle({x:cols[4],y:y-2,width:W-M-cols[4]-34,height:8,color:lg});if(sw>0)pg.drawRectangle({x:cols[4],y:y-2,width:sw,height:8,color:hex(c)});T(Math.round(D.zs[k]/zt*100)+' %',W-M-28,y,{z:8.5})});y-=12}
+  if(mon&&D.L.length){sec('Weekly summary');const wk={};D.L.forEach(x=>{const dt=new Date(x.date+'T00:00');const m=new Date(dt);m.setDate(dt.getDate()-((dt.getDay()+6)%7));const k=_loc(m);(wk[k]=wk[k]||[]).push(x)});
+   const cols=[M,M+120,M+190,M+260,M+330,M+410];['Week from','Sessions','Time','TRIMP','Hard time','Avg HR'].forEach((h,i)=>T(h,cols[i],y,{z:8,f:B,c:grey}));y-=4;
+   Object.keys(wk).sort().forEach(k=>{const L=wk[k],du=L.reduce((s,x)=>s+(+x.dur||0),0);need(16);y-=14;T(fmtDate(k),cols[0],y);T(String(L.length),cols[1],y);T(dvClock(du),cols[2],y);T(String(L.reduce((s,x)=>s+(+x.trimp||0),0)),cols[3],y,{f:B});T(dvClock(L.reduce((s,x)=>s+((x.zones||[])[3]||0)+((x.zones||[])[4]||0),0)),cols[4],y);T(du?String(Math.round(L.reduce((s,x)=>s+(+x.avg||0)*(+x.dur||0),0)/du)):'-',cols[5],y)});y-=10}
+  if(D.L.length){sec('Sessions');const cols=mon?[M,M+64,M+190,M+246,M+316,M+366,M+404,M+446]:[M,M+50,M+190,M+250,M+330,M+390,M+440];
+   (mon?['Date','Type','Time','Avg / max','TRIMP','RPE','HRR','Zones']:['Start','Type','Time','Avg / max','TRIMP','RPE','HR recovery']).forEach((h,i)=>T(h,cols[i],y,{z:8,f:B,c:grey}));y-=4;
+   D.L.forEach(x=>{need(16);y-=14;let i=0;if(mon)T(fmtDate(x.date).replace(/ \d{4}$/,''),cols[i++],y,{z:8.5});else T(x.time||'',cols[i++],y);T(String(x.type||'').slice(0,mon?22:26),cols[i++],y,{z:mon?8.5:9});T(dvClock(+x.dur||0),cols[i++],y);T(x.avg+' / '+x.max,cols[i++],y,{f:B});T(String(x.trimp),cols[i++],y);T(x.rpe!=null?String(x.rpe):'-',cols[i++],y);T(x.hrr!=null?(x.hrr>=0?'-':'+')+Math.abs(x.hrr)+(mon?'':' bpm'):'-',cols[i++],y);
+    if(mon){const zt=(x.zones||[]).reduce((s,v)=>s+v,0)||1;let bx=cols[7];(x.zones||[]).forEach((s,k)=>{const w=(W-M-cols[7])*s/zt;if(w>0)pg.drawRectangle({x:bx,y:y-1,width:w,height:7,color:hex(DV_Z[k][2])});bx+=w})}});y-=10}
+  sec('What it means');const zi=D.zs.indexOf(Math.max(...D.zs)),hard=D.zs[3]+D.zs[4],tot=D.zs.reduce((s,x)=>s+x,0)||1;const H2=D.L.filter(x=>x.hrr!=null);
+  const notes=mon?[D.L.length?`${D.L.length} sessions on ${tDays} days; most time in ${DV_Z[zi][1]} (${DV_Z[zi][3].toLowerCase()}); ${Math.round(hard/tot*100)} % of training time was hard (Z4-Z5).`:'No heart-rate sessions this month.',
+    prev&&prev.trimp?`Training load ${D.trimp>=prev.trimp?'rose':'fell'} ${Math.abs(Math.round((D.trimp-prev.trimp)/prev.trimp*100))} % compared with ${dvMonthName(prev.key)} (${prev.trimp} -> ${D.trimp} AU). Large month-to-month jumps raise injury risk; aim for steady progress.`:'',
+    H2.length>=4?(()=>{const h=Math.ceil(H2.length/2),a1=H2.slice(0,h).reduce((s,x)=>s+ +x.hrr,0)/h,a2=H2.slice(h).reduce((s,x)=>s+ +x.hrr,0)/(H2.length-h);return `Heart-rate recovery ${a2>=a1?'improved':'dropped'} from ${a1.toFixed(0)} to ${a2.toFixed(0)} bpm in 60 s across the month – ${a2>=a1?'a sign of better fitness':'check fatigue, sleep and load'}.`})():'',
+    D.V.length>=6?(()=>{const h=Math.ceil(D.V.length/2),a1=D.V.slice(0,h).reduce((s,x)=>s+ +x.ln,0)/h,a2=D.V.slice(h).reduce((s,x)=>s+ +x.ln,0)/(D.V.length-h);return `Morning HRV ${a2>=a1-0.05?'stayed stable or rose':'went down'} (ln RMSSD ${a1.toFixed(2)} -> ${a2.toFixed(2)}).`})():'Do a 2-minute HRV test every morning to follow recovery.']
+   :[D.L.length?`Most time in ${DV_Z[zi][1]} (${DV_Z[zi][3].toLowerCase()}); ${Math.round(hard/tot*100)} % of the session was hard (Z4-Z5).`:'',
+    D.trimp?`Training load today: TRIMP ${D.trimp} AU${D.L.some(x=>x.rpe!=null)?' – the session RPE load is in Load Monitoring.':'. Add a session RPE to send it to Load Monitoring.'}`:'',
+    D.hrr!=null?`Heart-rate recovery ${Math.abs(D.hrr)} bpm in 60 s (${dvHrrTxt(D.hrr)}). Compare it with the same test on other days: a rising value shows better fitness, a falling value can show fatigue.`:'',
+    D.hrv?dvHrvStatus(D.a.id,+D.hrv.ln).d:'Do a 2-minute HRV test every morning to follow recovery.'];
+  notes.filter(Boolean).forEach(n=>{wrap('- '+n,F,9,W-2*M).forEach(l=>{need(13);T(l,M,y,{z:9});y-=12});y-=2});
+  need(40);y-=8;wrap('Methods: zones in % of HRmax; TRIMP (Edwards 1993; Banister 1991); energy estimate (Keytel 2005); heart-rate recovery (Daanen 2012); HRV RMSSD vs 7-day baseline (Plews 2013). Heart-rate data guide training; they are not a medical diagnosis.',F,7,W-2*M).forEach(l=>{T(l,M,y,{z:7,c:grey});y-=9});
+  doc.getPages().forEach((p,i,A)=>p.drawText(fcTx(`Page ${i+1} of ${A.length}  ·  BIOMOTOR Device Nexus`),{x:M,y:22,size:7,font:F,color:grey}));
+  const bytes=await doc.save();await dvDownload(bytes,dvFile(D,mon?'monthly_report':'daily_report','pdf'),'application/pdf');toast(mon?'Monthly report ready':'Daily report ready')}
+ catch(e){console.error(e);toast('PDF failed: '+(e.message||e))}}
+function dvRepCard(aid){if(!aid)return '';const H=dvList(aid,'HR'),V=dvHrvList(aid);const days=[...new Set(H.map(x=>x.date).concat(V.map(x=>x.date)))].sort().reverse();
+ if(!DV.rep.date)DV.rep.date=H.map(x=>x.date).sort().reverse()[0]||today();if(!DV.rep.month)DV.rep.month=(H.map(x=>x.date).sort().reverse()[0]||today()).slice(0,7);
+ const mon=DV.rep.mode==='month',D=dvRange(aid,DV.rep.mode,dvRepKey());setTimeout(dvCardPaint,30);
+ const months=[];{const x=new Date(today().slice(0,7)+'-01T00:00');for(let i=0;i<18;i++){const k=_loc(x).slice(0,7);months.push(k);x.setMonth(x.getMonth()-1)}}
+ const mCount=k=>H.filter(x=>x.date.slice(0,7)===k).length;
+ const seg=(k,l)=>`<button class="btn sm ${DV.rep.mode===k?'pri':''}" data-ro-ok onclick="dvRepSet('mode','${k}')">${l}</button>`;
+ return `<div class="card"><h3 style="margin-top:0">📄 Reports &amp; photo card</h3><p class="muted" style="margin:-4px 0 12px;font-size:13px">Choose a day or a month, add your own photo – heart rate, zones and load are drawn on it. Download the photo card (PNG) to share, or the full PDF report.</p>
+ <div class="row" style="gap:6px;margin-bottom:12px">${seg('day','📅 Daily / any date')}${seg('month','🗓 Monthly')}</div>
+ <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start"><canvas id="dvCard" data-aid="${esc(aid)}" style="width:min(100%,320px);aspect-ratio:1080/1350;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.18);background:var(--card2)"></canvas>
+ <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:10px">
+ ${mon?`<div><label>Month</label><select data-ro-ok onchange="dvRepSet('month',this.value)">${months.map(k=>`<option value="${k}" ${k===DV.rep.month?'selected':''}>${dvMonthName(k)}${mCount(k)?' · '+mCount(k)+' sessions':''}</option>`).join('')}</select></div>`
+  :`<div><label>Date</label><div class="row" style="gap:6px"><input type="date" data-ro-ok value="${DV.rep.date}" max="${today()}" onchange="if(this.value)dvRepSet('date',this.value)" style="width:auto"><button class="btn sm" data-ro-ok onclick="dvRepSet('date',today())">Today</button></div></div>
+  ${days.length?`<div class="row" style="gap:4px;flex-wrap:wrap"><span class="muted" style="font-size:12px">Days with data:</span>${days.slice(0,8).map(d=>`<button class="btn sm ${d===DV.rep.date?'pri':''}" data-ro-ok style="padding:3px 9px;font-size:12px" onclick="dvRepSet('date','${d}')">${fmtDate(d).replace(/ \d{4}$/,'')}</button>`).join('')}</div>`:''}
+  ${D.S.length>1?`<div><label>Session</label><select data-ro-ok onchange="dvRepSet('sel',this.value)"><option value="all">All ${D.S.length} sessions</option>${D.S.map(x=>`<option value="${esc(x.id)}" ${String(x.id)===String(DV.rep.sel)?'selected':''}>${esc(x.time||'')} · ${esc(x.type||'')} · ${dvClock(+x.dur||0)}</option>`).join('')}</select></div>`:''}`}
+  <label class="btn" data-ro-ok style="text-align:center;cursor:pointer">📸 ${DV.rep.photo?'Change photo':'Choose / take photo'}<input type="file" accept="image/*" data-ro-ok style="display:none" onchange="dvPhotoPick(this)"></label>
+  ${DV.rep.photo?`<button class="btn sm" data-ro-ok onclick="DV.rep.photo=null;render()">✕ Remove photo</button>`:''}
+  <button class="btn pri" data-ro-ok onclick="dvCardPng('${esc(aid)}')" ${D.L.length?'':'disabled'}>⬇ ${mon?'Monthly':'Daily'} photo card (PNG)</button>
+  <button class="btn pri" data-ro-ok onclick="dvPdf('${esc(aid)}')" ${D.L.length||D.V.length?'':'disabled'}>📄 ${mon?'Monthly':'Daily'} report (PDF)</button>
+  <div class="muted" style="font-size:12px">${D.L.length?`${D.title}: ${D.L.length} session(s) · ${dvClock(D.dur)} · TRIMP ${D.trimp}`:`${D.title}: no heart-rate session.`}${D.V.length?` · ${D.V.length} HRV test(s)`:''}<br>Your photo stays on this device – it is only used inside the card and the PDF.</div>
+ </div></div></div>`}
+function dvCardFrom(aid,id,date){closeModal();DV.tab='hist';DV.aid=aid;DV.rep.mode='day';DV.rep.date=date;DV.rep.sel=id;render();setTimeout(()=>{const c=document.getElementById('dvCard');if(c)c.scrollIntoView({behavior:'smooth',block:'center'})},120)}
+/* ---------- navigation ---------- */
+(function(){dvInit();try{SKI.plug='<path d="M9 3v5M15 3v5"/><path d="M6 8h12v3a6 6 0 0 1-12 0z"/><path d="M12 17v4"/>'}catch(e){}
+ const i=NAV.findIndex(g=>g[0]==='LOAD');NAV.splice(i>=0?i+1:NAV.length-1,0,['DEVICES',[['devices','Device Nexus']]]);TITLES.devices='Device Nexus';TITLES['my-devices']='Device Nexus';
+ try{SKMAP.devices='plug';SKMAP['my-devices']='plug';SKGRP.DEVICES='Devices'}catch(e){}
+ try{const g=ATH_NAV.find(x=>x[0]==='MY TRAINING');if(g&&!g[1].some(x=>x[0]==='my-devices'))g[1].push(['my-devices','Device Nexus']);if(!PORTAL_PAGES.includes('my-devices'))PORTAL_PAGES.push('my-devices')}catch(e){}
+ window.addEventListener('hashchange',()=>setTimeout(dvPaint,50))})();
 skBoot();
