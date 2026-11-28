@@ -8015,7 +8015,7 @@ async function axdPdf(aid) { const a = byId('athletes', aid); if (!a) return; to
 
 /* ============ AUTO UPDATE (a new version was published → the app reloads itself when nobody is typing) ============ */
 /* BM_APP_VER must equal VERSION in sw.js – both change with every release. */
-const BM_APP_VER='biomotor-v72-2026-11-28';
+const BM_APP_VER='biomotor-v73-2026-11-28';
 var UPD={shown:false,t:null};
 function updCheck(){if(UPD.shown||!/^https?:$/.test(location.protocol)||globalThis.BIOMOTOR_NATIVE)return;
  fetch('sw.js?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{const m=String(t).match(/VERSION\s*=\s*'([^']+)'/);if(!m||m[1]===BM_APP_VER)return;
@@ -8106,10 +8106,10 @@ async function dvDisconnect(k){const d=DV.devs.find(x=>x.k===k);if(!d)return;if(
 /* ---- data ---- */
 function dvOnData(d,dv){const p=dvParseHR(dv);if(!p)return;d.last=Date.now();d.contact=p.contact;if(p.hr>0)d.bpm=p.hr;
  p.rr.forEach(x=>{d.rrBuf.push(x);if(d.rrBuf.length>90)d.rrBuf.shift()});if(d.rec&&!d.rec.done)p.rr.forEach(x=>d.rec.rr.push(x));
- const el=document.getElementById('dvB_'+d.k);if(el)el.textContent=d.bpm||'—'}
+ dvBeatQueue(d,p.rr,p.hr);const el=document.getElementById('dvB_'+d.k);if(el)el.textContent=d.bpm||'—'}
 const dvLive=d=>d.status==='on'&&Date.now()-d.last<3000&&d.bpm>0&&d.contact!==false;
 function dvTicker(){const on=DV.devs.length>0;if(on&&!DV.tick){DV.tick=setInterval(dvSecond,1000)}else if(!on&&DV.tick){clearInterval(DV.tick);DV.tick=null}}
-function dvSecond(){DV.devs.forEach(d=>{const live=dvLive(d);d.hist.push(live?d.bpm:null);if(d.hist.length>180)d.hist.shift();const R=d.rec;if(!R||R.done)return;
+function dvSecond(){DV.devs.forEach(d=>{try{dvWarnCheck(d)}catch(e){}const live=dvLive(d);d.hist.push(live?d.bpm:null);if(d.hist.length>180)d.hist.shift();const R=d.rec;if(!R||R.done)return;
   if(R.mode==='hr'){if(R.phase==='rec'){R.rs++;R.rhr.push(live?d.bpm:null);if(R.rs>=60)dvRecDone(d);return}
    R.sec++;R.hr.push(live?d.bpm:null);if(live){const a=dvAth(R.aid),z=dvZone(d.bpm,dvHRmax(a).v);if(z)R.zs[z-1]++;R.kcal+=dvKcalMin(a,d.bpm)/60}}
   else{R.sec++;if(R.sec===R.settle)R.rr.length=0;if(R.sec>=R.settle+R.dur){R.done=true;dvHrvDone(d)}}});
@@ -8148,7 +8148,7 @@ function dvPaint(){if(location.hash!=='#devices'&&location.hash!=='#my-devices')
  DV.devs.forEach(d=>{const a=dvAth(d.aid),mx=dvHRmax(a).v,live=dvLive(d),pct=live?d.bpm/mx:0,z=live?dvZone(d.bpm,mx):0,R=d.rec;
   const set=(id,v,prop='innerHTML')=>{const e=document.getElementById(id+'_'+d.k);if(e&&e[prop]!==v)e[prop]=v};
   set('dvB',live?String(d.bpm):'—','textContent');set('dvP',live?Math.round(pct*100)+' % HRmax':'','textContent');set('dvGa',dvGauge(pct));
-  set('dvZ',live?`<span style="background:${dvZc(z)};color:#fff;border-radius:999px;padding:3px 10px;font-weight:700">${z?DV_Z[z-1][1]:'Below Z1'}</span> <span class="muted">${z?DV_Z[z-1][3]:'Rest / very easy'}</span>`:`<span class="muted">${d.status==='connecting'?'Connecting…':d.status==='on'?(d.contact===false?'No skin contact – wet the strap':'Waiting for heart beat…'):'Disconnected'}</span>`);
+  set('dvZ',live?`<span style="background:${z?dvZc(z):'#475569'};color:#fff;border-radius:999px;padding:3px 10px;font-weight:700">${z?DV_Z[z-1][1]:'Below Z1'}</span> <span class="muted">${z?DV_Z[z-1][3]:'Rest / very easy'}</span>`:`<span class="muted">${d.status==='connecting'?'Connecting…':d.status==='on'?(d.contact===false?'No skin contact – wet the strap':'Waiting for heart beat…'):'Disconnected'}</span>`);
   const h=document.getElementById('dvH_'+d.k);if(h){h.style.animationDuration=live?(60/d.bpm).toFixed(2)+'s':'0s';h.style.color=live?dvZc(z):'var(--muted)'}
   const card=document.getElementById('dvC_'+d.k);if(card){card.style.borderColor=z?dvZc(z):'var(--line)';card.style.boxShadow=z?`0 10px 30px ${dvZc(z)}33`:''}
   set('dvS',(d.status==='on'?'<span class="dvdot"></span>Connected':d.status==='connecting'?'○ Connecting…':'○ Disconnected')+(d.batt!=null?` · 🔋 ${d.batt} %`:''));
@@ -8175,15 +8175,15 @@ function dvDraw(d,mx){const c=document.getElementById('dvG_'+d.k);if(!c)return;c
  const lv=h[h.length-1];if(lv>0){const z=dvZone(lv,mx);g.fillStyle=dvZc(z);g.beginPath();g.arc(W-8,Y(lv),8,0,7);g.fill();g.fillStyle=css.getPropertyValue('--card')||'#fff';g.beginPath();g.arc(W-8,Y(lv),4,0,7);g.fill()}}
 /* ---- recording ---- */
 function dvStart(k,mode){const d=DV.devs.find(x=>x.k===k);if(!d)return;if(!d.aid)return toast('Choose the athlete first');if(d.status!=='on')return toast('Device is not connected');
- const dur=+((document.getElementById('dvHd_'+k)||{}).value||120);d.rec={mode,aid:d.aid,t0:Date.now(),sec:0,hr:[],rr:[],zs:[0,0,0,0,0],kcal:0,phase:'run',rs:0,rhr:[],settle:mode==='hrv'?30:0,dur,done:false};render();dvWake()}
+ const dur=+((document.getElementById('dvHd_'+k)||{}).value||120);d.rec={mode,aid:d.aid,t0:Date.now(),sec:0,hr:[],rr:[],zs:[0,0,0,0,0],kcal:0,phase:'run',rs:0,rhr:[],settle:mode==='hrv'?30:0,dur,done:false};dvSfx('start');render();dvWake()}
 function dvStartAll(){let n=0;DV.devs.forEach(d=>{if(!d.rec&&d.aid&&d.status==='on'){dvStart(d.k,'hr');n++}});toast(n?`⏺ ${n} session(s) started`:'Connect straps and choose athletes first')}
 function dvStop(k){const d=DV.devs.find(x=>x.k===k);if(!d||!d.rec)return;const R=d.rec;
  if(R.mode==='hrv'){R.done=true;if(R.sec<R.settle+60){d.rec=null;render();return toast('HRV test stopped (needs at least 1 minute of measuring)')}return dvHrvDone(d)}
  if(R.phase==='rec')return dvRecDone(d);
  if(R.hr.filter(x=>x>0).length<30){d.rec=null;render();return toast('Too short – nothing saved')}
  // 60-s heart-rate recovery: athlete stops, stands still; the drop in 60 s is saved with the session
- R.phase='rec';R.rs=0;R.hrStop=dvLive(d)?d.bpm:(R.hr.filter(x=>x>0).slice(-1)[0]||0);render();toast('💓 60-s heart-rate recovery – athlete stands still')}
-function dvRecDone(d){const R=d.rec;if(!R)return;R.done=true;const L=R.rhr.filter(x=>x>0);const end=L.length?Math.round(L.slice(-5).reduce((s,x)=>s+x,0)/Math.min(5,L.length)):NaN;R.hrr=R.rs>=55&&isFinite(end)?R.hrStop-end:null;dvSaveDlg(d)}
+ dvSfx('stop');R.phase='rec';R.rs=0;R.hrStop=dvLive(d)?d.bpm:(R.hr.filter(x=>x>0).slice(-1)[0]||0);render();toast('💓 60-s heart-rate recovery – athlete stands still')}
+function dvRecDone(d){const R=d.rec;if(!R)return;R.done=true;dvSfx('done');const L=R.rhr.filter(x=>x>0);const end=L.length?Math.round(L.slice(-5).reduce((s,x)=>s+x,0)/Math.min(5,L.length)):NaN;R.hrr=R.rs>=55&&isFinite(end)?R.hrStop-end:null;dvSaveDlg(d)}
 function dvHrSummary(R){const a=dvAth(R.aid),mx=dvHRmax(a).v,rest=dvHRrest(a),v=R.hr.filter(x=>x>0);if(v.length<30)return null;const zs=[0,0,0,0,0];let ban=0,kc=0;const fem=/^f/i.test((a&&a.gender)||'');
  v.forEach(h=>{const z=dvZone(h,mx);if(z)zs[z-1]++;const r=Math.max(0,Math.min(1,(h-rest)/(mx-rest)));ban+=r*(fem?0.86*Math.exp(1.67*r):0.64*Math.exp(1.92*r))/60;kc+=dvKcalMin(a,h)/60});
  const ed=zs.reduce((s,x,i)=>s+x/60*(i+1),0);const ds=[];for(let i=0;i<R.hr.length;i+=5){const w=R.hr.slice(i,i+5).filter(x=>x>0);ds.push(w.length?Math.round(w.reduce((s,x)=>s+x,0)/w.length):0)}
@@ -8207,7 +8207,7 @@ function dvHrvCalc(rr){const c=dvRRclean(rr);if(c.length<40)return null;let s=0;
  const sd=Math.sqrt(c.reduce((a,x)=>a+(x-m)**2,0)/(c.length-1));return {rmssd:+rmssd.toFixed(1),ln:+Math.log(rmssd).toFixed(2),sdnn:+sd.toFixed(1),mhr:Math.round(60000/m),n:c.length,art:+((rr.length-c.length)/Math.max(1,rr.length)*100).toFixed(1),tach:c.slice(-120).map(x=>Math.round(x))}}
 function dvTacho(rr,w=520,h=90){if(rr.length<3)return '';const lo=Math.min(...rr),hi=Math.max(...rr);const p=rr.map((x,i)=>`${i?'L':'M'}${(i/(rr.length-1)*w).toFixed(1)} ${(h-4-(x-lo)/Math.max(1,hi-lo)*(h-8)).toFixed(1)}`).join(' ');
  return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="display:block"><path d="${p}" fill="none" stroke="#8b5cf6" stroke-width="1.8"/></svg><div class="muted" style="font-size:11px">beat-to-beat RR intervals (${lo}–${hi} ms) – breathing makes the waves</div>`}
-function dvHrvDone(d){const R=d.rec;const H=dvHrvCalc(R.rr);d.rec=null;if(!H){render();return modal(`<h3 style="margin-top:0">HRV test</h3><p>Not enough clean beats were received. Check the strap is wet and tight, stay still, and try again.</p><button class="btn" data-ro-ok onclick="closeModal()">OK</button>`)}
+function dvHrvDone(d){const R=d.rec;const H=dvHrvCalc(R.rr);dvSfx('done');d.rec=null;if(!H){render();return modal(`<h3 style="margin-top:0">HRV test</h3><p>Not enough clean beats were received. Check the strap is wet and tight, stay still, and try again.</p><button class="btn" data-ro-ok onclick="closeModal()">OK</button>`)}
  const dt=new Date(R.t0),S=Object.assign({date:_loc(dt),time:dt.toTimeString().slice(0,5),dur:R.dur,dev:d.name},H);const st=dvHrvStatus(R.aid,S.ln);
  modal(`<h3 style="margin-top:0">HRV result · ${esc((dvAth(R.aid)||{}).name||'')}</h3><div class="dvtiles">${[['RMSSD',S.rmssd,'ms'],['ln RMSSD',S.ln,''],['Resting HR',S.mhr,'bpm'],['SDNN',S.sdnn,'ms'],['Beats',S.n,S.art+' % removed']].map(([l,x,u])=>`<div class="dvtile"><span>${l}</span><b>${x}</b><small>${u}</small></div>`).join('')}</div>
   <div style="margin:12px 0;padding:12px;border-radius:14px;background:${st.c}18;border:1px solid ${st.c}55"><b style="color:${st.c}">${st.t}</b><br><span class="muted">${st.d}</span></div>${dvTacho(S.tach)}
@@ -8291,14 +8291,14 @@ function dvDevCard(d,aths,lockAth){const R=d.rec,a=dvAth(d.aid),mx=dvHRmax(a);
   :`<span class="pill p-blue" id="dvT_${d.k}"></span><span class="muted" id="dvA_${d.k}" style="font-size:12.5px"></span><button class="btn" data-ro-ok onclick="dvStop('${d.k}')">${R.mode==='hr'?'Skip → report':'■ Stop'}</button>`)
   :`<button class="btn pri" data-ro-ok onclick="dvStart('${d.k}','hr')" ${d.status==='on'?'':'disabled'}>⏺ Start session</button><span class="row" style="gap:4px"><button class="btn" data-ro-ok onclick="dvStart('${d.k}','hrv')" ${d.status==='on'?'':'disabled'}>🫀 HRV test</button><select id="dvHd_${d.k}" data-ro-ok style="width:auto"><option value="60">1 min</option><option value="120" selected>2 min</option><option value="300">5 min</option></select></span>`;
  return `<div class="card dvcard" id="dvC_${d.k}" style="margin:0;border-width:2px"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><div><b>${esc(d.name)}</b><div class="muted" style="font-size:12px" id="dvS_${d.k}"></div></div>
- <div class="row" style="gap:6px">${d.status==='off'?`<button class="btn sm" data-ro-ok onclick="dvReconnect('${d.k}')">↻ Reconnect</button>`:''}<button class="btn sm" data-ro-ok onclick="dvDisconnect('${d.k}')" aria-label="Disconnect">✕</button></div></div>
+ <div class="row" style="gap:6px"><button class="btn sm ${DV.snd.beat&&dvBeatDev()===d?'pri':''}" data-ro-ok onclick="dvBeatPick('${d.k}')" title="Heartbeat sound for this strap" aria-label="Heartbeat sound">${DV.snd.beat&&dvBeatDev()===d?'🔊':'🔈'}</button>${d.status==='off'?`<button class="btn sm" data-ro-ok onclick="dvReconnect('${d.k}')">↻ Reconnect</button>`:''}<button class="btn sm" data-ro-ok onclick="dvDisconnect('${d.k}')" aria-label="Disconnect">✕</button></div></div>
  <div class="row" style="margin:8px 0;gap:8px;flex-wrap:wrap">${sel}<span class="muted" style="font-size:12px">HRmax ${mx.v} (${esc(mx.src)})</span></div>
  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div class="dvgw"><div id="dvGa_${d.k}">${dvGauge(0)}</div><div class="dvgc"><span class="dvheart" id="dvH_${d.k}">❤</span><span class="dvnum" id="dvB_${d.k}">—</span><span class="muted" style="font-size:11px;line-height:1.2;text-align:center">bpm<br><span id="dvP_${d.k}"></span></span></div></div>
  <div style="flex:1;min-width:160px"><div id="dvZ_${d.k}" style="font-size:12.5px;margin-bottom:6px;line-height:1.9"></div><div id="dvZl_${d.k}"></div><div class="muted" style="font-size:11.5px;margin-top:4px" id="dvR_${d.k}"></div></div></div>
  ${R&&R.mode==='hr'&&R.phase!=='rec'?`<div class="dvtiles" id="dvTiles_${d.k}" style="margin:10px 0"></div>`:''}
  <canvas id="dvG_${d.k}" style="width:100%;height:110px;display:block;border-radius:12px;background:var(--card2);margin-top:8px"></canvas>
  <div class="muted" style="font-size:11px;margin:3px 0 10px">last 3 minutes · line colour = training zone</div><div class="row" style="gap:8px;flex-wrap:wrap">${ctl}</div></div>`}
-function dvLivePage(aths,lockAth){return dvSupportBar()+dvCatalog()+(DV.devs.length?`<div class="row" style="justify-content:space-between;margin:6px 0 10px"><h3 style="margin:0">Connected devices (${DV.devs.length})</h3>${!lockAth&&DV.devs.length>1?`<button class="btn" data-ro-ok onclick="dvStartAll()">⏺ Start all</button>`:''}</div><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:12px">${DV.devs.map(d=>dvDevCard(d,aths,lockAth)).join('')}</div>`
+function dvLivePage(aths,lockAth){return dvSupportBar()+dvCatalog()+dvSoundBar()+(DV.devs.length?`<div class="row" style="justify-content:space-between;margin:6px 0 10px"><h3 style="margin:0">Connected devices (${DV.devs.length})</h3>${!lockAth&&DV.devs.length>1?`<button class="btn" data-ro-ok onclick="dvStartAll()">⏺ Start all</button>`:''}</div><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:12px">${DV.devs.map(d=>dvDevCard(d,aths,lockAth)).join('')}</div>`
  :`<div class="card"><p class="muted" style="margin:0">No device connected. Put the strap on (wet electrodes), then tap <b>+ Connect</b> on Heart-rate strap.</p></div>`)+(DV.log.length?`<details style="margin-top:12px"><summary class="muted">Connection log</summary><pre style="font-size:11.5px;white-space:pre-wrap">${esc(DV.log.join('\n'))}</pre></details>`:'')}
 function dvWallPage(){const L=DV.devs.slice().sort((x,y)=>{const a=dvAth(x.aid),b=dvAth(y.aid);return String(a?a.name:'~').localeCompare(String(b?b.name:'~'))});
  return `<div id="dvWall"><div class="row" style="justify-content:space-between;margin-bottom:12px"><span class="muted">${L.length} device(s) · colours = training zones</span><button class="btn" data-ro-ok onclick="const e=document.getElementById('dvWall');(e.requestFullscreen||e.webkitRequestFullscreen||function(){}).call(e)">⛶ Full screen (TV)</button></div>
@@ -8333,6 +8333,40 @@ P['my-devices']=()=>{dvInit();const me=authUser();const {a}=axCur(me);if(!a)retu
  DV.devs.forEach(d=>{if(!d.rec)d.aid=a.id});if(DV.tab==='wall')DV.tab='live';setTimeout(dvPaint,0);
  return dvCss()+axHead(me,'Device Nexus','Connect your heart-rate strap (Polar H10 and others) – live heart rate, zones, recovery and morning HRV.').replace(/<div class="pill p-blue"[^>]*>👁 View only[^<]*<\/div>/,'')+
  dvTabs([['live','Live & connect'],['hist','My history'],['refs','Methods']])+(DV.tab==='hist'?dvHistory(a.id,false):DV.tab==='refs'?dvRefs():dvLivePage([a],true))};
+/* ---- sound: heartbeat in time with the real beats (RR intervals from the strap) + warning sounds ---- */
+DV.snd=(()=>{let o={};try{o=JSON.parse(localStorage.getItem('bm_dv_snd')||'{}')}catch(e){}return Object.assign({beat:false,warn:true,vol:0.7,thr:0.9,dev:''},o)})();
+function dvSndSave(){try{const {beat,warn,vol,thr}=DV.snd;localStorage.setItem('bm_dv_snd',JSON.stringify({beat,warn,vol,thr}))}catch(e){}}
+function dvAudio(){try{if(!DV.ac){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;DV.ac=new C()}if(DV.ac.state==='suspended')DV.ac.resume();return DV.ac}catch(e){return null}}
+// one "lub-dub": two short low thumps; a little higher and stronger in the hard zones
+function dvThump(t,z){const ac=DV.ac;if(!ac)return;const v=DV.snd.vol;const f0=55+z*6;[[0,1],[0.12,0.62]].forEach(([dt,k])=>{const o=ac.createOscillator(),g=ac.createGain(),s=t+dt;o.type='sine';o.frequency.setValueAtTime(f0*1.6,s);o.frequency.exponentialRampToValueAtTime(f0,s+0.09);
+  g.gain.setValueAtTime(0.0001,s);g.gain.exponentialRampToValueAtTime(Math.max(0.001,v*k),s+0.008);g.gain.exponentialRampToValueAtTime(0.0001,s+0.16);o.connect(g).connect(ac.destination);o.start(s);o.stop(s+0.18)})}
+function dvTones(seq,type='square'){const ac=dvAudio();if(!ac)return;const t0=ac.currentTime+0.02,v=DV.snd.vol*0.35;seq.forEach(([f,dt,du])=>{const o=ac.createOscillator(),g=ac.createGain(),s=t0+dt;o.type=type;o.frequency.setValueAtTime(f,s);
+  g.gain.setValueAtTime(0.0001,s);g.gain.exponentialRampToValueAtTime(Math.max(0.001,v),s+0.01);g.gain.setValueAtTime(Math.max(0.001,v),s+du-0.03);g.gain.exponentialRampToValueAtTime(0.0001,s+du);o.connect(g).connect(ac.destination);o.start(s);o.stop(s+du+0.02)})}
+const DV_SFX={high:[[880,0,.12],[880,.18,.12],[1175,.36,.22]],max:[[1175,0,.1],[1175,.14,.1],[1175,.28,.1],[1568,.42,.25]],lost:[[660,0,.18],[440,.24,.32]],back:[[440,0,.12],[660,.15,.16]],start:[[523,0,.1],[784,.13,.16]],stop:[[784,0,.1],[523,.13,.18]],done:[[523,0,.1],[659,.12,.1],[784,.24,.2]]};
+function dvSfx(k,vib){if(DV.snd.warn)dvTones(DV_SFX[k],k==='lost'||k==='back'?'triangle':k==='high'||k==='max'?'square':'sine');if(vib&&navigator.vibrate)try{navigator.vibrate(vib)}catch(e){}}
+// heartbeat source: the chosen device, or the only one connected
+const dvBeatDev=()=>DV.devs.find(d=>d.k===DV.snd.dev&&d.status!=='gone')||(DV.devs.length===1?DV.devs[0]:null);
+// schedule one thump per real beat: the RR intervals of each notification are played back in the same rhythm (~1 s behind)
+function dvBeatQueue(d,rr,hr){if(!DV.snd.beat||dvBeatDev()!==d||d.contact===false)return;const ac=DV.ac;if(!ac||ac.state!=='running')return;const now=ac.currentTime;
+ if(!DV.bt||DV.bt<now+0.03||DV.bt>now+2.5)DV.bt=now+0.08;const z=dvZone(hr||d.bpm,dvHRmax(dvAth(d.aid)).v);
+ if(rr&&rr.length){rr.forEach(x=>{if(x<250||x>2200)return;dvThump(DV.bt,z);DV.bt+=x/1000})}
+ else if(hr>0){const iv=60/hr;let n=0;while(DV.bt<now+1.05&&n++<4){dvThump(DV.bt,z);DV.bt+=iv}}}
+// warnings, checked every second for every strap
+function dvWarnCheck(d){const live=dvLive(d),a=dvAth(d.aid),mx=dvHRmax(a).v,pct=live?d.bpm/mx:0,now=Date.now(),nm=a?a.name:d.name;
+ if(d.wasLive&&!live&&d.status!=='connecting'){d.wasLive=false;dvSfx('lost',[300,150,300]);toast(`⚠️ ${nm}: ${d.contact===false?'no skin contact – wet the strap':'heart-rate signal lost'}`);dvFlash(d,'#64748b')}
+ else if(!d.wasLive&&live){if(d.wasLive===false)dvSfx('back');d.wasLive=true}
+ if(!live)return;
+ if(pct>=1&&now-(d.wMax||0)>8000){d.wMax=d.wHi=now;dvSfx('max',[400,100,400,100,400]);toast(`🚨 ${nm}: ${d.bpm} bpm – above HRmax (${mx})`);dvFlash(d,'#dc2626')}
+ else if(pct>=DV.snd.thr&&now-(d.wHi||0)>15000){d.wHi=now;dvSfx('high',[250,120,250]);toast(`⚠️ ${nm}: ${d.bpm} bpm – ${Math.round(pct*100)} % HRmax`);dvFlash(d,'#ef4444')}}
+function dvFlash(d,c){const e=document.getElementById('dvC_'+d.k);if(!e||!e.animate)return;try{e.animate([{boxShadow:`0 0 0 0 ${c}00`},{boxShadow:`0 0 0 10px ${c}aa`},{boxShadow:`0 0 0 0 ${c}00`}],{duration:900,iterations:2})}catch(err){}}
+function dvSndSet(k,v){if(k==='beat'||k==='warn'){dvAudio();DV.snd[k]=v;if(k==='beat'&&v&&!dvBeatDev()&&DV.devs[0])DV.snd.dev=DV.devs[0].k;if(k==='warn'&&v)dvTones(DV_SFX.back,'triangle')}else DV.snd[k]=v;dvSndSave();render()}
+function dvBeatPick(k){dvAudio();if(DV.snd.beat&&DV.snd.dev===k){DV.snd.beat=false}else{DV.snd.beat=true;DV.snd.dev=k}dvSndSave();render()}
+function dvSoundBar(){const S=DV.snd,tg=(k,on,l)=>`<button class="btn sm ${on?'pri':''}" data-ro-ok aria-pressed="${on}" onclick="dvSndSet('${k}',${!on})">${l} ${on?'On':'Off'}</button>`;
+ return `<div class="card" style="padding:10px 14px;margin:0 0 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+ <b style="font-size:14px">🔈 Sound</b>${tg('beat',S.beat,'❤️ Heartbeat')}${tg('warn',S.warn,'⚠️ Warnings')}
+ <label class="row" style="gap:6px;font-size:13px">Volume <input type="range" min="0.1" max="1" step="0.1" value="${S.vol}" data-ro-ok style="width:110px" oninput="DV.snd.vol=+this.value;dvSndSave()" onchange="dvTones(DV_SFX.start,'sine')"></label>
+ <label class="row" style="gap:6px;font-size:13px">Warn at <select data-ro-ok style="width:auto" onchange="dvSndSet('thr',+this.value)">${[[.8,'80 % (Z4)'],[.85,'85 %'],[.9,'90 % (Z5)'],[.95,'95 %']].map(([v,l])=>`<option value="${v}" ${S.thr===v?'selected':''}>${l}</option>`).join('')}</select></label>
+ <span class="muted" style="font-size:12px;flex-basis:100%">Heartbeat plays each real beat from the strap (about 1 s behind)${DV.devs.length>1?' – tap 🔊 on a card to choose whose heart you hear':''}. Warnings: high heart rate, above HRmax, signal lost / back – for every strap. Keep the phone's media volume up.</span></div>`}
 /* ---- reports: daily (any date) and monthly – photo card (own photo + heart-rate overlay, PNG) and PDF ---- */
 DV.rep=DV.rep||{mode:'day',date:'',month:'',sel:'all',photo:null,logo:null};
 const dvMonthName=m=>{const x=new Date(m+'-01T00:00');return isNaN(x)?m:x.toLocaleDateString('en-GB',{month:'long',year:'numeric'})};
