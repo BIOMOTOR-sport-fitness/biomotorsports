@@ -330,6 +330,7 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
     <div id="fb"></div>
     <div class="inds"><span class="ind" id="indStab" style="display:none"></span><span class="ind" id="indPlate" style="display:none"></span><span class="ind" id="indLight" style="display:none"></span></div>
     <div class="tools" id="tools">
+      <button data-tool="cam" title="Camera frame rate and resolution">🎥<small id="tCam">60 · FHD</small></button>
       <button data-tool="plate">◎<small id="tPlate">45 cm</small></button>
       <button data-tool="fb">📣<small>Feedback</small></button>
       <button data-tool="tempo">⏱<small>Tempo</small></button>
@@ -337,6 +338,16 @@ details summary{cursor:pointer;font-weight:600} details ol{padding-left:20px;mar
       <button data-tool="zoom">🔍<small id="tZoom">1×</small></button>
       <button data-tool="rec">⏺<small id="tRec">Rec on</small></button>
       <button data-tool="path" title="Show / hide the bar path">〰<small id="tPath">Path on</small></button>
+    </div>
+    <div class="panel" id="pnl-cam">
+      <b>Camera</b>
+      <div style="font-size:12px;margin:2px 0 8px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.06);line-height:1.45"><b>Accuracy note</b><br>
+      • <b>Higher frame rate = more accurate.</b> 120 or 240 fps records more frames in every rep, so the start, end and peak velocity of each rep are measured more precisely, especially for fast lifts, jumps and throws. 60 fps is the minimum for VBT.<br>
+      • <b>Higher resolution = sharper video.</b> Full HD is enough for tracking; 4K / 8K give a clearer recording and help when the plate is small or far away, but add little tracking accuracy and make files bigger and the phone warmer.<br>
+      • Accuracy also needs: tripod, side-on view at bar height, good light, the plate fully in frame.</div>
+      <div style="font-size:13px;margin-top:4px">Frame rate</div><div class="seg" id="camFpsSeg" style="margin:4px 0 8px;flex-wrap:wrap"></div>
+      <div style="font-size:13px">Resolution</div><div class="seg" id="camResSeg" style="margin:4px 0 8px;flex-wrap:wrap"></div>
+      <div class="muted" id="camInfo" style="font-size:12px"></div>
     </div>
     <div class="panel" id="pnl-plate">
       <b>What to track</b>
@@ -2971,14 +2982,14 @@ async function startCamera() {
   if (T.set) await endSet();
   stopSource();
   try {
-    const st = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: ST_().facing }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60 } } });
+    const st = await camOpen();
     T.stream = st; video.srcObject = st; T.mode = 'camera';
     await video.play();
     if (!video.videoWidth) await new Promise(r => video.addEventListener('loadedmetadata', r, { once: true }));
     $('#fileCtl').style.display = 'none';
     await applyZoom(false);
-    const s = st.getVideoTracks()[0].getSettings(); T.camFps = s.frameRate || 30;
-    $('#srcTag').textContent = `camera ${s.width || video.videoWidth}×${s.height || video.videoHeight} · ${Math.round(s.frameRate || 30)} fps`;
+    const s = st.getVideoTracks()[0].getSettings(); T.camFps = s.frameRate || 30; T.camGot = { w: s.width || video.videoWidth, h: s.height || video.videoHeight, fps: Math.round(s.frameRate || 30) };
+    $('#srcTag').textContent = `camera ${T.camGot.w}×${T.camGot.h} · ${T.camGot.fps} fps`; camReport();
     sourceReady();
   } catch (e) { camBlocked(e && e.name === 'NotAllowedError' ? 'Camera permission was denied or is blocked in this view.' : 'Camera could not start (' + (e && e.name || e) + ').'); }
 }
@@ -3618,7 +3629,7 @@ function startSet() {
   if (T.pos) { T.y0 = T.pos.y; T.x0 = T.pos.x; } T.buf = { t: [], y: [], x: [] };
   setHUD(null);
   showFB('info', `${ref.e.name} · ${s.load} kg × ${s.reps}`, T.tracker ? (s.vMax < 5 ? `Target ${fmt(s.vMin)}–${fmt(s.vMax)} m/s · go when ready` : 'Go when ready') : 'Recording – the plate is found when the bar moves', 2500);
-  if (T.mode === 'camera') { T.recorder = startRecording(T.stream); T.set.recT0 = T.recorder ? T.recorder._t0 : null; }
+  if (T.mode === 'camera') { T.recorder = startRecording(T.stream, camBps()); T.set.recT0 = T.recorder ? T.recorder._t0 : null; }
   clearInterval(T.metro); if (ST_().tempo.on && can('tempo')) { beep('tick'); T.metro = setInterval(() => beep('tick'), 1000); }
   updateCTA();
 }
@@ -4108,13 +4119,38 @@ function updatePlateInfo() { const S = ST_(); $('#plateInfo').textContent = T.se
 $('#tools').onclick = async e => {
   const b = e.target.closest('button'); if (!b) return; const t = b.dataset.tool, S = ST_();
   if ((t === 'fb' && locked('feedback')) || (t === 'tempo' && locked('tempo'))) return;
-  if (['plate', 'fb', 'tempo'].includes(t)) { const p = $('#pnl-' + t), was = p.classList.contains('on'); closePanels(); if (!was) { p.classList.add('on'); b.classList.add('on'); renderPanels(); } return; }
+  if (['plate', 'fb', 'tempo', 'cam'].includes(t)) { const p = $('#pnl-' + t), was = p.classList.contains('on'); closePanels(); if (!was) { p.classList.add('on'); b.classList.add('on'); renderPanels(); } return; }
   closePanels();
   if (t === 'rec') { S.rec = !S.rec; save(); renderPanels(); toast(S.rec ? 'Sets will be recorded to the video library' : 'Recording off'); }
   if (t === 'path') { bpToggle(); }
   if (t === 'flip') { if (T.set) return toast('Finish the set first'); S.facing = S.facing === 'user' ? 'environment' : 'user'; save(); renderPanels(); if (T.mode === 'camera') startCamera(); }
   if (t === 'zoom') { if (T.set) return toast('Finish the set first'); S.zoom = S.zoom >= 2 ? 1 : S.zoom === 1 ? 1.5 : 2; save(); renderPanels(); if (T.mode) { await applyZoom(true); } }
 };
+/* ================= camera frame rate + resolution =================
+   Default 60 fps. The browser is asked for the chosen frame rate and size; the phone gives the nearest mode it supports
+   (many phones allow 120 / 240 fps and 4K only in their own camera app, not in a browser) – the panel shows what was really given. */
+const CAM_FPS = [60, 120, 240];
+const CAM_RES = [['FHD', 'Full HD 1080p', 1920, 1080], ['4K', '4K 2160p', 3840, 2160], ['8K', '8K 4320p', 7680, 4320]];
+const camFps = () => CAM_FPS.includes(+ST_().camFps) ? +ST_().camFps : 60; const camRes = () => CAM_RES.find(r => r[0] === ST_().camRes) || CAM_RES[0];
+async function camOpen() { const [, , W, H] = camRes(), f = camFps(), fac = { ideal: ST_().facing };
+  const tries = [{ facingMode: fac, width: { ideal: W }, height: { ideal: H }, frameRate: { ideal: f, min: Math.min(f, 60) } }, { facingMode: fac, width: { ideal: W }, height: { ideal: H }, frameRate: { ideal: f } }, { facingMode: fac, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } }, { facingMode: fac, frameRate: { ideal: 60 } }];
+  let last; for (const v of tries) { try { const st = await navigator.mediaDevices.getUserMedia({ audio: false, video: v }); const tr = st.getVideoTracks()[0];
+      // portrait phones report width / height swapped – also try to lift the frame rate after opening
+      try { const c = tr.getCapabilities ? tr.getCapabilities() : {}; if (c.frameRate && c.frameRate.max && (tr.getSettings().frameRate || 0) < f) await tr.applyConstraints({ frameRate: { ideal: Math.min(f, c.frameRate.max) } }); } catch (e) {}
+      return st; } catch (e) { last = e; if (e && e.name === 'NotAllowedError') throw e; } }
+  throw last; }
+function camBps() { const g = T.camGot || { w: 1280, h: 720, fps: 30 }; return Math.round(Math.min(60e6, Math.max(4e6, g.w * g.h * g.fps * 0.1))); }
+function camCaps() { try { const tr = T.stream && T.stream.getVideoTracks()[0]; return tr && tr.getCapabilities ? tr.getCapabilities() : {}; } catch (e) { return {}; } }
+function camReport() { const g = T.camGot, f = camFps(), R = camRes(), t = $('#tCam'); if (t) t.textContent = (g ? g.fps : f) + ' · ' + (g ? (Math.min(g.w, g.h) >= 4320 ? '8K' : Math.min(g.w, g.h) >= 2160 ? '4K' : Math.min(g.w, g.h) >= 1080 ? 'FHD' : 'HD') : R[0]);
+  if (!g || g.warned) return; g.warned = 1; const short = Math.min(g.w, g.h), want = R[3];
+  const msg = [g.fps + 1 < f ? `${f} fps asked – this camera gives ${g.fps} fps here` : '', short + 8 < want ? `${R[1]} asked – this camera gives ${g.w}×${g.h} here` : ''].filter(Boolean);
+  if (msg.length) toast(msg.join(' · ') + '. For more, record in the phone camera app and use Load video.', 4500); }
+function camPanel() { const c = camCaps(), g = T.camGot, maxF = c.frameRate && c.frameRate.max, maxS = c.width && c.height ? Math.min(c.width.max, c.height.max) : null;
+  seg($('#camFpsSeg'), CAM_FPS.map(f => [String(f), f + ' fps' + (maxF && f > maxF + 1 ? ' ✕' : '')]), String(camFps()), v => camSet({ camFps: +v }));
+  seg($('#camResSeg'), CAM_RES.map(r => [r[0], r[1] + (maxS && r[3] > maxS + 8 ? ' ✕' : '')]), camRes()[0], v => camSet({ camRes: v }));
+  $('#camInfo').innerHTML = (g ? `Now: <b>${g.w}×${g.h} · ${g.fps} fps</b>. ` : '') + (maxF || maxS ? `This camera in the browser: up to ${maxF ? Math.round(maxF) + ' fps' : '?'}${maxS ? ' · ' + (c.width.max + '×' + c.height.max) : ''}. ✕ = not offered here. ` : '') + 'For 120 / 240 fps slow motion or 4K–8K, film in the phone camera app and use <b>Load video</b> – the analysis reads the real frame rate.'; }
+async function camSet(o) { if (T.set) return toast('Finish the set first'); Object.assign(ST_(), o); save(); camPanel(); camReport(); if (T.mode === 'camera') { await startCamera(); camPanel(); } }
+{ const _rp3 = renderPanels; renderPanels = function () { const x = _rp3.apply(this, arguments); try { camPanel(); camReport(); } catch (e) {} return x; }; }
 function bpLabels() { const on = BP.on(); const t = $('#tPath'); if (t) { t.textContent = on ? 'Path on' : 'Path off'; $('[data-tool=path]').classList.toggle('pathoff', !on); } const d = $('#dPath'); if (d) d.textContent = '〰 Bar path: ' + (on ? 'On' : 'Off'); const v = $('#vsShow'); if (v) v.checked = on; }
 function bpToggle(force) { DB.settings.bpShow = force == null ? !BP.on() : !!force; save(); bpLabels(); try { redraw(); } catch (e) {} window.dispatchEvent(new Event('bp-change')); toast(BP.on() ? 'Bar path shown' : 'Bar path hidden'); }
 async function applyZoom(recalib) {
