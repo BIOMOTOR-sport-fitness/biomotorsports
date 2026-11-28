@@ -1463,7 +1463,7 @@ class Tracker {
       fx.push(ox); fy.push(oy);
     }
     this.fx = Float32Array.from(fx); this.fy = Float32Array.from(fy); this.oc = new Map();
-    this.r0 = r; this.rr = r; this.rimN = 0; this.useScale(1);
+    this.r0 = r; this.rr = r; this.rimN = 0; this.rTol = 0.2; this.useScale(1);
     this.x = cx; this.y = cy; this.vx = 0; this.vy = 0; this.lastT = null; this.score = 1;
     const ix = Math.round(cx), iy = Math.round(cy);
     if (!this.inb(ix, iy)) return false;
@@ -1477,7 +1477,7 @@ class Tracker {
   }
   useScale(sc) { const o = this.grid(clamp(sc, 0.6, 1.8)); this.sc = o.k; this.offs = o.offs; this.ext = o.ext; this.S = clamp(Math.round(0.55 * this.r0 * this.sc), 8, 48); }
   // global re-acquisition of the plate template anywhere in the frame (current size first, then larger / smaller)
-  reacquire(g) {
+  reacquire(g, need = 0.55) {
     const keep = this.sc, scales = [keep, ...[0.8, 0.9, 1, 1.15, 1.3, 1.5].map(k => k * (keep > 1.2 ? 1.15 : 1)).filter(k => Math.abs(k - keep) > 0.04)];
     let best = -3, bx = 0, by = 0, bs = keep;
     for (const sc of scales) {
@@ -1486,7 +1486,7 @@ class Tracker {
     }
     this.useScale(bs);
     const cx = bx, cy = by; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const c = this.ncc(g, cx + dx, cy + dy); if (c > best) { best = c; bx = cx + dx; by = cy + dy; } }
-    if (best < 0.55) { this.useScale(keep); return false; }
+    if (best < need) { this.useScale(keep); return false; }
     this.x = bx; this.y = by; this.vx = 0; this.vy = 0; this.score = best; this.lastT = null; return true;
   }
   // fit a circle to the strongest rim edge around (cx, cy): rays → outermost strong edge → Kasa fit with outlier removal, twice
@@ -1502,15 +1502,16 @@ class Tracker {
         if (br > 0) P.push([x + ux * br, y + uy * br]); }
       if (P.length < N * 0.3) return null;
       let Q = P; for (let it = 0; it < 5; it++) { fit = kasa(Q); if (!fit) return null; const res = Q.map(p => Math.abs(Math.hypot(p[0] - fit.x, p[1] - fit.y) - fit.r)), m = [...res].sort((a, b) => a - b)[res.length >> 1]; const Z = Q.filter((p, i) => res[i] <= Math.max(0.8, 2.5 * m)); if (Z.length < N * 0.25 || Z.length === Q.length) break; Q = Z; }
-      sup = Q.length / N; x = fit.x; y = fit.y; R = fit.r; lo = 0.85; hi = 1.15; }
-    if (!fit || Math.abs(fit.r - r) / r > 0.2 || Math.hypot(fit.x - cx, fit.y - cy) > 0.7 * r || sup < 0.3) return null;
+      sup = Q.length / N; x = fit.x; y = fit.y; R = fit.r; lo = 1 - 0.75 * this.rTol; hi = 1 + 0.75 * this.rTol; }
+    if (!fit || Math.abs(fit.r - r) / r > this.rTol || Math.hypot(fit.x - cx, fit.y - cy) > 0.7 * r || sup < 0.3) return null;
     return { x: fit.x, y: fit.y, r: fit.r, support: sup }; }
   // re-find the object near its last position first (avoids jumping to a look-alike elsewhere in the frame)
   reacquireNear(g, rad) {
-    const keep = this.sc, x0 = Math.round(this.x), y0 = Math.round(this.y); let best = -3, bx = x0, by = y0;
-    for (let dy = -rad; dy <= rad; dy += 3) for (let dx = -rad; dx <= rad; dx += 3) { const c = this.ncc(g, x0 + dx, y0 + dy); if (c > best) { best = c; bx = x0 + dx; by = y0 + dy; } }
-    const fit = this.rim ? this.rimFit(g, bx, by, this.rr) : null;
-    if (fit && best > 0.25) { this.x = fit.x; this.y = fit.y; this.vx = this.vy = 0; this.lastT = null; this.useScale(keep); return true; }
+    const keep = this.sc, x0 = Math.round(this.x), y0 = Math.round(this.y); let best = -3, bx = x0, by = y0, bs = -9;
+    // template score minus a distance penalty: a look-alike (a stored plate on the rack) further away cannot win over the real object
+    for (let dy = -rad; dy <= rad; dy += 3) for (let dx = -rad; dx <= rad; dx += 3) { const c = this.ncc(g, x0 + dx, y0 + dy), s = c - 0.12 * Math.hypot(dx, dy) / this.rr; if (s > bs) { bs = s; best = c; bx = x0 + dx; by = y0 + dy; } }
+    const fit = this.rim ? this.rimFit(this.rg || g, bx, by, this.rr) : null;
+    if (fit && best > 0.4 && Math.abs(fit.r - this.rr) < 0.75 * this.rTol * this.rr) { this.x = fit.x; this.y = fit.y; this.vx = this.vy = 0; this.lastT = null; this.useScale(keep); return true; }
     if (best < 0.55) return false; this.x = bx; this.y = by; this.vx = this.vy = 0; this.lastT = null; return true; }
   inb(ix, iy) { return ix - this.ext >= 0 && iy - this.ext >= 0 && ix + this.ext < this.W && iy + this.ext < this.H; }
   sample(g, ix, iy) {
@@ -1552,11 +1553,12 @@ class Tracker {
     // fit the rim around the prediction and around the template match; keep the fit closest to the prediction
     // (a second plate or a look-alike next to the object cannot pull the track away)
     let fit = null;
-    if (this.rim) for (const [cx, cy] of best >= 0.3 && Math.hypot(bx - px, by - py) > 1.5 ? [[px, py], [bx, by]] : [[px, py]]) { const f = this.rimFit(g, cx, cy, this.rr); if (f && (!fit || Math.hypot(f.x - px, f.y - py) < Math.hypot(fit.x - px, fit.y - py))) fit = f; }
+    if (this.rim) for (const [cx, cy] of best >= 0.3 && Math.hypot(bx - px, by - py) > 1.5 ? [[px, py], [bx, by]] : [[px, py]]) { const f = this.rimFit(this.rg || g, cx, cy, this.rr); if (f && (!fit || Math.hypot(f.x - px, f.y - py) < Math.hypot(fit.x - px, fit.y - py))) fit = f; }
+    if (fit && this.rTol < 0.15 && Math.abs(fit.r - this.r0) > 0.15 * this.r0) fit = null; // a much larger / smaller circle is a shadow or a nearby edge, not the rim
     if (fit && Math.hypot(fit.x - px, fit.y - py) < maxJ && (best >= 0.3 || fit.support >= 0.5)) {
       const nx = fit.x, ny = fit.y;
       if (dt > 0) { this.vx = 0.6 * this.vx + 0.4 * (nx - this.x) / dt; this.vy = 0.6 * this.vy + 0.4 * (ny - this.y) / dt; }
-      this.x = nx; this.y = ny; this.lastT = t; if (fit.support > 0.6) this.rr = clamp(0.92 * this.rr + 0.08 * fit.r, 0.75 * this.r0, 1.3 * this.r0); this.rimN++;
+      this.x = nx; this.y = ny; this.lastT = t; if (fit.support > 0.6) this.rr = clamp(0.92 * this.rr + 0.08 * fit.r, (this.rTol < 0.15 ? 0.88 : 0.75) * this.r0, (this.rTol < 0.15 ? 1.12 : 1.3) * this.r0); this.rimN++;
       if (best > 0.8) { const fresh = this.sample(g, Math.round(nx), Math.round(ny)); if (fresh) { let s2 = 0; for (let k = 0; k < fresh.length; k++) { this.tpl[k] = 0.93 * this.tpl[k] + 0.07 * fresh[k]; s2 += this.tpl[k] ** 2; } const inv = 1 / Math.sqrt(s2); for (let k = 0; k < fresh.length; k++) this.tpl[k] *= inv; } }
       this.score = Math.max(best, 0.45 + 0.5 * fit.support); return { ok: true, x: nx, y: ny, score: this.score, sc: this.sc, rim: true };
     }
@@ -2930,6 +2932,16 @@ function setupDims() {
   view.style.display = 'block'; $('#ph').style.display = 'none';
 }
 const drawSrc = (ctx, W, H) => { const c = T.crop; ctx.drawImage(video, c.x, c.y, c.w, c.h, 0, 0, W, H); };
+// colour of a coloured (bumper) plate: mean colour of the ring 0.5–0.85 r; null for black / grey / chrome plates
+function plateColour(d, W, H, cx, cy, r) {
+  let n = 0, R = 0, G = 0, B = 0;
+  for (let y = Math.max(0, Math.round(cy - r)); y <= Math.min(H - 1, Math.round(cy + r)); y++) for (let x = Math.max(0, Math.round(cx - r)); x <= Math.min(W - 1, Math.round(cx + r)); x++) {
+    const q = Math.hypot(x - cx, y - cy) / r; if (q < 0.5 || q > 0.85) continue; const j = (y * W + x) * 4; R += d[j]; G += d[j + 1]; B += d[j + 2]; n++; }
+  if (n < 20) return null; R /= n; G /= n; B /= n;
+  const a = R - G, b = (R + G) / 2 - B; return Math.hypot(a, b) > 45 ? { a, b, Y: 0.299 * R + 0.587 * G + 0.114 * B } : null; }
+// "looks like the plate" image: 255 on the plate colour, falling to 0 away from it — the rim of a coloured plate then has a strong
+// edge all round, even where the grey image shows little contrast (light plate in front of a light wall, plate over the body)
+function colourMap(d, n, pc, out) { for (let i = 0, j = 0; i < n; i++, j += 4) { const R = d[j], G = d[j + 1], B = d[j + 2], da = R - G - pc.a, db = (R + G) / 2 - B - pc.b; out[i] = Math.max(0, 255 - 1.6 * Math.hypot(da, db)); } return out; }
 function toGray(d, n, out) { for (let i = 0, j = 0; i < n; i++, j += 4) out[i] = 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2]; return out; }
 function grabFrame() {
   if (!video.videoWidth || !T.PW) return;
@@ -3729,7 +3741,7 @@ function setWarnings(rec) {
 function frameReader(v, maxDim) {
   const W0 = v.videoWidth, H0 = v.videoHeight, s = maxDim / Math.max(W0, H0), W = Math.round(W0 * s), H = Math.round(H0 * s);
   const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d', { willReadFrequently: true });
-  return { W, H, s, read(out) { x.drawImage(v, 0, 0, W, H); return toGray(x.getImageData(0, 0, W, H).data, W * H, out || new Float32Array(W * H)); } };
+  const o = { W, H, s, rgba: null, read(out) { x.drawImage(v, 0, 0, W, H); o.rgba = x.getImageData(0, 0, W, H).data; return toGray(o.rgba, W * H, out || new Float32Array(W * H)); } }; return o;
 }
 function playFrames(v, rate, onF, until = Infinity) {
   return new Promise(res => {
@@ -3777,15 +3789,33 @@ async function analyzeVideo(blob, opts = {}) {
     let mpp = ((opts.plateCm || ST_().plateCm) / 100) / (2 * (plate.rv || plate.r)), mppH = ((opts.plateCm || ST_().plateCm) / 100) / (2 * (plate.rh || plate.r));
     if (plate.scale) { mpp = mppH = (plate.scale.cm / 100) / plate.scale.px; }
     const light = lightStats(tplGray, FR.W, FR.H, plate.x * FR.s, plate.y * FR.s, plate.r * FR.s);
+    let pc = null; const rgBuf = new Float32Array(n);
+    if (!isJoint) { try { await seekTo(tplT, v); FR.read(); pc = plateColour(FR.rgba, FR.W, FR.H, plate.x * FR.s, plate.y * FR.s, plate.r * FR.s);
+      // use the colour image only if it really shows this object as one round patch of its colour with a clean rim
+      if (pc) { const m = colourMap(FR.rgba, n, pc, rgBuf), cx = plate.x * FR.s, cy = plate.y * FR.s, r = plate.r * FR.s; let a = 0, an = 0, b = 0, bn = 0;
+        for (let y = Math.max(0, Math.round(cy - 1.5 * r)); y <= Math.min(FR.H - 1, Math.round(cy + 1.5 * r)); y++) for (let x = Math.max(0, Math.round(cx - 1.5 * r)); x <= Math.min(FR.W - 1, Math.round(cx + 1.5 * r)); x++) {
+          const q = Math.hypot(x - cx, y - cy) / r, on = m[y * FR.W + x] > 128; if (q < 0.85) { an++; a += on; } else if (q > 1.15 && q < 1.5) { bn++; b += on; } }
+        tk.rTol = 0.12; const f = tk.rimFit(m, cx, cy, tk.rr);
+        if (!(an && a / an > 0.6 && bn && b / bn < 0.2 && f && f.support > 0.6 && Math.hypot(f.x - cx, f.y - cy) < 0.12 * r && Math.abs(f.r - tk.rr) < 0.1 * tk.rr)) { pc = null; tk.rTol = 0.2; } } } catch (e) { pc = null; tk.rTol = 0.2; } }
     const trace = { t: [], y: [], x: [], v: [] }, px = { x: [], y: [] }, stats = { lost: 0, edge: 0, movedEv: 0, motionEv: 0 };
     // 4K and other very large videos: play the tracking pass at half speed, so the phone can read every frame instead of skipping them
     const rate2 = Math.max(v.videoWidth, v.videoHeight) > 1920 ? 0.5 : 1;
-    await seekTo(0, v); const g = new Float32Array(n); let first = true, y0 = null, x0 = null, lostRun = 0;
+    await seekTo(0, v); const g = new Float32Array(n); let first = true, y0 = null, x0 = null, lostRun = 0, waitInit = false;
     await playFrames(v, rate2, t => {
-      FR.read(g); prog(45 + Math.min(54, t / v.duration * 54));
-      if (first) { first = false; if (!isJoint && !tk.reacquire(g)) { tk.x = plate.x * FR.s; tk.y = plate.y * FR.s; } }
+      FR.read(g); if (pc) tk.rg = colourMap(FR.rgba, n, pc, rgBuf); prog(45 + Math.min(54, t / v.duration * 54));
+      if (first) { first = false;
+        // start position: the tapped / detected plate if it was taken from this first frame; otherwise the round object in the
+        // first frame that matches the plate's size and look (never the place where the plate was at a later time)
+        if (!isJoint && tplT > 0.05) {
+          let bc = null, bs = -9;
+          for (const c of detectPlates(g, FR.W, FR.H, 0.3)) { if (Math.abs(c.r - tk.rr) > 0.15 * tk.rr) continue; const f = tk.rimFit(tk.rg || g, c.x, c.y, tk.rr); if (!f || f.support < 0.6) continue; const sc = tk.ncc(g, Math.round(f.x), Math.round(f.y)) + 0.3 * f.support; if (sc > bs) { bs = sc; bc = f; } }
+          if (bc && bs > 0.3) { tk.x = bc.x; tk.y = bc.y; tk.vx = tk.vy = 0; tk.lastT = null; }
+          else if (!tk.reacquire(g, 0.6)) waitInit = true;
+        }
+      }
+      if (waitInit) { if (tk.reacquire(g, 0.6)) waitInit = false; else return; }
       const r = tk.update(g, t);
-      if (!r.ok) { stats.lost++; ++lostRun; if (lostRun % 2 === 0 && !tk.reacquireNear(g, Math.round(Math.min(3.5 * tk.rr, 0.45 * Math.min(FR.W, FR.H))))) { if (lostRun >= 45) tk.reacquire(g); } return; }
+      if (!r.ok) { stats.lost++; ++lostRun; if (lostRun % 2 === 0 && !tk.reacquireNear(g, Math.round(Math.min(tk.rr * (0.8 + 0.1 * lostRun), 3 * tk.rr, 0.45 * Math.min(FR.W, FR.H))))) { if (lostRun >= 90) tk.reacquire(g, 0.7); } return; }
       lostRun = 0;
       const vx = r.x / FR.s, vy = r.y / FR.s; if (y0 === null) { y0 = vy; x0 = vx; }
       trace.t.push(+t.toFixed(4)); trace.y.push(+(-(vy - y0) * mpp).toFixed(5)); trace.x.push(+((vx - x0) * mppH).toFixed(5));
@@ -3800,7 +3830,15 @@ async function analyzeVideo(blob, opts = {}) {
 }
 // zero-phase local quadratic smoothing (Savitzky–Golay style, works with uneven frame times): removes frame-to-frame tracking jitter
 // before velocity is computed – used only for analysed videos (the whole set is available)
-function smoothTrack(T, A, half = 0.1) { const n = T.length, out = new Array(n); let lo = 0, hi = 0;
+// robust version: points that jump away from the local fit (a one-frame mis-fit of the rim, motion blur) are replaced by the
+// fit before the final smoothing, so they cannot create a false peak velocity
+function smoothTrack(T, A, half = 0.1) {
+  let S = smoothTrack0(T, A, half);
+  for (let it = 0; it < 2; it++) {
+    const res = A.map((v, i) => Math.abs(v - S[i])), m = [...res].sort((a, b) => a - b)[res.length >> 1] || 0, thr = Math.max(3.5 * 1.4826 * m, 0.003);
+    let k = 0; const B = A.map((v, i) => res[i] > thr ? (k++, S[i]) : v); if (!k) break; S = smoothTrack0(T, B, half); }
+  return S; }
+function smoothTrack0(T, A, half = 0.1) { const n = T.length, out = new Array(n); let lo = 0, hi = 0;
   for (let i = 0; i < n; i++) { while (T[i] - T[lo] > half) lo++; if (hi < i) hi = i; while (hi + 1 < n && T[hi + 1] - T[i] <= half) hi++;
     let s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, b0 = 0, b1 = 0, b2 = 0;
     for (let j = lo; j <= hi; j++) { const d = T[j] - T[i], d2 = d * d, v = A[j]; s0++; s1 += d; s2 += d2; s3 += d2 * d; s4 += d2 * d2; b0 += v; b1 += v * d; b2 += v * d2; }
